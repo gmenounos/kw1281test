@@ -1,29 +1,36 @@
 ﻿using System;
+using System.Globalization;
 
-namespace BitFab.Kwp1281Test
+namespace BitFab.KW1281Test
 {
     class Program
     {
         static void Main(string[] args)
         {
-            const string portName = "COM4";
+            if (args.Length != 2)
+            {
+                Console.WriteLine("Usage: KW1281Test [PORT] [Address]");
+                return;
+            }
+
+            string portName = args[0];
+            var controllerAddress = int.Parse(args[1], NumberStyles.HexNumber);
 
             Console.WriteLine($"Opening serial port {portName}");
             using (IInterface @interface = new Interface(portName))
             {
-                IKwp1281 kwp1281 = new Kwp1281(@interface);
+                IKW1281Dialog kwp1281 = new KW1281Dialog(@interface);
 
                 Console.WriteLine("Sending wakeup message");
-                kwp1281.WakeUp(0x17);
+                var ecuInfo = kwp1281.WakeUp((byte)controllerAddress);
+                Console.WriteLine($"ECU: {ecuInfo}");
 
-                // Receive ECU identification
-                kwp1281.ReceiveBlocks();
-
-                kwp1281.ReadIdent();
+                var identInfo = kwp1281.ReadIdent();
+                Console.WriteLine($"Ident: {identInfo}");
 
                 kwp1281.CustomUnlockAdditionalCommands();
 
-                // kwp1281.CustomReadSoftwareVersion();
+                kwp1281.CustomReadSoftwareVersion();
 
 #if false
                 for (ushort addr = 0; addr < 2048; addr += 16)
@@ -39,11 +46,9 @@ namespace BitFab.Kwp1281Test
                 }
 #endif
 
-                kwp1281.CustomReadRom(0x10, 0xFF0000);
+                // kwp1281.CustomReadRom(0x10, 0xFF0000);
 
-#if false
-                kwp1281.CustomReset();
-#endif
+                // kwp1281.CustomReset();
 
                 kwp1281.EndCommunication();
             }

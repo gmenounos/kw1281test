@@ -1,13 +1,24 @@
-﻿using BitFab.Kwp1281Test.Blocks;
+﻿using BitFab.KW1281Test.Blocks;
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices.WindowsRuntime;
+using System.Linq;
 
-namespace BitFab.Kwp1281Test
+namespace BitFab.KW1281Test
 {
-    internal interface IKwp1281
+    /// <summary>
+    /// Manages a dialog with a VW module using the KW1281 protocol.
+    /// </summary>
+    internal interface IKW1281Dialog
     {
-        void WakeUp(byte controllerAddress);
+        ModuleInfo WakeUp(byte controllerAddress);
+
+        void EndCommunication();
+
+        ModuleIdent ReadIdent();
+
+        void ReadEeprom(byte count, ushort address);
+
+        void CustomUnlockAdditionalCommands();
 
         void CustomReadRom(byte count, uint address);
 
@@ -15,29 +26,19 @@ namespace BitFab.Kwp1281Test
 
         void CustomReset();
 
-        void CustomUnlockAdditionalCommands();
-
-        void EndCommunication();
-
-        void ReadEeprom(byte count, ushort address);
-
-        void ReadIdent();
-
-        void ReceiveBlocks();
-
         void SendBlock(List<byte> blockBytes);
 
         void SendCustom(List<byte> blockCustomBytes);
     }
 
-    internal class Kwp1281 : IKwp1281
+    internal class KW1281Dialog : IKW1281Dialog
     {
-        public Kwp1281(IInterface @interface)
+        public KW1281Dialog(IInterface @interface)
         {
             _interface = @interface;
         }
 
-        public void WakeUp(byte controllerAddress)
+        public ModuleInfo WakeUp(byte controllerAddress)
         {
             _interface.BitBang5Baud(controllerAddress);
 
@@ -59,13 +60,17 @@ namespace BitFab.Kwp1281Test
             {
                 Console.WriteLine("Protocol is KW 1281 (8N1)");
             }
+
+            var blocks = ReceiveBlocks();
+            return new ModuleInfo(blocks.Where(b => !b.IsAckNak));
         }
 
-        public void ReadIdent()
+        public ModuleIdent ReadIdent()
         {
             Console.WriteLine("Sending ReadIdent block");
             SendBlock(new List<byte> { (byte)BlockTitle.ReadIdent });
-            ReceiveBlocks();
+            var blocks = ReceiveBlocks();
+            return new ModuleIdent(blocks.Where(b => !b.IsAckNak));
         }
 
         public void ReadEeprom(byte count, ushort address)
@@ -140,17 +145,22 @@ namespace BitFab.Kwp1281Test
             _interface.WriteByte(0x03); // Block end, does not get ACK'd
         }
 
-        public void ReceiveBlocks()
+        private List<Block> ReceiveBlocks()
         {
+            var blocks = new List<Block>();
+
             while (true)
             {
                 var block = ReceiveBlock();
+                blocks.Add(block);
                 if (block is AckBlock || block is NakBlock)
                 {
                     break;
                 }
                 SendAckBlock();
             }
+
+            return blocks;
         }
 
         private byte ReadAndAckByte()

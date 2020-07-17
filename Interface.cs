@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.IO.Ports;
 using System.Threading;
 
-namespace BitFab.Kwp1281Test
+namespace BitFab.KW1281Test
 {
     interface IInterface : IDisposable
     {
@@ -84,6 +84,7 @@ namespace BitFab.Kwp1281Test
         /// <param name="b">The byte to write.</param>
         public void BitBang5Baud(byte b)
         {
+            // Disable garbage collection during this time-critical 
             bool noGc = GC.TryStartNoGCRegion(1024 * 1024);
 
             const int bitsPerSec = 5;
@@ -92,6 +93,7 @@ namespace BitFab.Kwp1281Test
 
             var stopWatch = new Stopwatch();
 
+            // Delay the appropriate amount and then set/clear the TxD line
             Action<bool> BitBang = bit =>
             {
                 Thread.Sleep((int)(msecPerBit - stopWatch.ElapsedMilliseconds));
@@ -120,11 +122,12 @@ namespace BitFab.Kwp1281Test
                 GC.EndNoGCRegion();
             }
 
+            // Throw away anything that might be in the receive buffer
             _port.DiscardInBuffer();
         }
 
         private SerialPort _port;
 
-        static byte[] _buf = new byte[1];
+        private byte[] _buf = new byte[1];
     }
 }

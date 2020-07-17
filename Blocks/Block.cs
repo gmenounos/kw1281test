@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
-namespace BitFab.Kwp1281Test.Blocks
+namespace BitFab.KW1281Test.Blocks
 {
     /// <summary>
     /// KWP1281 block
@@ -12,6 +13,13 @@ namespace BitFab.Kwp1281Test.Blocks
             Bytes = bytes;
         }
 
+        /// <summary>
+        /// Returns the body of the block, excluding the length, counter, title and end bytes.
+        /// </summary>
+        public IEnumerable<byte> Body => Bytes.Skip(3).Take(Bytes.Count - 4);
+
         public List<byte> Bytes { get; }
+
+        public bool IsAckNak { get; protected set; } = false;
     }
 }

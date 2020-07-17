@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace BitFab.Kwp1281Test.Blocks
+namespace BitFab.KW1281Test.Blocks
 {
     internal class UnknownBlock : Block
     {
