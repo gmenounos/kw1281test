@@ -13,7 +13,7 @@ namespace kwp1281test
 
         static void Main(string[] args)
         {
-            const string portName = "COM1";
+            const string portName = "COM4";
 
             _port = new SerialPort(portName)
             {
@@ -28,16 +28,12 @@ namespace kwp1281test
                 WriteTimeout = (int)TimeSpan.FromSeconds(5).TotalMilliseconds
             };
 
-            Console.WriteLine("Opening serial port");
+            Console.WriteLine($"Opening serial port {portName}");
             _port.Open();
 
             try
             {
-                Thread.Sleep(TimeSpan.FromMilliseconds(300));
-
                 WakeUp(0x17);
-
-                _port.DiscardInBuffer();
 
                 Console.WriteLine("Reading sync byte");
                 var syncByte = _port.ReadByte();
@@ -374,33 +370,46 @@ namespace kwp1281test
         /// Send a byte at 5 baud manually
         /// https://www.blafusel.de/obd/obd2_kw1281.html
         /// </summary>
-        /// <param name="port"></param>
         /// <param name="b"></param>
         private static void BitBang5Baud(byte b)
         {
+            bool noGc = GC.TryStartNoGCRegion(1024 * 1024);
+
             const int bitsPerSec = 5;
             const int msecPerSec = 1000;
             const int msecPerBit = msecPerSec / bitsPerSec;
 
-            _port.BreakState = true; // Start bit
-            Thread.Sleep(msecPerBit);
+            Stopwatch stopWatch = new Stopwatch();
 
-            byte parity = 1; // XORed with each bit to produce odd parity
+            Action<bool> BitBang = bit =>
+            {
+                Thread.Sleep((int)(msecPerBit - stopWatch.ElapsedMilliseconds));
+                stopWatch.Restart();
+                _port.BreakState = !bit;
+            };
+
+            BitBang(false); // Start bit
+
+            bool parity = true; // XORed with each bit to produce odd parity
             for (int i = 0; i < 7; i++)
             {
-                byte bit = (byte)(b & 1);
+                bool bit = (b & 1) == 1;
                 parity ^= bit;
                 b >>= 1;
 
-                _port.BreakState = (bit == 0);
-                Thread.Sleep(msecPerBit);
+                BitBang(bit);
             }
 
-            _port.BreakState = (parity == 0);
-            Thread.Sleep(msecPerBit);
+            BitBang(parity);
 
-            _port.BreakState = false; // Stop bit
-            Thread.Sleep(msecPerBit);
+            BitBang(true); // Stop bit
+
+            if (noGc)
+            {
+                GC.EndNoGCRegion();
+            }
+
+            _port.DiscardInBuffer();
         }
     }
 }
