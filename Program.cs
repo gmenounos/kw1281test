@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.Linq;
 
 namespace BitFab.KW1281Test
 {
@@ -7,14 +10,15 @@ namespace BitFab.KW1281Test
     {
         static void Main(string[] args)
         {
-            if (args.Length != 2)
+            if (args.Length < 3)
             {
-                Console.WriteLine("Usage: KW1281Test [PORT] [Address]");
+                ShowUsage();
                 return;
             }
 
             string portName = args[0];
             var controllerAddress = int.Parse(args[1], NumberStyles.HexNumber);
+            var command = args[2];
 
             Console.WriteLine($"Opening serial port {portName}");
             using (IInterface @interface = new Interface(portName))
@@ -30,28 +34,44 @@ namespace BitFab.KW1281Test
 
                 kwp1281.CustomUnlockAdditionalCommands();
 
-                kwp1281.CustomReadSoftwareVersion();
-
-#if false
-                for (ushort addr = 0; addr < 2048; addr += 16)
+                if (string.Compare(command, "ReadSoftwareVersion", true) == 0)
                 {
-                    kwp1281.ReadEeprom(16, addr);
+                    kwp1281.CustomReadSoftwareVersion();
                 }
-#endif
 
-#if false
-                for (ushort addr = 0; addr < 0x100; addr += 0x10)
+                if (string.Compare(command, "ReadEeprom", true) == 0)
                 {
-                    kwp1281.CustomReadRom(0x10, addr);
+                    var bytes = new List<byte>();
+                    const byte blockSize = 16;
+                    for (ushort addr = 0; addr < 2048; addr += blockSize)
+                    {
+                        var blockBytes = kwp1281.ReadEeprom(addr, blockSize);
+                        bytes.AddRange(blockBytes);
+                    }
+                    var dumpFileName = identInfo.ToString().Replace(' ', '_') + "_eeprom.bin";
+                    Console.WriteLine($"Saving EEPROM dump to {dumpFileName}");
+                    File.WriteAllBytes(dumpFileName, bytes.ToArray());
                 }
-#endif
 
-                // kwp1281.CustomReadRom(0x10, 0xFF0000);
+                if (string.Compare(command, "ReadRom", true) == 0)
+                {
+                    kwp1281.CustomReadRom(0x000000, 0x10);
+                }
 
-                // kwp1281.CustomReset();
+                if (string.Compare(command, "Reset", true) == 0)
+                {
+                    kwp1281.CustomReset();
+                }
 
                 kwp1281.EndCommunication();
             }
+        }
+
+        private static void ShowUsage()
+        {
+            Console.WriteLine("Usage: KW1281Test [PORT] [Address] [Command]");
+            Console.WriteLine("       [Command] = ReadSoftwareVersion|Reset|ReadEeprom|ReadRom");
+            Console.WriteLine("Usage: KW1281Test [PORT] [Address] ReadEeprom");
         }
     }
 }

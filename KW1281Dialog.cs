@@ -16,19 +16,25 @@ namespace BitFab.KW1281Test
 
         ModuleIdent ReadIdent();
 
-        void ReadEeprom(byte count, ushort address);
+        List<byte> ReadEeprom(ushort address, byte count);
 
+        /// <summary>
+        /// http://www.maltchev.com/kiti/VAG_guide.txt
+        /// </summary>
         void CustomUnlockAdditionalCommands();
 
-        void CustomReadRom(byte count, uint address);
-
+        /// <summary>
+        /// http://www.maltchev.com/kiti/VAG_guide.txt
+        /// </summary>
         void CustomReadSoftwareVersion();
+
+        List<byte> CustomReadRom(uint address, byte count);
 
         void CustomReset();
 
         void SendBlock(List<byte> blockBytes);
 
-        void SendCustom(List<byte> blockCustomBytes);
+        List<Block> SendCustom(List<byte> blockCustomBytes);
     }
 
     internal class KW1281Dialog : IKW1281Dialog
@@ -73,9 +79,9 @@ namespace BitFab.KW1281Test
             return new ModuleIdent(blocks.Where(b => !b.IsAckNak));
         }
 
-        public void ReadEeprom(byte count, ushort address)
+        public List<byte> ReadEeprom(ushort address, byte count)
         {
-            Console.WriteLine($"Sending ReadEeprom block (Count: 0x{count:X2}, Address: 0x{address:X4})");
+            Console.WriteLine($"Sending ReadEeprom block (Address: 0x{address:X4}, Count: 0x{count:X2})");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.ReadEeprom,
@@ -83,13 +89,18 @@ namespace BitFab.KW1281Test
                 (byte)(address >> 8),
                 (byte)(address & 0xFF)
             });
-            ReceiveBlocks();
+            var blocks = ReceiveBlocks().Where(b => !b.IsAckNak).ToList();
+            if (blocks.Count != 1)
+            {
+                throw new InvalidOperationException($"ReadEeprom returned {blocks.Count} blocks instead of 1");
+            }
+            return blocks[0].Body.ToList();
         }
 
-        public void CustomReadRom(byte count, uint address)
+        public List<byte> CustomReadRom(uint address, byte count)
         {
-            Console.WriteLine($"Sending Custom \"Read ROM\" block (Count: 0x{count:X2}, Address: 0x{address:X6})");
-            SendCustom(new List<byte>
+            Console.WriteLine($"Sending Custom \"Read ROM\" block (Address: 0x{address:X6}, Count: 0x{count:X2})");
+            var blocks = SendCustom(new List<byte>
             {
                 0x86,
                 count,
@@ -97,6 +108,12 @@ namespace BitFab.KW1281Test
                 (byte)((address >> 8) & 0xFF),
                 (byte)((address >> 16) & 0xFF),
             });
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
+            if (blocks.Count != 1)
+            {
+                throw new InvalidOperationException($"Custom \"Read ROM\" returned {blocks.Count} blocks instead of 1");
+            }
+            return blocks[0].Body.ToList();
         }
 
         public void CustomUnlockAdditionalCommands()
@@ -117,11 +134,11 @@ namespace BitFab.KW1281Test
             SendCustom(new List<byte> { 0x82 });
         }
 
-        public void SendCustom(List<byte> blockCustomBytes)
+        public List<Block> SendCustom(List<byte> blockCustomBytes)
         {
             blockCustomBytes.Insert(0, (byte)BlockTitle.Custom);
             SendBlock(blockCustomBytes);
-            ReceiveBlocks();
+            return ReceiveBlocks();
         }
 
         public void EndCommunication()
