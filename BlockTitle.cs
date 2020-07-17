@@ -1,4 +1,4 @@
-﻿namespace kwp1281test
+﻿namespace BitFab.Kwp1281Test
 {
     public enum BlockTitle : byte
     {
