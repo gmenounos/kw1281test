@@ -16,7 +16,7 @@ namespace BitFab.KW1281Test
 
         ModuleIdent ReadIdent();
 
-        List<byte> ReadEeprom(ushort address, byte count);
+        List<byte> ReadEeprom(ushort address, byte count, bool map = false);
 
         /// <summary>
         /// http://www.maltchev.com/kiti/VAG_guide.txt
@@ -79,7 +79,7 @@ namespace BitFab.KW1281Test
             return new ModuleIdent(blocks.Where(b => !b.IsAckNak));
         }
 
-        public List<byte> ReadEeprom(ushort address, byte count)
+        public List<byte> ReadEeprom(ushort address, byte count, bool map)
         {
             Console.WriteLine($"Sending ReadEeprom block (Address: 0x{address:X4}, Count: 0x{count:X2})");
             SendBlock(new List<byte>
@@ -89,7 +89,22 @@ namespace BitFab.KW1281Test
                 (byte)(address >> 8),
                 (byte)(address & 0xFF)
             });
-            var blocks = ReceiveBlocks().Where(b => !b.IsAckNak).ToList();
+            var blocks = ReceiveBlocks();
+
+            if (map)
+            {
+                if (blocks.Count == 1 && blocks[0] is NakBlock)
+                {
+                    // Permissions issue
+                    return Enumerable.Repeat((byte)0, count).ToList();
+                }
+                else
+                {
+                    return Enumerable.Repeat((byte)0xFF, count).ToList();
+                }
+            }
+
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
             if (blocks.Count != 1)
             {
                 throw new InvalidOperationException($"ReadEeprom returned {blocks.Count} blocks instead of 1");

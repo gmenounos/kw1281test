@@ -8,7 +8,7 @@ namespace BitFab.KW1281Test.Blocks
     {
         public AsciiDataBlock(List<byte> bytes) : base(bytes)
         {
-            Dump();
+            // Dump();
         }
 
         public bool MoreDataAvailable => Bytes[3] > 0x7F;

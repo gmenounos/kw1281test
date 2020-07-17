@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace BitFab.KW1281Test
 {
@@ -29,8 +30,10 @@ namespace BitFab.KW1281Test
                 var ecuInfo = kwp1281.WakeUp((byte)controllerAddress);
                 Console.WriteLine($"ECU: {ecuInfo}");
 
+#if false
                 var identInfo = kwp1281.ReadIdent();
                 Console.WriteLine($"Ident: {identInfo}");
+#endif
 
                 kwp1281.CustomUnlockAdditionalCommands();
 
@@ -39,8 +42,42 @@ namespace BitFab.KW1281Test
                     kwp1281.CustomReadSoftwareVersion();
                 }
 
+                if (string.Compare(command, "MapEeprom", true) == 0)
+                {
+                    // Unlock partial EEPROM read
+                    var response = kwp1281.SendCustom(new List<byte> { 0x9D, 0x39, 0x34, 0x34, 0x40 });
+
+                    var bytes = new List<byte>();
+                    const byte blockSize = 1;
+                    for (ushort addr = 0; addr < 2048; addr += blockSize)
+                    {
+                        var blockBytes = kwp1281.ReadEeprom(addr, blockSize, map:true);
+                        bytes.AddRange(blockBytes);
+                    }
+                    var dumpFileName = "eeprom_map.bin";
+                    Console.WriteLine($"Saving EEPROM map to {dumpFileName}");
+                    File.WriteAllBytes(dumpFileName, bytes.ToArray());
+
+                }
+
                 if (string.Compare(command, "ReadEeprom", true) == 0)
                 {
+                    Console.WriteLine("Sending Custom \"Unlock More Commands\" block");
+                    var response = kwp1281.SendCustom(new List<byte> { 0x9D, 0x39, 0x34, 0x34, 0x40 });
+
+                    Console.WriteLine("Sending Custom \"Give me a challlenge\" block");
+                    response = kwp1281.SendCustom(new List<byte> { 0x96, 0x01 });
+                    foreach (var block in response.Where(b => !b.IsAckNak))
+                    {
+                        Console.WriteLine($"Block: {Dump(block.Body)}");
+                    }
+
+                    Console.WriteLine("Sending Custom \"Here is my response\" block");
+                    response = kwp1281.SendCustom(new List<byte> { 0x96, 0x02, 0x07, 0x57, 0x1F, 0x00, 0xA4, 0x00, 0x44, 0x00 });
+
+                    var blockBytes = kwp1281.ReadEeprom(0x020, 16);
+
+#if false
                     var bytes = new List<byte>();
                     const byte blockSize = 16;
                     for (ushort addr = 0; addr < 2048; addr += blockSize)
@@ -51,6 +88,7 @@ namespace BitFab.KW1281Test
                     var dumpFileName = identInfo.ToString().Replace(' ', '_') + "_eeprom.bin";
                     Console.WriteLine($"Saving EEPROM dump to {dumpFileName}");
                     File.WriteAllBytes(dumpFileName, bytes.ToArray());
+#endif
                 }
 
                 if (string.Compare(command, "ReadRom", true) == 0)
@@ -67,10 +105,20 @@ namespace BitFab.KW1281Test
             }
         }
 
+        private static string Dump(IEnumerable<byte> body)
+        {
+            var sb = new StringBuilder();
+            foreach (var b in body)
+            {
+                sb.Append($" {b:X2}");
+            }
+            return sb.ToString();
+        }
+
         private static void ShowUsage()
         {
             Console.WriteLine("Usage: KW1281Test [PORT] [Address] [Command]");
-            Console.WriteLine("       [Command] = ReadSoftwareVersion|Reset|ReadEeprom|ReadRom");
+            Console.WriteLine("       [Command] = ReadSoftwareVersion|Reset|ReadEeprom|ReadRom|MapEeprom");
             Console.WriteLine("Usage: KW1281Test [PORT] [Address] ReadEeprom");
         }
     }

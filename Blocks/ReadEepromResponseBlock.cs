@@ -13,9 +13,9 @@ namespace BitFab.KW1281Test.Blocks
         private void Dump()
         {
             Console.Write("Received \"Read EEPROM Response\" block:");
-            for (var i = 3; i < Bytes.Count - 1; i++)
+            foreach (var b in Body)
             {
-                Console.Write($" {Bytes[i]:X2}");
+                Console.Write($" {b:X2}");
             }
 
             Console.WriteLine();
