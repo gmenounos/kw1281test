@@ -66,6 +66,14 @@ namespace BitFab.KW1281Test
             {
                 Console.WriteLine("Protocol is KW 1281 (8N1)");
             }
+            else if (keywordLsb == 0xE9 && keywordMsb == 0x8F)
+            {
+                Console.WriteLine("Protocol is KW 2025 (8N1)");
+            }
+            else if (keywordLsb == 0x6B && keywordMsb == 0x8F)
+            {
+                Console.WriteLine("Protocol is KW 2027 (8N1)");
+            }
 
             var blocks = ReceiveBlocks();
             return new ModuleInfo(blocks.Where(b => !b.IsAckNak));

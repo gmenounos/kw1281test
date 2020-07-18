@@ -29,11 +29,11 @@ namespace BitFab.KW1281Test
 
     class Interface : IInterface
     {
-        public Interface(string portName)
+        public Interface(string portName, int baudRate)
         {
             _port = new SerialPort(portName)
             {
-                BaudRate = 10400,
+                BaudRate = baudRate,
                 DataBits = 8,
                 Parity = Parity.None,
                 StopBits = StopBits.One,

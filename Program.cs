@@ -22,7 +22,8 @@ namespace BitFab.KW1281Test
             var command = args[2];
 
             Console.WriteLine($"Opening serial port {portName}");
-            using (IInterface @interface = new Interface(portName))
+            const int baudRate = 10400;
+            using (IInterface @interface = new Interface(portName, baudRate))
             {
                 IKW1281Dialog kwp1281 = new KW1281Dialog(@interface);
 
