@@ -63,18 +63,27 @@ namespace BitFab.KW1281Test
 
                 if (string.Compare(command, "ReadEeprom", true) == 0)
                 {
-                    Console.WriteLine("Sending Custom \"Unlock More Commands\" block");
+                    Console.WriteLine("Sending Custom \"Unlock partial EEPROM read\" block");
                     var response = kwp1281.SendCustom(new List<byte> { 0x9D, 0x39, 0x34, 0x34, 0x40 });
 
-                    Console.WriteLine("Sending Custom \"Give me a challlenge\" block");
+#if false
+                    Console.WriteLine("Sending Custom \"Are you unlocked?\" block");
+                    response = kwp1281.SendCustom(new List<byte> { 0x96, 0x04 });
+                    // Custom 0x04 means need to do Seed/Key
+                    // Custom 0x07 means unlocked
+#endif
+
+#if false
+                    Console.WriteLine("Sending Custom \"Give me a seed\" block");
                     response = kwp1281.SendCustom(new List<byte> { 0x96, 0x01 });
                     foreach (var block in response.Where(b => !b.IsAckNak))
                     {
                         Console.WriteLine($"Block: {Dump(block.Body)}");
                     }
 
-                    Console.WriteLine("Sending Custom \"Here is my response\" block");
+                    Console.WriteLine("Sending Custom \"Here is the key\" block");
                     response = kwp1281.SendCustom(new List<byte> { 0x96, 0x02, 0x07, 0x57, 0x1F, 0x00, 0xA4, 0x00, 0x44, 0x00 });
+#endif
 
                     var blockBytes = kwp1281.ReadEeprom(0x020, 16);
 
