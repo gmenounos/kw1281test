@@ -11,18 +11,18 @@ namespace BitFab.KW1281Test
     {
         static void Main(string[] args)
         {
-            if (args.Length < 3)
+            if (args.Length < 4)
             {
                 ShowUsage();
                 return;
             }
 
             string portName = args[0];
-            var controllerAddress = int.Parse(args[1], NumberStyles.HexNumber);
-            var command = args[2];
+            var baudRate = int.Parse(args[1]);
+            var controllerAddress = int.Parse(args[2], NumberStyles.HexNumber);
+            var command = args[3];
 
             Console.WriteLine($"Opening serial port {portName}");
-            const int baudRate = 10400;
             using (IInterface @interface = new Interface(portName, baudRate))
             {
                 IKW1281Dialog kwp1281 = new KW1281Dialog(@interface);
@@ -127,9 +127,8 @@ namespace BitFab.KW1281Test
 
         private static void ShowUsage()
         {
-            Console.WriteLine("Usage: KW1281Test [PORT] [Address] [Command]");
+            Console.WriteLine("Usage: KW1281Test [PORT] [Baud] [Address] [Command]");
             Console.WriteLine("       [Command] = ReadSoftwareVersion|Reset|ReadEeprom|ReadRom|MapEeprom");
-            Console.WriteLine("Usage: KW1281Test [PORT] [Address] ReadEeprom");
         }
     }
 }
