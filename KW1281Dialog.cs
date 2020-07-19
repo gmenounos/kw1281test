@@ -14,6 +14,8 @@ namespace BitFab.KW1281Test
 
         void EndCommunication();
 
+        void Login(ushort code, ushort workshopCode, byte fernByte = 0x00);
+
         ModuleIdent ReadIdent();
 
         List<byte> ReadEeprom(ushort address, byte count, bool map = false);
@@ -79,6 +81,22 @@ namespace BitFab.KW1281Test
             return new ModuleInfo(blocks.Where(b => !b.IsAckNak));
         }
 
+        public void Login(ushort code, ushort workshopCode, byte fernByte)
+        {
+            Console.WriteLine("Sending Login block");
+            SendBlock(new List<byte>
+            {
+                (byte)BlockTitle.Login,
+                (byte)(code >> 8),
+                (byte)(code & 0xFF),
+                fernByte,
+                (byte)(workshopCode >> 8),
+                (byte)(workshopCode & 0xFF)
+            });
+
+            var blocks = ReceiveBlocks();
+        }
+
         public ModuleIdent ReadIdent()
         {
             Console.WriteLine("Sending ReadIdent block");
@@ -110,6 +128,11 @@ namespace BitFab.KW1281Test
                 {
                     return Enumerable.Repeat((byte)0xFF, count).ToList();
                 }
+            }
+
+            if (blocks.Count == 1 && blocks[0] is NakBlock)
+            {
+                return new List<byte>();
             }
 
             blocks = blocks.Where(b => !b.IsAckNak).ToList();

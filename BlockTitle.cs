@@ -12,6 +12,7 @@
         WriteEeprom = 0x1A,
         Custom = 0x1B,
         GroupReading = 0x29,
+        Login = 0x2B,
         GroupReadingResponse = 0xE7,
         ReadEepromResponse = 0xEF,
         AsciiData = 0xF6,
