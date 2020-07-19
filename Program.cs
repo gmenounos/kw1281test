@@ -31,14 +31,15 @@ namespace BitFab.KW1281Test
                 var ecuInfo = kwp1281.WakeUp((byte)controllerAddress);
                 Console.WriteLine($"ECU: {ecuInfo}");
 
-#if false
-                var identInfo = kwp1281.ReadIdent();
-                Console.WriteLine($"Ident: {identInfo}");
-#endif
-
                 if (controllerAddress == 0x17)
                 {
                     kwp1281.CustomUnlockAdditionalCommands();
+                }
+
+                if (string.Compare(command, "ReadIdent", true) == 0)
+                {
+                    var identInfo = kwp1281.ReadIdent();
+                    Console.WriteLine($"Ident: {identInfo}");
                 }
 
                 if (string.Compare(command, "ReadSoftwareVersion", true) == 0)
@@ -129,10 +130,37 @@ namespace BitFab.KW1281Test
         {
             kwp1281.Login(19283, 222);
 
-            for(int addr = 0x1000; addr < 65536; addr += 12)
+            const int maxReadLength = 12;
+
+            var bytes = ReadEeprom(kwp1281, 0x0000, 1, maxReadLength);
+            SaveEeprom(bytes, "ccm_eeprom_0000.bin");
+
+            bytes = ReadEeprom(kwp1281, 0x1000, 0x200, maxReadLength);
+            SaveEeprom(bytes, "ccm_eeprom_1000.bin");
+
+            bytes = ReadEeprom(kwp1281, 0x9000, 0x1000, maxReadLength);
+            SaveEeprom(bytes, "ccm_eeprom_9000.bin");
+        }
+
+        private static void SaveEeprom(List<byte> bytes, string fileName)
+        {
+            Console.WriteLine($"Saving EEPROM dump to {fileName}");
+            File.WriteAllBytes(fileName, bytes.ToArray());
+        }
+
+        private static List<byte> ReadEeprom(
+            IKW1281Dialog kwp1281, int startAddr, int length, int maxReadLength)
+        {
+            var bytes = new List<byte>();
+
+            for (int addr = startAddr; addr < (startAddr + length); addr += maxReadLength)
             {
-                var bytes = kwp1281.ReadEeprom((ushort)addr, 12);
+                var readLength = Math.Min(startAddr + length - addr, maxReadLength);
+                var blockBytes = kwp1281.ReadEeprom((ushort)addr, (byte)readLength);
+                bytes.AddRange(blockBytes);
             }
+
+            return bytes;
         }
 
         private static void ReadClusterEeprom(IKW1281Dialog kwp1281)
@@ -188,7 +216,7 @@ namespace BitFab.KW1281Test
         private static void ShowUsage()
         {
             Console.WriteLine("Usage: KW1281Test [PORT] [Baud] [Address] [Command]");
-            Console.WriteLine("       [Command] = ReadSoftwareVersion|Reset|ReadEeprom|ReadRom|MapEeprom");
+            Console.WriteLine("       [Command] = ReadIdent|ReadSoftwareVersion|Reset|ReadEeprom|ReadRom|MapEeprom");
         }
     }
 }
