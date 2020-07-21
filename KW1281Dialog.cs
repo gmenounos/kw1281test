@@ -197,7 +197,9 @@ namespace BitFab.KW1281Test
         {
             var blockLength = (byte)(blockBytes.Count + 2);
 
-            blockBytes.Insert(0, _blockCounter++);
+            blockBytes.Insert(0, _blockCounter.Value);
+            _blockCounter++;
+
             blockBytes.Insert(0, blockLength);
 
             foreach (var b in blockBytes)
@@ -314,7 +316,12 @@ namespace BitFab.KW1281Test
         private byte ReadBlockCounter()
         {
             var blockCounter = ReadAndAckByte();
-            if (blockCounter != _blockCounter)
+            if (!_blockCounter.HasValue)
+            {
+                // First block
+                _blockCounter = blockCounter;
+            }
+            else if (blockCounter != _blockCounter)
             {
                 throw new InvalidOperationException(
                     $"Received block counter 0x{blockCounter:X2} but expected 0x{_blockCounter:X2}");
@@ -324,6 +331,6 @@ namespace BitFab.KW1281Test
         }
 
         private readonly IInterface _interface;
-        private byte _blockCounter = 0x01;
+        private byte? _blockCounter = null;
     }
 }
