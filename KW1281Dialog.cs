@@ -20,6 +20,8 @@ namespace BitFab.KW1281Test
 
         List<byte> ReadEeprom(ushort address, byte count, bool map = false);
 
+        List<byte> ReadRomEeprom(ushort address, byte count);
+
         /// <summary>
         /// http://www.maltchev.com/kiti/VAG_guide.txt
         /// </summary>
@@ -139,6 +141,31 @@ namespace BitFab.KW1281Test
             if (blocks.Count != 1)
             {
                 throw new InvalidOperationException($"ReadEeprom returned {blocks.Count} blocks instead of 1");
+            }
+            return blocks[0].Body.ToList();
+        }
+
+        public List<byte> ReadRomEeprom(ushort address, byte count)
+        {
+            Console.WriteLine($"Sending ReadEeprom block (Address: 0x{address:X4}, Count: 0x{count:X2})");
+            SendBlock(new List<byte>
+            {
+                (byte)BlockTitle.ReadRomEeprom,
+                count,
+                (byte)(address >> 8),
+                (byte)(address & 0xFF)
+            });
+            var blocks = ReceiveBlocks();
+
+            if (blocks.Count == 1 && blocks[0] is NakBlock)
+            {
+                return new List<byte>();
+            }
+
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
+            if (blocks.Count != 1)
+            {
+                throw new InvalidOperationException($"ReadRomEeprom returned {blocks.Count} blocks instead of 1");
             }
             return blocks[0].Body.ToList();
         }
@@ -298,6 +325,9 @@ namespace BitFab.KW1281Test
 
                 case (byte)BlockTitle.ReadEepromResponse:
                     return new ReadEepromResponseBlock(blockBytes);
+
+                case (byte)BlockTitle.ReadRomEepromResponse:
+                    return new ReadRomEepromResponse(blockBytes);
 
                 case (byte)BlockTitle.Custom:
                     return new CustomBlock(blockBytes);

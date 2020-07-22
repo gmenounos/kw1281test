@@ -89,6 +89,13 @@ namespace BitFab.KW1281Test
                     kwp1281.CustomReset();
                 }
 
+                if (string.Compare(command, "CrackDelcoVWPremium5", true) == 0)
+                {
+                    kwp1281.Login(0x4f43, 0x4544, 0x4c);  // "OCLED"
+                    var bytes = kwp1281.ReadRomEeprom(0x0014, 2);
+                    Console.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
+                }
+
                 kwp1281.EndCommunication();
             }
         }
@@ -216,7 +223,7 @@ namespace BitFab.KW1281Test
         private static void ShowUsage()
         {
             Console.WriteLine("Usage: KW1281Test [PORT] [Baud] [Address] [Command]");
-            Console.WriteLine("       [Command] = ReadIdent|ReadSoftwareVersion|Reset|ReadEeprom|ReadRom|MapEeprom");
+            Console.WriteLine("       [Command] = ReadIdent|ReadSoftwareVersion|Reset|ReadEeprom|ReadRom|MapEeprom|CrackDelcoVWPremium5");
         }
     }
 }

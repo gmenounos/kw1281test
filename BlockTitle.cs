@@ -3,6 +3,7 @@
     public enum BlockTitle : byte
     {
         ReadIdent = 0x00,
+        ReadRomEeprom = 0x03,
         ClearErrors = 0x05,
         End = 0x06, // end output, end of communication
         GetErrors = 0x07, // get errors, all errors output
@@ -18,6 +19,7 @@
         AsciiData = 0xF6,
         WriteEepromResponse = 0xF9,
         GetErrorsResponse = 0xFC,
+        ReadRomEepromResponse = 0xFD,
     }
 
     // http://nefariousmotorsports.com/forum/index.php?topic=8274.0

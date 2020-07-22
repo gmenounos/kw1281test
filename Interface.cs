@@ -92,11 +92,14 @@ namespace BitFab.KW1281Test
             const int msecPerBit = msecPerSec / bitsPerSec;
 
             var stopWatch = new Stopwatch();
+            stopWatch.Start();
 
             // Delay the appropriate amount and then set/clear the TxD line
             Action<bool> BitBang = bit =>
             {
-                Thread.Sleep((int)(msecPerBit - stopWatch.ElapsedMilliseconds));
+                while ((msecPerBit - stopWatch.ElapsedMilliseconds) > 0)
+                    ;
+                // Thread.Sleep((int)(msecPerBit - stopWatch.ElapsedMilliseconds));
                 stopWatch.Restart();
                 _port.BreakState = !bit;
             };
