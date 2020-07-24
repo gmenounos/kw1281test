@@ -14,7 +14,7 @@ namespace BitFab.KW1281Test
 
         void EndCommunication();
 
-        void Login(ushort code, ushort workshopCode, byte fernByte = 0x00);
+        void Login(ushort code, ushort workshopCode, byte unknown = 0x00);
 
         ModuleIdent ReadIdent();
 
@@ -83,7 +83,7 @@ namespace BitFab.KW1281Test
             return new ModuleInfo(blocks.Where(b => !b.IsAckNak));
         }
 
-        public void Login(ushort code, ushort workshopCode, byte fernByte)
+        public void Login(ushort code, ushort workshopCode, byte unknown)
         {
             Console.WriteLine("Sending Login block");
             SendBlock(new List<byte>
@@ -91,7 +91,7 @@ namespace BitFab.KW1281Test
                 (byte)BlockTitle.Login,
                 (byte)(code >> 8),
                 (byte)(code & 0xFF),
-                fernByte,
+                unknown,
                 (byte)(workshopCode >> 8),
                 (byte)(workshopCode & 0xFF)
             });
