@@ -143,7 +143,7 @@ namespace BitFab.KW1281Test
 
         private static void ReadCcmEeprom(IKW1281Dialog kwp1281)
         {
-            kwp1281.Login(19283, 222);
+            kwp1281.Login(code: 19283, workshopCode: 222); // This is what VDS-PRO uses
 
             const int maxReadLength = 12;
 
