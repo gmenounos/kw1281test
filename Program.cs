@@ -81,7 +81,14 @@ namespace BitFab.KW1281Test
 
                 if (string.Compare(command, "ReadRom", true) == 0)
                 {
-                    kwp1281.CustomReadRom(0x000000, 0x10);
+                    if (controllerAddress == 0x17)
+                    {
+                        DumpClusterRom(kwp1281);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Not supported");
+                    }
                 }
 
                 if (string.Compare(command, "Reset", true) == 0)
@@ -209,6 +216,22 @@ namespace BitFab.KW1281Test
             Console.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
 #endif
+        }
+
+        private static void DumpClusterRom(IKW1281Dialog kwp1281)
+        {
+            var dumpFileName = "cluster_rom.bin";
+            Console.WriteLine($"Saving ROM dump to {dumpFileName}");
+
+            const byte blockSize = 0x10;
+            using (var fs = File.Create(dumpFileName, blockSize))
+            {
+                for (uint addr = 0x000000; addr <= 0xFFFFFF; addr += blockSize)
+                {
+                    var blockBytes = kwp1281.CustomReadRom(addr, blockSize);
+                    fs.Write(blockBytes.ToArray());
+                }
+            }
         }
 
         private static string Dump(IEnumerable<byte> body)
