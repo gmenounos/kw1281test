@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BitFab.KW1281Test.Blocks;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -224,12 +225,18 @@ namespace BitFab.KW1281Test
             Console.WriteLine($"Saving ROM dump to {dumpFileName}");
 
             const byte blockSize = 0x10;
-            using (var fs = File.Create(dumpFileName, blockSize))
+            using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
             {
-                for (uint addr = 0x000000; addr <= 0xFFFFFF; addr += blockSize)
+                for (uint addr = 0x002000; addr < 0x042000; addr += blockSize)
                 {
                     var blockBytes = kwp1281.CustomReadRom(addr, blockSize);
+                    if (blockBytes.Count != blockSize)
+                    {
+                        throw new InvalidOperationException(
+                            $"Expected 0x{blockSize:X2} bytes from CustomReadRom() but received 0x{blockBytes.Count:X2} bytes");
+                    }
                     fs.Write(blockBytes.ToArray());
+                    fs.Flush();
                 }
             }
         }
