@@ -13,12 +13,14 @@ namespace BitFab.KW1281Test.Blocks
             Bytes = bytes;
         }
 
+        public List<byte> Bytes { get; }
+
+        public byte Title => Bytes[2];
+
         /// <summary>
         /// Returns the body of the block, excluding the length, counter, title and end bytes.
         /// </summary>
         public IEnumerable<byte> Body => Bytes.Skip(3).Take(Bytes.Count - 4);
-
-        public List<byte> Bytes { get; }
 
         public bool IsAckNak { get; protected set; } = false;
     }

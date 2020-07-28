@@ -6,19 +6,19 @@ using System.Linq;
 namespace BitFab.KW1281Test
 {
     /// <summary>
-    /// Manages a dialog with a VW module using the KW1281 protocol.
+    /// Manages a dialog with a VW controller using the KW1281 protocol.
     /// </summary>
     internal interface IKW1281Dialog
     {
-        ModuleInfo WakeUp(byte controllerAddress);
+        ControllerInfo WakeUp(byte controllerAddress);
 
         void EndCommunication();
 
         void Login(ushort code, ushort workshopCode, byte unknown = 0x00);
 
-        ModuleIdent ReadIdent();
+        ControllerIdent ReadIdent();
 
-        List<byte> ReadEeprom(ushort address, byte count, bool map = false);
+        List<byte> ReadEeprom(ushort address, byte count);
 
         List<byte> ReadRomEeprom(ushort address, byte count);
 
@@ -48,7 +48,7 @@ namespace BitFab.KW1281Test
             _interface = @interface;
         }
 
-        public ModuleInfo WakeUp(byte controllerAddress)
+        public ControllerInfo WakeUp(byte controllerAddress)
         {
             _interface.BitBang5Baud(controllerAddress);
 
@@ -80,7 +80,7 @@ namespace BitFab.KW1281Test
             }
 
             var blocks = ReceiveBlocks();
-            return new ModuleInfo(blocks.Where(b => !b.IsAckNak));
+            return new ControllerInfo(blocks.Where(b => !b.IsAckNak));
         }
 
         public void Login(ushort code, ushort workshopCode, byte unknown)
@@ -99,15 +99,21 @@ namespace BitFab.KW1281Test
             var blocks = ReceiveBlocks();
         }
 
-        public ModuleIdent ReadIdent()
+        public ControllerIdent ReadIdent()
         {
             Console.WriteLine("Sending ReadIdent block");
             SendBlock(new List<byte> { (byte)BlockTitle.ReadIdent });
             var blocks = ReceiveBlocks();
-            return new ModuleIdent(blocks.Where(b => !b.IsAckNak));
+            return new ControllerIdent(blocks.Where(b => !b.IsAckNak));
         }
 
-        public List<byte> ReadEeprom(ushort address, byte count, bool map)
+        /// <summary>
+        /// Reads a range of bytes from the EEPROM.
+        /// </summary>
+        /// <param name="address"></param>
+        /// <param name="count"></param>
+        /// <returns>The bytes or null if the bytes could not be read</returns>
+        public List<byte> ReadEeprom(ushort address, byte count)
         {
             Console.WriteLine($"Sending ReadEeprom block (Address: 0x{address:X4}, Count: 0x{count:X2})");
             SendBlock(new List<byte>
@@ -119,22 +125,10 @@ namespace BitFab.KW1281Test
             });
             var blocks = ReceiveBlocks();
 
-            if (map)
-            {
-                if (blocks.Count == 1 && blocks[0] is NakBlock)
-                {
-                    // Permissions issue
-                    return Enumerable.Repeat((byte)0, count).ToList();
-                }
-                else
-                {
-                    return Enumerable.Repeat((byte)0xFF, count).ToList();
-                }
-            }
-
             if (blocks.Count == 1 && blocks[0] is NakBlock)
             {
-                return new List<byte>();
+                // Permissions issue
+                return null;
             }
 
             blocks = blocks.Where(b => !b.IsAckNak).ToList();

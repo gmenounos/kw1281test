@@ -6,11 +6,11 @@ using System.Text;
 namespace BitFab.KW1281Test
 {
     /// <summary>
-    /// The info returned when a module wakes up.
+    /// The info returned when a controller wakes up.
     /// </summary>
-    internal class ModuleInfo
+    internal class ControllerInfo
     {
-        public ModuleInfo(IEnumerable<Block> blocks)
+        public ControllerInfo(IEnumerable<Block> blocks)
         {
             var sb = new StringBuilder();
             foreach(var block in blocks)
@@ -25,7 +25,7 @@ namespace BitFab.KW1281Test
                 }
                 else
                 {
-                    Console.WriteLine($"Module wakeup returned block of type {block.GetType()}");
+                    Console.WriteLine($"Controller wakeup returned block of type {block.GetType()}");
                 }
             }
             Text = sb.ToString();

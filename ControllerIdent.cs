@@ -6,11 +6,11 @@ using System.Text;
 namespace BitFab.KW1281Test
 {
     /// <summary>
-    /// The info returned by the module to a ReadIdent block.
+    /// The info returned by the controller to a ReadIdent block.
     /// </summary>
-    internal class ModuleIdent
+    internal class ControllerIdent
     {
-        public ModuleIdent(IEnumerable<Block> blocks)
+        public ControllerIdent(IEnumerable<Block> blocks)
         {
             var sb = new StringBuilder();
             foreach (var block in blocks)
