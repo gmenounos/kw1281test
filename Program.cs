@@ -98,7 +98,7 @@ namespace BitFab.KW1281Test
                     }
                     else if (controllerAddress == (int)ControllerAddress.CCM)
                     {
-                        DumpCcmEeprom(kwp1281, address, length);
+                        DumpCcmEeprom(kwp1281, (ushort)address, (ushort)length);
                     }
                     else
                     {
@@ -209,20 +209,14 @@ namespace BitFab.KW1281Test
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
         }
 
-        private static void DumpCcmEeprom(IKW1281Dialog kwp1281, uint startAddress, uint length)
+        private static void DumpCcmEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
         {
             UnlockControllerForEepromRead(kwp1281, ControllerAddress.CCM);
 
-            const int maxReadLength = 12;
+            const byte maxReadLength = 12;
 
-            var bytes = ReadEeprom(kwp1281, 0x0000, 1, maxReadLength);
-            SaveEeprom(bytes, "ccm_eeprom_0000.bin");
-
-            bytes = ReadEeprom(kwp1281, 0x1000, 0x200, maxReadLength);
-            SaveEeprom(bytes, "ccm_eeprom_1000.bin");
-
-            bytes = ReadEeprom(kwp1281, 0x9000, 0x1000, maxReadLength);
-            SaveEeprom(bytes, "ccm_eeprom_9000.bin");
+            var bytes = ReadEeprom(kwp1281, startAddress, length, maxReadLength);
+            SaveEeprom(bytes, $"ccm_eeprom_${startAddress:X4}.bin");
         }
 
         private static void UnlockControllerForEepromRead(
@@ -272,14 +266,14 @@ namespace BitFab.KW1281Test
         }
 
         private static List<byte> ReadEeprom(
-            IKW1281Dialog kwp1281, int startAddr, int length, int maxReadLength)
+            IKW1281Dialog kwp1281, ushort startAddr, ushort length, byte maxReadLength)
         {
             var bytes = new List<byte>();
             bool succeeded = true;
 
-            for (int addr = startAddr; addr < (startAddr + length); addr += maxReadLength)
+            for (uint addr = startAddr; addr < (startAddr + length); addr += maxReadLength)
             {
-                var readLength = Math.Min(startAddr + length - addr, maxReadLength);
+                var readLength = (byte)Math.Min(startAddr + length - addr, maxReadLength);
                 var blockBytes = kwp1281.ReadEeprom((ushort)addr, (byte)readLength);
                 if (blockBytes == null)
                 {
@@ -317,34 +311,18 @@ namespace BitFab.KW1281Test
         {
             const byte blockSize = 0x10;
 
-            var dumpFileName = "cluster_ram.bin";
-            Console.WriteLine($"Saving RAM dump to {dumpFileName}");
-            using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
-            {
-                for (uint addr = 0x000000; addr < 0x001800; addr += blockSize)
-                {
-                    var blockBytes = kwp1281.CustomReadRom(addr, blockSize);
-                    if (blockBytes.Count != blockSize)
-                    {
-                        throw new InvalidOperationException(
-                            $"Expected 0x{blockSize:X2} bytes from CustomReadRom() but received 0x{blockBytes.Count:X2} bytes");
-                    }
-                    fs.Write(blockBytes.ToArray());
-                    fs.Flush();
-                }
-            }
-
-            dumpFileName = "cluster_rom.bin";
+            var dumpFileName = $"cluster_rom_${startAddress:X6}.bin";
             Console.WriteLine($"Saving ROM dump to {dumpFileName}");
             using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
             {
-                for (uint addr = 0x002000; addr < 0x042000; addr += blockSize)
+                for (uint addr = startAddress; addr < startAddress + length; addr += blockSize)
                 {
-                    var blockBytes = kwp1281.CustomReadRom(addr, blockSize);
-                    if (blockBytes.Count != blockSize)
+                    var readLength = (byte)Math.Min(startAddress + length - addr, blockSize);
+                    var blockBytes = kwp1281.CustomReadRom(addr, readLength);
+                    if (blockBytes.Count != readLength)
                     {
                         throw new InvalidOperationException(
-                            $"Expected 0x{blockSize:X2} bytes from CustomReadRom() but received 0x{blockBytes.Count:X2} bytes");
+                            $"Expected 0x{readLength:X2} bytes from CustomReadRom() but received 0x{blockBytes.Count:X2} bytes");
                     }
                     fs.Write(blockBytes.ToArray());
                     fs.Flush();
