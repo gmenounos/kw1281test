@@ -20,6 +20,8 @@ namespace BitFab.KW1281Test
 
         List<byte> ReadEeprom(ushort address, byte count);
 
+        void WriteEeprom(ushort address, byte value);
+
         List<byte> ReadRomEeprom(ushort address, byte count);
 
         /// <summary>
@@ -137,6 +139,51 @@ namespace BitFab.KW1281Test
                 throw new InvalidOperationException($"ReadEeprom returned {blocks.Count} blocks instead of 1");
             }
             return blocks[0].Body.ToList();
+        }
+
+        public void WriteEeprom(ushort address, byte value)
+        {
+            Console.WriteLine($"Sending WriteEeprom block (Address: 0x{address:X4}, Value: 0x{value:X2})");
+
+            const byte count = 0x01; // Maybe we can support more in the future
+            var sendBody = new byte[]
+            {
+                (byte)BlockTitle.WriteEeprom,
+                count,
+                (byte)(address >> 8),
+                (byte)(address & 0xFF),
+                value
+            };
+
+            SendBlock(sendBody.ToList());
+            var blocks = ReceiveBlocks();
+
+            if (blocks.Count == 1 && blocks[0] is NakBlock)
+            {
+                // Permissions issue
+                Console.WriteLine("WriteEeprom failed");
+                return;
+            }
+
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
+            if (blocks.Count != 1)
+            {
+                Console.WriteLine($"WriteEeprom returned {blocks.Count} blocks instead of 1");
+                return;
+            }
+
+            var block = blocks[0];
+            if (!(block is WriteEepromResponseBlock))
+            {
+                Console.WriteLine($"Expected WriteEepromResponseBlock but got {block.GetType()}");
+                return;
+            }
+
+            if (!Enumerable.SequenceEqual(block.Body, sendBody.Skip(1)))
+            {
+                Console.WriteLine("WriteEepromResponseBlock body does not match WriteEepromBlock");
+                return;
+            }
         }
 
         public List<byte> ReadRomEeprom(ushort address, byte count)
@@ -319,6 +366,9 @@ namespace BitFab.KW1281Test
 
                 case (byte)BlockTitle.ReadEepromResponse:
                     return new ReadEepromResponseBlock(blockBytes);
+
+                case (byte)BlockTitle.WriteEepromResponse:
+                    return new WriteEepromResponseBlock(blockBytes);
 
                 case (byte)BlockTitle.ReadRomEepromResponse:
                     return new ReadRomEepromResponse(blockBytes);

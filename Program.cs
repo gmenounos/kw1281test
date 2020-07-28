@@ -24,6 +24,7 @@ namespace BitFab.KW1281Test
             var command = args[3];
             uint address = 0;
             uint length = 0;
+            byte value = 0;
 
             if (string.Compare(command, "ReadEeprom", true) == 0)
             {
@@ -46,6 +47,17 @@ namespace BitFab.KW1281Test
 
                 address = ParseUint(args[4]);
                 length = ParseUint(args[5]);
+            }
+            else if (string.Compare(command, "WriteEeprom", true) == 0)
+            {
+                if (args.Length < 6)
+                {
+                    ShowUsage();
+                    return;
+                }
+
+                address = ParseUint(args[4]);
+                value = (byte)ParseUint(args[5]);
             }
 
             Console.WriteLine($"Opening serial port {portName}");
@@ -75,7 +87,7 @@ namespace BitFab.KW1281Test
 
                 if (string.Compare(command, "ReadEeprom", true) == 0)
                 {
-                    UnlockControllerForEepromRead(kwp1281, (ControllerAddress)controllerAddress);
+                    UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)controllerAddress);
 
                     var blockBytes = kwp1281.ReadEeprom((ushort)address, 1);
                     if (blockBytes == null)
@@ -84,10 +96,17 @@ namespace BitFab.KW1281Test
                     }
                     else
                     {
-                        var value = blockBytes[0];
+                        value = blockBytes[0];
                         Console.WriteLine(
                             $"Address {address} (${address:X4}): Value {value} (${value:X2})");
                     }
+                }
+
+                if (string.Compare(command, "WriteEeprom", true) == 0)
+                {
+                    UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)controllerAddress);
+
+                    kwp1281.WriteEeprom((ushort)address, value);
                 }
 
                 if (string.Compare(command, "DumpEeprom", true) == 0)
@@ -211,7 +230,7 @@ namespace BitFab.KW1281Test
 
         private static void DumpCcmEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
         {
-            UnlockControllerForEepromRead(kwp1281, ControllerAddress.CCM);
+            UnlockControllerForEepromReadWrite(kwp1281, ControllerAddress.CCM);
 
             const byte maxReadLength = 12;
 
@@ -219,7 +238,7 @@ namespace BitFab.KW1281Test
             SaveEeprom(bytes, $"ccm_eeprom_${startAddress:X4}.bin");
         }
 
-        private static void UnlockControllerForEepromRead(
+        private static void UnlockControllerForEepromReadWrite(
             IKW1281Dialog kwp1281, ControllerAddress controllerAddress)
         {
             if (controllerAddress == ControllerAddress.CCM)
@@ -299,7 +318,7 @@ namespace BitFab.KW1281Test
         {
             var identInfo = kwp1281.ReadIdent();
 
-            UnlockControllerForEepromRead(kwp1281, ControllerAddress.Cluster);
+            UnlockControllerForEepromReadWrite(kwp1281, ControllerAddress.Cluster);
 
             var bytes = ReadEeprom(kwp1281, startAddress, length, 16);
             var dumpFileName = identInfo.ToString().Replace(' ', '_') + $"_${startAddress:X4}_eeprom.bin";
@@ -366,6 +385,9 @@ namespace BitFab.KW1281Test
             Console.WriteLine("                 ReadSoftwareVersion");
             Console.WriteLine("                 ReadEeprom ADDRESS");
             Console.WriteLine("                            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");
+            Console.WriteLine("                 WriteEeprom ADDRESS VALUE");
+            Console.WriteLine("                             ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");
+            Console.WriteLine("                             VALUE   = Value in decimal (e.g. 138) or hex (e.g. $8A)");
             Console.WriteLine("                 DumpEeprom START LENGTH");
             Console.WriteLine("                            START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
             Console.WriteLine("                            LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)");
