@@ -371,7 +371,7 @@ namespace BitFab.KW1281Test
             Console.WriteLine("                            LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)");
             Console.WriteLine("                 DumpRom START LENGTH");
             Console.WriteLine("                         START  = Start address in decimal (e.g. 8192) or hex (e.g. $2000)");
-            Console.WriteLine("                         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000");
+            Console.WriteLine("                         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)");
             Console.WriteLine("                 MapEeprom");
             Console.WriteLine("                 Reset");
             Console.WriteLine("                 DelcoVWPremium5SafeCode");
