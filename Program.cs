@@ -368,7 +368,7 @@ namespace BitFab.KW1281Test
             Console.WriteLine("                            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");
             Console.WriteLine("                 DumpEeprom START LENGTH");
             Console.WriteLine("                            START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
-            Console.WriteLine("                            LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800");
+            Console.WriteLine("                            LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)");
             Console.WriteLine("                 DumpRom START LENGTH");
             Console.WriteLine("                         START  = Start address in decimal (e.g. 8192) or hex (e.g. $2000)");
             Console.WriteLine("                         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000");
