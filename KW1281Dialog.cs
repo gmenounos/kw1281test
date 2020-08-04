@@ -238,8 +238,11 @@ namespace BitFab.KW1281Test
 
         public void CustomReadSoftwareVersion()
         {
-            Console.WriteLine("Sending Custom \"Read Software Version\" block");
-            SendCustom(new List<byte> { 0x84 });
+            Console.WriteLine("Sending Custom \"Read Software Version\" blocks");
+            SendCustom(new List<byte> { 0x84, 0x00 });
+            SendCustom(new List<byte> { 0x84, 0x01 });
+            SendCustom(new List<byte> { 0x84, 0x02 });
+            SendCustom(new List<byte> { 0x84, 0x03 });
         }
 
         public void CustomReset()
