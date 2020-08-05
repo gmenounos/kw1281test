@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO.Ports;
-using System.Threading;
 
 namespace BitFab.KW1281Test
 {

@@ -264,17 +264,23 @@ namespace BitFab.KW1281Test
                 }
 
                 // Perform Seed/Key authentication
-#if false
                 Console.WriteLine("Sending Custom \"Seed request\" block");
                 response = kwp1281.SendCustom(new List<byte> { 0x96, 0x01 });
-                foreach (var block in response.Where(b => !b.IsAckNak))
-                {
-                    Console.WriteLine($"Block: {Dump(block.Body)}");
-                }
 
-                Console.WriteLine("Sending Custom \"Key response\" block");
-                response = kwp1281.SendCustom(new List<byte> { 0x96, 0x02, 0x07, 0x57, 0x1F, 0x00, 0xA4, 0x00, 0x44, 0x00 });
-#endif
+                responseBlocks = response.Where(b => !b.IsAckNak).ToList();
+                if (responseBlocks.Count == 1 && responseBlocks[0] is CustomBlock customBlock)
+                {
+                    Console.WriteLine($"Block: {Dump(customBlock.Body)}");
+
+                    var keyBytes = KeyFinder.FindKey(customBlock.Body.ToArray());
+
+                    Console.WriteLine("Sending Custom \"Key response\" block");
+
+                    var keyResponse = new List<byte> { 0x96, 0x02 };
+                    keyResponse.AddRange(keyBytes);
+
+                    response = kwp1281.SendCustom(keyResponse);
+                }
             }
         }
 
