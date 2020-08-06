@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace BitFab.KW1281Test
 {
@@ -59,14 +60,14 @@ namespace BitFab.KW1281Test
             if (syncByte != 0x55)
             {
                 throw new InvalidOperationException(
-                    $"Unexpected sync byte: Expected 0x55, Actual 0x{syncByte:X2}");
+                    $"Unexpected sync byte: Expected $55, Actual ${syncByte:X2}");
             }
 
             var keywordLsb = _interface.ReadByte();
-            Console.WriteLine($"Keyword Lsb 0x{keywordLsb:X2}");
+            Console.WriteLine($"Keyword Lsb ${keywordLsb:X2}");
 
             var keywordMsb = ReadAndAckByte();
-            Console.WriteLine($"Keyword Msb 0x{keywordMsb:X2}");
+            Console.WriteLine($"Keyword Msb ${keywordMsb:X2}");
 
             if (keywordLsb == 0x01 && keywordMsb == 0x8A)
             {
@@ -117,7 +118,7 @@ namespace BitFab.KW1281Test
         /// <returns>The bytes or null if the bytes could not be read</returns>
         public List<byte> ReadEeprom(ushort address, byte count)
         {
-            Console.WriteLine($"Sending ReadEeprom block (Address: 0x{address:X4}, Count: 0x{count:X2})");
+            Console.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.ReadEeprom,
@@ -143,7 +144,7 @@ namespace BitFab.KW1281Test
 
         public void WriteEeprom(ushort address, byte value)
         {
-            Console.WriteLine($"Sending WriteEeprom block (Address: 0x{address:X4}, Value: 0x{value:X2})");
+            Console.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Value: ${value:X2})");
 
             const byte count = 0x01; // Maybe we can support more in the future
             var sendBody = new byte[]
@@ -188,7 +189,7 @@ namespace BitFab.KW1281Test
 
         public List<byte> ReadRomEeprom(ushort address, byte count)
         {
-            Console.WriteLine($"Sending ReadEeprom block (Address: 0x{address:X4}, Count: 0x{count:X2})");
+            Console.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.ReadRomEeprom,
@@ -213,7 +214,7 @@ namespace BitFab.KW1281Test
 
         public List<byte> CustomReadRom(uint address, byte count)
         {
-            Console.WriteLine($"Sending Custom \"Read ROM\" block (Address: 0x{address:X6}, Count: 0x{count:X2})");
+            Console.WriteLine($"Sending Custom \"Read ROM\" block (Address: ${address:X6}, Count: ${count:X2})");
             var blocks = SendCustom(new List<byte>
             {
                 0x86,
@@ -239,10 +240,52 @@ namespace BitFab.KW1281Test
         public void CustomReadSoftwareVersion()
         {
             Console.WriteLine("Sending Custom \"Read Software Version\" blocks");
-            SendCustom(new List<byte> { 0x84, 0x00 });
-            SendCustom(new List<byte> { 0x84, 0x01 });
-            SendCustom(new List<byte> { 0x84, 0x02 });
-            SendCustom(new List<byte> { 0x84, 0x03 });
+
+            // The cluster can return 4 variations of software version, specified by the 2nd byte
+            // of the block:
+            // 0x00 - Cluster software version
+            // 0x01 - Unknown
+            // 0x02 - Unknown
+            // 0x03 - Unknown
+            for (byte variation = 0x00; variation < 0x04; variation++)
+            {
+                var blocks = SendCustom(new List<byte> { 0x84, variation });
+                foreach (var block in blocks.Where(b => !b.IsAck))
+                {
+                    Console.WriteLine($"{variation:X2}: {DumpMixedContent(block)}");
+                }
+            }
+        }
+
+        private string DumpMixedContent(Block block)
+        {
+            if (block.IsNak)
+            {
+                return "NAK";
+            }
+
+            char mode = '?';
+            var sb = new StringBuilder();
+            foreach(var b in block.Body)
+            {
+                if (b >= 32 && b <= 126)
+                {
+                    mode = 'A';
+
+                    sb.Append((char)b);
+                }
+                else
+                {
+                    if (mode == 'A')
+                    {
+                        sb.Append(" ");
+                    }
+                    mode = 'X';
+
+                    sb.Append($"${b:X2} ");
+                }
+            }
+            return sb.ToString();
         }
 
         public void CustomReset()
@@ -288,7 +331,7 @@ namespace BitFab.KW1281Test
             while (true)
             {
                 var block = ReceiveBlock();
-                blocks.Add(block);
+                blocks.Add(block); // TODO: Maybe don't add the block if it's an Ack
                 if (block is AckBlock || block is NakBlock)
                 {
                     break;
@@ -325,7 +368,7 @@ namespace BitFab.KW1281Test
             if (actualComplement != expectedComplement)
             {
                 throw new InvalidOperationException(
-                    $"Received complement 0x{actualComplement:X2} but expected 0x{expectedComplement:X2}");
+                    $"Received complement ${actualComplement:X2} but expected ${expectedComplement:X2}");
             }
         }
 
@@ -353,7 +396,7 @@ namespace BitFab.KW1281Test
             if (blockEnd != 0x03)
             {
                 throw new InvalidOperationException(
-                    $"Received block end 0x{blockEnd:X2} but expected 0x03");
+                    $"Received block end ${blockEnd:X2} but expected $03");
             }
 
             switch (blockTitle)
@@ -401,7 +444,7 @@ namespace BitFab.KW1281Test
             else if (blockCounter != _blockCounter)
             {
                 throw new InvalidOperationException(
-                    $"Received block counter 0x{blockCounter:X2} but expected 0x{_blockCounter:X2}");
+                    $"Received block counter ${blockCounter:X2} but expected ${_blockCounter:X2}");
             }
             _blockCounter++;
             return blockCounter;

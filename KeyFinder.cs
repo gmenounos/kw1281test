@@ -7,8 +7,6 @@ namespace BitFab.KW1281Test
         /// <summary>
         /// Takes a 10-byte seed block and generates an 8-byte key block.
         /// </summary>
-        /// <param name="seed"></param>
-        /// <returns></returns>
         public static byte[] FindKey(byte[] seed)
         {
             if (seed.Length != 10)
@@ -30,8 +28,6 @@ namespace BitFab.KW1281Test
         /// <summary>
         /// Takes a 4-byte seed and calculates a 4-byte key.
         /// </summary>
-        /// <param name="seed"></param>
-        /// <returns></returns>
         private static byte[] CalculateKey(byte[] seed)
         {
             var work = new byte[] { 0x07, seed[0], seed[1], seed[2], seed[3], 0x00, 0x00 };
@@ -104,8 +100,6 @@ namespace BitFab.KW1281Test
         /// <summary>
         /// Right-Rotate the first 4 bytes of a buffer count times.
         /// </summary>
-        /// <param name="buf"></param>
-        /// <param name="count"></param>
         private static void RightRotateFirst4Bytes(byte[] buf, int count)
         {
             while (count != 0)
@@ -122,9 +116,6 @@ namespace BitFab.KW1281Test
         /// <summary>
         /// Rotate a byte right.
         /// </summary>
-        /// <param name="value"></param>
-        /// <param name="carry"></param>
-        /// <returns></returns>
         private static byte RightRotate(byte value, ref bool carry)
         {
             var newCarry = (value & 0x01) != 0;
@@ -154,9 +145,6 @@ namespace BitFab.KW1281Test
         /// <summary>
         /// Left-Rotate a value count-times.
         /// </summary>
-        /// <param name="value"></param>
-        /// <param name="count"></param>
-        /// <returns></returns>
         private static byte LeftRotate(byte value, int count)
         {
             while (count != 0)
@@ -172,9 +160,6 @@ namespace BitFab.KW1281Test
         /// <summary>
         /// Left-Rotate a value.
         /// </summary>
-        /// <param name="value"></param>
-        /// <param name="carry"></param>
-        /// <returns></returns>
         private static byte LeftRotate(byte value, ref bool carry)
         {
             var newCarry = (value & 0x80) != 0;

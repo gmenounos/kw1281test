@@ -7,7 +7,7 @@ namespace BitFab.KW1281Test.Blocks
     {
         public CustomBlock(List<byte> bytes) : base(bytes)
         {
-            Dump();
+            // Dump();
         }
 
         private void Dump()

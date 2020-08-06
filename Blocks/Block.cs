@@ -22,6 +22,10 @@ namespace BitFab.KW1281Test.Blocks
         /// </summary>
         public IEnumerable<byte> Body => Bytes.Skip(3).Take(Bytes.Count - 4);
 
-        public bool IsAckNak { get; protected set; } = false;
+        public bool IsAck => Title == (byte)BlockTitle.ACK;
+
+        public bool IsNak => Title == (byte)BlockTitle.NAK;
+
+        public bool IsAckNak => IsAck || IsNak;
     }
 }

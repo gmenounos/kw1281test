@@ -7,7 +7,6 @@ namespace BitFab.KW1281Test.Blocks
     {
         public NakBlock(List<byte> bytes) : base(bytes)
         {
-            IsAckNak = true;
             Dump();
         }
 
