@@ -24,5 +24,5 @@ the source code. Type `dotnet build` to build the tool.
 4. You can run the tool by typing `dotnet run`
 
 ##### Credits
-Protocol Info: https://www.blafusel.de/obd/obd2_kw1281.html
+Protocol Info: https://www.blafusel.de/obd/obd2_kw1281.html  
 VW Radio Reverse Engineering Info: https://github.com/mnaberez/vwradio
