@@ -247,18 +247,32 @@ namespace BitFab.KW1281Test
             }
             else if (controllerAddress == ControllerAddress.Cluster)
             {
+                var versionBlocks = kwp1281.CustomReadSoftwareVersion();
+
+                // Now we need to send an unlock code that is unique to each ROM version
                 Console.WriteLine("Sending Custom \"Unlock partial EEPROM read\" block");
-                var response = kwp1281.SendCustom(new List<byte> { 0x9D, 0x39, 0x34, 0x34, 0x40 });
+                var unlockCode = GetClusterUnlockCode(versionBlocks[0].Body.ToList());
+                if (unlockCode == null)
+                {
+                    Console.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
+                }
+                else
+                {
+                    unlockCode.Insert(0, 0x9D);
+                    kwp1281.SendCustom(unlockCode);
+                }
 
                 Console.WriteLine("Sending Custom \"Are you unlocked?\" block");
-                response = kwp1281.SendCustom(new List<byte> { 0x96, 0x04 });
+                var response = kwp1281.SendCustom(new List<byte> { 0x96, 0x04 });
                 var responseBlocks = response.Where(b => !b.IsAckNak).ToList();
                 if (responseBlocks.Count == 1 && responseBlocks[0] is CustomBlock)
                 {
                     // Custom 0x04 means need to do Seed/Key
                     // Custom 0x07 means unlocked
-                    if (responseBlocks[0].Body.ToArray()[0] == 0x07)
+                    if (responseBlocks[0].Body.First() == 0x07)
                     {
+                        Console.WriteLine(
+                            "Cluster is unlocked for EEPROM access. Skipping Seed/Key login.");
                         return;
                     }
                 }
@@ -282,6 +296,35 @@ namespace BitFab.KW1281Test
                     response = kwp1281.SendCustom(keyResponse);
                 }
             }
+        }
+
+        /// <summary>
+        /// Different cluster models have different unlock codes. Return the appropriate one based
+        /// on the cluster's software version.
+        /// </summary>
+        private static List<Byte> GetClusterUnlockCode(List<byte> softwareVersion)
+        {
+            if (Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK501MH", 0x10, 0x01)))
+            {
+                return new List<byte> { 0x39, 0x34, 0x34, 0x40 };
+            }
+            else if (Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK501MH", 0x00, 0x01)))
+            {
+                return new List<byte> { 0x36, 0x3D, 0x3E, 0x47 };
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        private static IEnumerable<byte> ClusterVersion(
+            string software, byte romMajor, byte romMinor)
+        {
+            var versionBytes = new List<byte>(Encoding.ASCII.GetBytes(software));
+            versionBytes.Add(romMajor);
+            versionBytes.Add(romMinor);
+            return versionBytes;
         }
 
         private static void SaveEeprom(List<byte> bytes, string fileName)

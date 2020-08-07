@@ -33,7 +33,7 @@ namespace BitFab.KW1281Test
         /// <summary>
         /// http://www.maltchev.com/kiti/VAG_guide.txt
         /// </summary>
-        void CustomReadSoftwareVersion();
+        Dictionary<int, Block> CustomReadSoftwareVersion();
 
         List<byte> CustomReadRom(uint address, byte count);
 
@@ -237,8 +237,10 @@ namespace BitFab.KW1281Test
             SendCustom(new List<byte> { 0x80, 0x01, 0x02, 0x03, 0x04 });
         }
 
-        public void CustomReadSoftwareVersion()
+        public Dictionary<int, Block> CustomReadSoftwareVersion()
         {
+            var versionBlocks = new Dictionary<int, Block>();
+
             Console.WriteLine("Sending Custom \"Read Software Version\" blocks");
 
             // The cluster can return 4 variations of software version, specified by the 2nd byte
@@ -250,11 +252,21 @@ namespace BitFab.KW1281Test
             for (byte variation = 0x00; variation < 0x04; variation++)
             {
                 var blocks = SendCustom(new List<byte> { 0x84, variation });
-                foreach (var block in blocks.Where(b => !b.IsAck))
+                foreach (var block in blocks.Where(b => !b.IsAckNak))
                 {
-                    Console.WriteLine($"{variation:X2}: {DumpMixedContent(block)}");
+                    if (variation == 0x00 || variation == 0x03)
+                    {
+                        Console.WriteLine($"{variation:X2}: {DumpMixedContent(block)}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{variation:X2}: {DumpBinaryContent(block)}");
+                    }
+                    versionBlocks[variation] = block;
                 }
             }
+
+            return versionBlocks;
         }
 
         private string DumpMixedContent(Block block)
@@ -284,6 +296,21 @@ namespace BitFab.KW1281Test
 
                     sb.Append($"${b:X2} ");
                 }
+            }
+            return sb.ToString();
+        }
+
+        private string DumpBinaryContent(Block block)
+        {
+            if (block.IsNak)
+            {
+                return "NAK";
+            }
+
+            var sb = new StringBuilder();
+            foreach (var b in block.Body)
+            {
+                sb.Append($"${b:X2} ");
             }
             return sb.ToString();
         }
