@@ -30,4 +30,5 @@ the source code. Type `dotnet build` to build the tool.
 
 ##### Credits
 Protocol Info: https://www.blafusel.de/obd/obd2_kw1281.html  
-VW Radio Reverse Engineering Info: https://github.com/mnaberez/vwradio
+VW Radio Reverse Engineering Info: https://github.com/mnaberez/vwradio  
+6502bench SourceGen: https://6502bench.com/
