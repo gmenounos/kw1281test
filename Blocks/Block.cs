@@ -20,7 +20,7 @@ namespace BitFab.KW1281Test.Blocks
         /// <summary>
         /// Returns the body of the block, excluding the length, counter, title and end bytes.
         /// </summary>
-        public IEnumerable<byte> Body => Bytes.Skip(3).Take(Bytes.Count - 4);
+        public List<byte> Body => Bytes.Skip(3).Take(Bytes.Count - 4).ToList();
 
         public bool IsAck => Title == (byte)BlockTitle.ACK;
 

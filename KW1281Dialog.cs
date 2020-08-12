@@ -27,6 +27,7 @@ namespace BitFab.KW1281Test
 
         /// <summary>
         /// http://www.maltchev.com/kiti/VAG_guide.txt
+        /// This unlocks additional custom commands $81-$AF
         /// </summary>
         void CustomUnlockAdditionalCommands();
 
@@ -35,7 +36,7 @@ namespace BitFab.KW1281Test
         /// </summary>
         Dictionary<int, Block> CustomReadSoftwareVersion();
 
-        List<byte> CustomReadRom(uint address, byte count);
+        List<byte> CustomReadMemory(uint address, byte count);
 
         void CustomReset();
 
@@ -212,9 +213,9 @@ namespace BitFab.KW1281Test
             return blocks[0].Body.ToList();
         }
 
-        public List<byte> CustomReadRom(uint address, byte count)
+        public List<byte> CustomReadMemory(uint address, byte count)
         {
-            Console.WriteLine($"Sending Custom \"Read ROM\" block (Address: ${address:X6}, Count: ${count:X2})");
+            Console.WriteLine($"Sending Custom \"Read Memory\" block (Address: ${address:X6}, Count: ${count:X2})");
             var blocks = SendCustom(new List<byte>
             {
                 0x86,
@@ -226,7 +227,7 @@ namespace BitFab.KW1281Test
             blocks = blocks.Where(b => !b.IsAckNak).ToList();
             if (blocks.Count != 1)
             {
-                throw new InvalidOperationException($"Custom \"Read ROM\" returned {blocks.Count} blocks instead of 1");
+                throw new InvalidOperationException($"Custom \"Read Memory\" returned {blocks.Count} blocks instead of 1");
             }
             return blocks[0].Body.ToList();
         }
@@ -276,9 +277,17 @@ namespace BitFab.KW1281Test
                 return "NAK";
             }
 
+            return DumpMixedContent(block.Body);
+        }
+
+        /// <summary>
+        /// Todo: Move to utility class
+        /// </summary>
+        public static string DumpMixedContent(IEnumerable<byte> content)
+        {
             char mode = '?';
             var sb = new StringBuilder();
-            foreach(var b in block.Body)
+            foreach (var b in content)
             {
                 if (b >= 32 && b <= 126)
                 {
