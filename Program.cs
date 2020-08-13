@@ -37,7 +37,7 @@ namespace BitFab.KW1281Test
                 address = ParseUint(args[4]);
             }
             else if (string.Compare(command, "DumpEeprom", true) == 0 ||
-                     string.Compare(command, "DumpRom", true) == 0)
+                     string.Compare(command, "DumpMem", true) == 0)
             {
                 if (args.Length < 6)
                 {
@@ -125,11 +125,11 @@ namespace BitFab.KW1281Test
                     }
                 }
 
-                if (string.Compare(command, "DumpRom", true) == 0)
+                if (string.Compare(command, "DumpMem", true) == 0)
                 {
                     if (controllerAddress == (int)ControllerAddress.Cluster)
                     {
-                        DumpClusterRom(kwp1281, address, length);
+                        DumpClusterMem(kwp1281, address, length);
                     }
                     else
                     {
@@ -331,6 +331,7 @@ namespace BitFab.KW1281Test
                     {
                         Console.WriteLine("Please report this to the program maintainer.");
                     }
+                    unlocked = true;
                     break;
                 }
                 else if (!unlockResponse[0].IsNak)
@@ -464,14 +465,14 @@ namespace BitFab.KW1281Test
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
         }
 
-        private static void DumpClusterRom(IKW1281Dialog kwp1281, uint startAddress, uint length)
+        private static void DumpClusterMem(IKW1281Dialog kwp1281, uint startAddress, uint length)
         {
             UnlockControllerForEepromReadWrite(kwp1281, ControllerAddress.Cluster);
 
             const byte blockSize = 0x10;
 
-            var dumpFileName = $"cluster_rom_${startAddress:X6}.bin";
-            Console.WriteLine($"Saving ROM dump to {dumpFileName}");
+            var dumpFileName = $"cluster_mem_${startAddress:X6}.bin";
+            Console.WriteLine($"Saving memory dump to {dumpFileName}");
             using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
             {
                 for (uint addr = startAddress; addr < startAddress + length; addr += blockSize)
@@ -481,7 +482,7 @@ namespace BitFab.KW1281Test
                     if (blockBytes.Count != readLength)
                     {
                         throw new InvalidOperationException(
-                            $"Expected 0x{readLength:X2} bytes from CustomReadRom() but received 0x{blockBytes.Count:X2} bytes");
+                            $"Expected 0x{readLength:X2} bytes from CustomReadMemory() but received 0x{blockBytes.Count:X2} bytes");
                     }
                     fs.Write(blockBytes.ToArray());
                     fs.Flush();
@@ -531,7 +532,7 @@ namespace BitFab.KW1281Test
             Console.WriteLine("                 DumpEeprom START LENGTH");
             Console.WriteLine("                            START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
             Console.WriteLine("                            LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)");
-            Console.WriteLine("                 DumpRom START LENGTH");
+            Console.WriteLine("                 DumpMem START LENGTH");
             Console.WriteLine("                         START  = Start address in decimal (e.g. 8192) or hex (e.g. $2000)");
             Console.WriteLine("                         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)");
             Console.WriteLine("                 MapEeprom");
