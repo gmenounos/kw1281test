@@ -106,7 +106,7 @@ namespace BitFab.KW1281Test
                 {
                     UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)controllerAddress);
 
-                    kwp1281.WriteEeprom((ushort)address, value);
+                    kwp1281.WriteEeprom((ushort)address, new List<byte> { value });
                 }
 
                 if (string.Compare(command, "DumpEeprom", true) == 0)

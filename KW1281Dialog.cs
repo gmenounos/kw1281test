@@ -21,7 +21,7 @@ namespace BitFab.KW1281Test
 
         List<byte> ReadEeprom(ushort address, byte count);
 
-        void WriteEeprom(ushort address, byte value);
+        void WriteEeprom(ushort address, List<byte> values);
 
         List<byte> ReadRomEeprom(ushort address, byte count);
 
@@ -143,19 +143,19 @@ namespace BitFab.KW1281Test
             return blocks[0].Body.ToList();
         }
 
-        public void WriteEeprom(ushort address, byte value)
+        public void WriteEeprom(ushort address, List<byte> values)
         {
-            Console.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Value: ${value:X2})");
+            Console.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Values: {DumpBytes(values)}");
 
-            const byte count = 0x01; // Maybe we can support more in the future
-            var sendBody = new byte[]
+            byte count = (byte)values.Count;
+            var sendBody = new List<byte>
             {
                 (byte)BlockTitle.WriteEeprom,
                 count,
                 (byte)(address >> 8),
                 (byte)(address & 0xFF),
-                value
             };
+            sendBody.AddRange(values);
 
             SendBlock(sendBody.ToList());
             var blocks = ReceiveBlocks();
@@ -316,8 +316,13 @@ namespace BitFab.KW1281Test
                 return "NAK";
             }
 
+            return DumpBytes(block.Body);
+        }
+
+        private string DumpBytes(IEnumerable<byte> bytes)
+        {
             var sb = new StringBuilder();
-            foreach (var b in block.Body)
+            foreach (var b in bytes)
             {
                 sb.Append($"${b:X2} ");
             }
