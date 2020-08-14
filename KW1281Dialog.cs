@@ -21,7 +21,7 @@ namespace BitFab.KW1281Test
 
         List<byte> ReadEeprom(ushort address, byte count);
 
-        void WriteEeprom(ushort address, List<byte> values);
+        bool WriteEeprom(ushort address, List<byte> values);
 
         List<byte> ReadRomEeprom(ushort address, byte count);
 
@@ -143,7 +143,7 @@ namespace BitFab.KW1281Test
             return blocks[0].Body.ToList();
         }
 
-        public void WriteEeprom(ushort address, List<byte> values)
+        public bool WriteEeprom(ushort address, List<byte> values)
         {
             Console.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Values: {DumpBytes(values)}");
 
@@ -164,28 +164,30 @@ namespace BitFab.KW1281Test
             {
                 // Permissions issue
                 Console.WriteLine("WriteEeprom failed");
-                return;
+                return false;
             }
 
             blocks = blocks.Where(b => !b.IsAckNak).ToList();
             if (blocks.Count != 1)
             {
                 Console.WriteLine($"WriteEeprom returned {blocks.Count} blocks instead of 1");
-                return;
+                return false;
             }
 
             var block = blocks[0];
             if (!(block is WriteEepromResponseBlock))
             {
                 Console.WriteLine($"Expected WriteEepromResponseBlock but got {block.GetType()}");
-                return;
+                return false;
             }
 
-            if (!Enumerable.SequenceEqual(block.Body, sendBody.Skip(1)))
+            if (!Enumerable.SequenceEqual(block.Body, sendBody.Skip(1).Take(4)))
             {
                 Console.WriteLine("WriteEepromResponseBlock body does not match WriteEepromBlock");
-                return;
+                return false;
             }
+
+            return true;
         }
 
         public List<byte> ReadRomEeprom(ushort address, byte count)

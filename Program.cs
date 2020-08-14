@@ -25,6 +25,7 @@ namespace BitFab.KW1281Test
             uint address = 0;
             uint length = 0;
             byte value = 0;
+            string filename = null;
 
             if (string.Compare(command, "ReadEeprom", true) == 0)
             {
@@ -58,6 +59,17 @@ namespace BitFab.KW1281Test
 
                 address = ParseUint(args[4]);
                 value = (byte)ParseUint(args[5]);
+            }
+            else if (string.Compare(command, "LoadEeprom", true) == 0)
+            {
+                if (args.Length < 6)
+                {
+                    ShowUsage();
+                    return;
+                }
+
+                address = ParseUint(args[4]);
+                filename = args[5];
             }
 
             Console.WriteLine($"Opening serial port {portName}");
@@ -122,6 +134,18 @@ namespace BitFab.KW1281Test
                     else
                     {
                         Console.WriteLine("Only supported for cluster and CCM");
+                    }
+                }
+
+                if (string.Compare(command, "LoadEeprom", true) == 0)
+                {
+                    if (controllerAddress == (int)ControllerAddress.Cluster)
+                    {
+                        LoadClusterEeprom(kwp1281, (ushort)address, filename);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Only supported for cluster");
                     }
                 }
 
@@ -453,6 +477,28 @@ namespace BitFab.KW1281Test
             return bytes;
         }
 
+        private static void WriteEeprom(
+            IKW1281Dialog kwp1281, ushort startAddr, byte[] bytes, uint maxWriteLength)
+        {
+            var succeeded = true;
+            var length = bytes.Length;
+            for (uint addr = startAddr; addr < (startAddr + length); addr += maxWriteLength)
+            {
+                var writeLength = (byte)Math.Min(startAddr + length - addr, maxWriteLength);
+                if (!kwp1281.WriteEeprom(
+                    (ushort)addr,
+                    bytes.Skip((int)(addr - startAddr)).Take(writeLength).ToList()))
+                {
+                    succeeded = false;
+                }
+            }
+
+            if (!succeeded)
+            {
+                Console.WriteLine("EEPROM write failed. You should probably try again.");
+            }
+        }
+
         private static void DumpClusterEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
         {
             var identInfo = kwp1281.ReadIdent();
@@ -463,6 +509,25 @@ namespace BitFab.KW1281Test
             var dumpFileName = identInfo.ToString().Replace(' ', '_') + $"_${startAddress:X4}_eeprom.bin";
             Console.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
+        }
+
+        private static void LoadClusterEeprom(IKW1281Dialog kwp1281, ushort address, string filename)
+        {
+            var identInfo = kwp1281.ReadIdent();
+
+            UnlockControllerForEepromReadWrite(kwp1281, ControllerAddress.Cluster);
+
+            if (!File.Exists(filename))
+            {
+                Console.WriteLine($"File {filename} does not exist.");
+                return;
+            }
+
+            Console.WriteLine($"Reading {filename}");
+            var bytes = File.ReadAllBytes(filename);
+
+            Console.WriteLine("Writing to cluster...");
+            WriteEeprom(kwp1281, address, bytes, 16);
         }
 
         private static void DumpClusterMem(IKW1281Dialog kwp1281, uint startAddress, uint length)
@@ -532,6 +597,9 @@ namespace BitFab.KW1281Test
             Console.WriteLine("                 DumpEeprom START LENGTH");
             Console.WriteLine("                            START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
             Console.WriteLine("                            LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)");
+            Console.WriteLine("                 LoadEeprom START FILENAME");
+            Console.WriteLine("                            START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
+            Console.WriteLine("                            FILENAME = Name of file containing binary data to load into EEPROM");
             Console.WriteLine("                 DumpMem START LENGTH");
             Console.WriteLine("                         START  = Start address in decimal (e.g. 8192) or hex (e.g. $2000)");
             Console.WriteLine("                         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)");
