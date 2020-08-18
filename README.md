@@ -9,7 +9,7 @@ The tool is written in .NET Core 3.1 and runs under Windows 10. It may also run 
 Windows 7, macOS and Linux but I have not tried them.
 
 If you don't have the .NET Core SDK installed, you can download a precompiled version
-(Win-x64 only) from the Releases page: https://github.com/gmenounos/kw1281test/releases/
+from the Releases page: https://github.com/gmenounos/kw1281test/releases/
 
 Otherwise, here's how to build it yourself:
 
