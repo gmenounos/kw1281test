@@ -12,6 +12,8 @@ namespace BitFab.KW1281Test
     {
         static void Main(string[] args)
         {
+            Console.WriteLine($"KW1281Test v0.20-beta (https://github.com/gmenounos/kw1281test/releases)");
+
             if (args.Length < 4)
             {
                 ShowUsage();
@@ -549,7 +551,7 @@ namespace BitFab.KW1281Test
                         throw new InvalidOperationException(
                             $"Expected 0x{readLength:X2} bytes from CustomReadMemory() but received 0x{blockBytes.Count:X2} bytes");
                     }
-                    fs.Write(blockBytes.ToArray());
+                    fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
                     fs.Flush();
                 }
             }

@@ -8,13 +8,11 @@ installing the Virtual COM Port drivers: https://www.ross-tech.com/vag-com/usb/v
 The tool is written in .NET Core 3.1 and runs under Windows 10. It may also run under
 Windows 7, macOS and Linux but I have not tried them.
 
-If you don't have the .NET Core SDK installed, you can download a precompiled version
-from the Releases page: https://github.com/gmenounos/kw1281test/releases/
+You can download a precompiled version from the Releases page: https://github.com/gmenounos/kw1281test/releases/
 
 Otherwise, here's how to build it yourself:
 
 ##### Compiling the tool
-For now you will have to compile the tool yourself.
 
 1. You will need the .NET Core SDK,
 which you can find here: https://dotnet.microsoft.com/download

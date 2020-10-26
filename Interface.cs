@@ -83,8 +83,10 @@ namespace BitFab.KW1281Test
         /// <param name="b">The byte to write.</param>
         public void BitBang5Baud(byte b)
         {
+#if !NET40
             // Disable garbage collection during this time-critical 
             bool noGc = GC.TryStartNoGCRegion(1024 * 1024);
+#endif
 
             const int bitsPerSec = 5;
             const int msecPerSec = 1000;
@@ -119,10 +121,12 @@ namespace BitFab.KW1281Test
 
             BitBang(true); // Stop bit
 
+#if !NET40
             if (noGc)
             {
                 GC.EndNoGCRegion();
             }
+#endif
 
             // Throw away anything that might be in the receive buffer
             _port.DiscardInBuffer();
