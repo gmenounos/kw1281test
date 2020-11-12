@@ -12,7 +12,7 @@ namespace BitFab.KW1281Test
     {
         static void Main(string[] args)
         {
-            Console.WriteLine($"KW1281Test v0.20-beta (https://github.com/gmenounos/kw1281test/releases)");
+            Console.WriteLine($"KW1281Test v0.25-beta (https://github.com/gmenounos/kw1281test/releases)");
 
             if (args.Length < 4)
             {

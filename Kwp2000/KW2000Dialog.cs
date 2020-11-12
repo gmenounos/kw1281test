@@ -78,8 +78,6 @@ namespace BitFab.KW1281Test
             Console.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
 
-            Console.WriteLine($"Memory: {DumpHex(bytes)}");
-
             EcuReset(0x01);
         }
 
