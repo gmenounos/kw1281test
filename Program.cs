@@ -28,6 +28,7 @@ namespace BitFab.KW1281Test
             uint length = 0;
             byte value = 0;
             string filename = null;
+            bool evenParityWakeup = false;
 
             if (string.Compare(command, "ReadEeprom", true) == 0)
             {
@@ -40,7 +41,8 @@ namespace BitFab.KW1281Test
                 address = ParseUint(args[4]);
             }
             else if (string.Compare(command, "DumpEeprom", true) == 0 ||
-                     string.Compare(command, "DumpMem", true) == 0)
+                     string.Compare(command, "DumpMem", true) == 0 ||
+                     string.Compare(command, "DumpRB8Eeprom", true) == 0)
             {
                 if (args.Length < 6)
                 {
@@ -50,6 +52,11 @@ namespace BitFab.KW1281Test
 
                 address = ParseUint(args[4]);
                 length = ParseUint(args[5]);
+
+                if (string.Compare(command, "DumpRB8Eeprom", true) == 0)
+                {
+                    evenParityWakeup = true;
+                }
             }
             else if (string.Compare(command, "WriteEeprom", true) == 0)
             {
@@ -77,15 +84,28 @@ namespace BitFab.KW1281Test
             Console.WriteLine($"Opening serial port {portName}");
             using (IInterface @interface = new Interface(portName, baudRate))
             {
-                IKW1281Dialog kwp1281 = new KW1281Dialog(@interface);
+                IKwpCommon kwpCommon = new KwpCommon(@interface);
 
                 Console.WriteLine("Sending wakeup message");
-                var ecuInfo = kwp1281.WakeUp((byte)controllerAddress);
-                Console.WriteLine($"ECU: {ecuInfo}");
+                var kwpVersion = kwpCommon.WakeUp((byte)controllerAddress, evenParityWakeup);
 
-                if (controllerAddress == (int)ControllerAddress.Cluster)
+                IKW1281Dialog kwp1281 = null;
+                KW2000Dialog kwp2000 = null;
+                if (kwpVersion == 1281)
                 {
-                    kwp1281.CustomUnlockAdditionalCommands();
+                    kwp1281 = new KW1281Dialog(kwpCommon);
+
+                    var ecuInfo = kwp1281.ReadEcuInfo();
+                    Console.WriteLine($"ECU: {ecuInfo}");
+
+                    if (controllerAddress == (int)ControllerAddress.Cluster)
+                    {
+                        kwp1281.CustomUnlockAdditionalCommands();
+                    }
+                }
+                else
+                {
+                    kwp2000 = new KW2000Dialog(kwpCommon, (byte)controllerAddress);
                 }
 
                 if (string.Compare(command, "ReadIdent", true) == 0)
@@ -136,6 +156,25 @@ namespace BitFab.KW1281Test
                     else
                     {
                         Console.WriteLine("Only supported for cluster and CCM");
+                    }
+                }
+
+                if (string.Compare(command, "DumpRB8Eeprom", true) == 0)
+                {
+                    if (controllerAddress == (int)ControllerAddress.Cluster)
+                    {
+                        if (kwpVersion >= 2000)
+                        {
+                            DumpClusterEepromRB8(kwp2000, address, length);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Cluster protocol is KWP{kwpVersion} but needs to be KWP2xxx");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Only supported for cluster (address 17)");
                     }
                 }
 
@@ -211,7 +250,10 @@ namespace BitFab.KW1281Test
                     }
                 }
 
-                kwp1281.EndCommunication();
+                if (kwpVersion == 1281)
+                {
+                    kwp1281.EndCommunication();
+                }
             }
         }
 
@@ -513,6 +555,12 @@ namespace BitFab.KW1281Test
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
         }
 
+        private static void DumpClusterEepromRB8(KW2000Dialog kwp2000, uint address, uint length)
+        {
+            kwp2000.SecurityAccess(0xFB);
+            kwp2000.DumpEeprom(address, length);
+        }
+
         private static void LoadClusterEeprom(IKW1281Dialog kwp1281, ushort address, string filename)
         {
             var identInfo = kwp1281.ReadIdent();
@@ -608,6 +656,9 @@ namespace BitFab.KW1281Test
             Console.WriteLine("                 MapEeprom");
             Console.WriteLine("                 Reset");
             Console.WriteLine("                 DelcoVWPremium5SafeCode");
+            Console.WriteLine("                 DumpRB8Eeprom START LENGTH");
+            Console.WriteLine("                               START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
+            Console.WriteLine("                               LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)");
         }
     }
 }

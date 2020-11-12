@@ -19,11 +19,14 @@ namespace BitFab.KW1281Test
         void WriteByte(byte b);
 
         /// <summary>
-        /// Send a byte at 5 baud manually to the port.
+        /// Send a byte at 5 baud manually to the port. The byte will be sent as
+        /// 1 start bit, 7 data bits, 1 parity bit (even or odd), 1 stop bit.
         /// https://www.blafusel.de/obd/obd2_kw1281.html
         /// </summary>
         /// <param name="b">The byte to write.</param>
-        void BitBang5Baud(byte b);
+        /// <param name="evenParity">
+        /// False for odd parity (KWP1281), true for even parity (KWP2000).</param>
+        void BitBang5Baud(byte b, bool evenParity);
     }
 
     class Interface : IInterface
@@ -51,10 +54,6 @@ namespace BitFab.KW1281Test
             _port.Close();
         }
 
-        /// <summary>
-        /// Read a byte from the interface.
-        /// </summary>
-        /// <returns>The byte.</returns>
         public byte ReadByte()
         {
             var b = (byte)_port.ReadByte();
@@ -76,15 +75,10 @@ namespace BitFab.KW1281Test
             }
         }
 
-        /// <summary>
-        /// Send a byte at 5 baud manually to the port.
-        /// https://www.blafusel.de/obd/obd2_kw1281.html
-        /// </summary>
-        /// <param name="b">The byte to write.</param>
-        public void BitBang5Baud(byte b)
+        public void BitBang5Baud(byte b, bool evenParity)
         {
 #if !NET40
-            // Disable garbage collection during this time-critical 
+            // Disable garbage collection during this time-critical code
             bool noGc = GC.TryStartNoGCRegion(1024 * 1024);
 #endif
 
@@ -100,14 +94,13 @@ namespace BitFab.KW1281Test
             {
                 while ((msecPerBit - stopWatch.ElapsedMilliseconds) > 0)
                     ;
-                // Thread.Sleep((int)(msecPerBit - stopWatch.ElapsedMilliseconds));
                 stopWatch.Restart();
                 _port.BreakState = !bit;
             };
 
             BitBang(false); // Start bit
 
-            bool parity = true; // XORed with each bit to produce odd parity
+            bool parity = !evenParity; // XORed with each bit to calculate parity bit
             for (int i = 0; i < 7; i++)
             {
                 bool bit = (b & 1) == 1;

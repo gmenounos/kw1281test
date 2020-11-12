@@ -11,7 +11,7 @@ namespace BitFab.KW1281Test
     /// </summary>
     internal interface IKW1281Dialog
     {
-        ControllerInfo WakeUp(byte controllerAddress);
+        ControllerInfo ReadEcuInfo();
 
         void EndCommunication();
 
@@ -47,42 +47,8 @@ namespace BitFab.KW1281Test
 
     internal class KW1281Dialog : IKW1281Dialog
     {
-        public KW1281Dialog(IInterface @interface)
+        public ControllerInfo ReadEcuInfo()
         {
-            _interface = @interface;
-        }
-
-        public ControllerInfo WakeUp(byte controllerAddress)
-        {
-            _interface.BitBang5Baud(controllerAddress);
-
-            Console.WriteLine("Reading sync byte");
-            var syncByte = _interface.ReadByte();
-            if (syncByte != 0x55)
-            {
-                throw new InvalidOperationException(
-                    $"Unexpected sync byte: Expected $55, Actual ${syncByte:X2}");
-            }
-
-            var keywordLsb = _interface.ReadByte();
-            Console.WriteLine($"Keyword Lsb ${keywordLsb:X2}");
-
-            var keywordMsb = ReadAndAckByte();
-            Console.WriteLine($"Keyword Msb ${keywordMsb:X2}");
-
-            if (keywordLsb == 0x01 && keywordMsb == 0x8A)
-            {
-                Console.WriteLine("Protocol is KW 1281 (8N1)");
-            }
-            else if (keywordLsb == 0xE9 && keywordMsb == 0x8F)
-            {
-                Console.WriteLine("Protocol is KW 2025 (8N1)");
-            }
-            else if (keywordLsb == 0x6B && keywordMsb == 0x8F)
-            {
-                Console.WriteLine("Protocol is KW 2027 (8N1)");
-            }
-
             var blocks = ReceiveBlocks();
             return new ControllerInfo(blocks.Where(b => !b.IsAckNak));
         }
@@ -364,7 +330,7 @@ namespace BitFab.KW1281Test
                 WriteByteAndReadAck(b);
             }
 
-            _interface.WriteByte(0x03); // Block end, does not get ACK'd
+            _kwpCommon.WriteByte(0x03); // Block end, does not get ACK'd
         }
 
         private List<Block> ReceiveBlocks()
@@ -385,56 +351,32 @@ namespace BitFab.KW1281Test
             return blocks;
         }
 
-        private byte ReadAndAckByte()
-        {
-            var b = _interface.ReadByte();
-            WriteComplement(b);
-            return b;
-        }
-
-        private void WriteComplement(byte b)
-        {
-            var complement = (byte)~b;
-            _interface.WriteByte(complement);
-        }
-
         private void WriteByteAndReadAck(byte b)
         {
-            _interface.WriteByte(b);
-            ReadComplement(b);
-        }
-
-        private void ReadComplement(byte b)
-        {
-            var expectedComplement = (byte)~b;
-            var actualComplement = _interface.ReadByte();
-            if (actualComplement != expectedComplement)
-            {
-                throw new InvalidOperationException(
-                    $"Received complement ${actualComplement:X2} but expected ${expectedComplement:X2}");
-            }
+            _kwpCommon.WriteByte(b);
+            _kwpCommon.ReadComplement(b);
         }
 
         private Block ReceiveBlock()
         {
             var blockBytes = new List<byte>();
 
-            var blockLength = ReadAndAckByte();
+            var blockLength = _kwpCommon.ReadAndAckByte();
             blockBytes.Add(blockLength);
 
             var blockCounter = ReadBlockCounter();
             blockBytes.Add(blockCounter);
 
-            var blockTitle = ReadAndAckByte();
+            var blockTitle = _kwpCommon.ReadAndAckByte();
             blockBytes.Add(blockTitle);
 
             for (int i = 0; i < blockLength - 3; i++)
             {
-                var b = ReadAndAckByte();
+                var b = _kwpCommon.ReadAndAckByte();
                 blockBytes.Add(b);
             }
 
-            var blockEnd = _interface.ReadByte();
+            var blockEnd = _kwpCommon.ReadByte();
             blockBytes.Add(blockEnd);
             if (blockEnd != 0x03)
             {
@@ -478,7 +420,7 @@ namespace BitFab.KW1281Test
 
         private byte ReadBlockCounter()
         {
-            var blockCounter = ReadAndAckByte();
+            var blockCounter = _kwpCommon.ReadAndAckByte();
             if (!_blockCounter.HasValue)
             {
                 // First block
@@ -493,7 +435,13 @@ namespace BitFab.KW1281Test
             return blockCounter;
         }
 
-        private readonly IInterface _interface;
         private byte? _blockCounter = null;
+
+        private readonly IKwpCommon _kwpCommon;
+
+        public KW1281Dialog(IKwpCommon kwpCommon)
+        {
+            _kwpCommon = kwpCommon;
+        }
     }
 }
