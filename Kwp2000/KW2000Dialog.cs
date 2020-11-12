@@ -74,7 +74,7 @@ namespace BitFab.KW1281Test
 
             var bytes = ReadEeprom(address, length, 32);
 
-            var dumpFileName = $"RB8_${address:X4}_eeprom.bin";
+            var dumpFileName = $"RB8_${address:X6}_eeprom.bin";
             Console.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
 

@@ -17,7 +17,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.IO.Ports" Version="4.7.0" Condition="'$(TargetFramework)' != 'net40'" />
+    <PackageReference Include="System.IO.Ports" Version="5.0" Condition="'$(TargetFramework)' != 'net40'" />
   </ItemGroup>
 
 </Project>
