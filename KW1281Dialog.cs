@@ -238,7 +238,7 @@ namespace BitFab.KW1281Test
             return versionBlocks;
         }
 
-        private string DumpMixedContent(Block block)
+        private static string DumpMixedContent(Block block)
         {
             if (block.IsNak)
             {
@@ -267,7 +267,7 @@ namespace BitFab.KW1281Test
                 {
                     if (mode == 'A')
                     {
-                        sb.Append(" ");
+                        sb.Append(' ');
                     }
                     mode = 'X';
 
@@ -277,7 +277,7 @@ namespace BitFab.KW1281Test
             return sb.ToString();
         }
 
-        private string DumpBinaryContent(Block block)
+        private static string DumpBinaryContent(Block block)
         {
             if (block.IsNak)
             {
@@ -287,7 +287,7 @@ namespace BitFab.KW1281Test
             return DumpBytes(block.Body);
         }
 
-        private string DumpBytes(IEnumerable<byte> bytes)
+        private static string DumpBytes(IEnumerable<byte> bytes)
         {
             var sb = new StringBuilder();
             foreach (var b in bytes)
@@ -384,32 +384,17 @@ namespace BitFab.KW1281Test
                     $"Received block end ${blockEnd:X2} but expected $03");
             }
 
-            switch (blockTitle)
+            return blockTitle switch
             {
-                case (byte)BlockTitle.AsciiData:
-                    return new AsciiDataBlock(blockBytes);
-
-                case (byte)BlockTitle.ACK:
-                    return new AckBlock(blockBytes);
-
-                case (byte)BlockTitle.NAK:
-                    return new NakBlock(blockBytes);
-
-                case (byte)BlockTitle.ReadEepromResponse:
-                    return new ReadEepromResponseBlock(blockBytes);
-
-                case (byte)BlockTitle.WriteEepromResponse:
-                    return new WriteEepromResponseBlock(blockBytes);
-
-                case (byte)BlockTitle.ReadRomEepromResponse:
-                    return new ReadRomEepromResponse(blockBytes);
-
-                case (byte)BlockTitle.Custom:
-                    return new CustomBlock(blockBytes);
-
-                default:
-                    return new UnknownBlock(blockBytes);
-            }
+                (byte)BlockTitle.AsciiData => new AsciiDataBlock(blockBytes),
+                (byte)BlockTitle.ACK => new AckBlock(blockBytes),
+                (byte)BlockTitle.NAK => new NakBlock(blockBytes),
+                (byte)BlockTitle.ReadEepromResponse => new ReadEepromResponseBlock(blockBytes),
+                (byte)BlockTitle.WriteEepromResponse => new WriteEepromResponseBlock(blockBytes),
+                (byte)BlockTitle.ReadRomEepromResponse => new ReadRomEepromResponse(blockBytes),
+                (byte)BlockTitle.Custom => new CustomBlock(blockBytes),
+                _ => new UnknownBlock(blockBytes),
+            };
         }
 
         private void SendAckBlock()

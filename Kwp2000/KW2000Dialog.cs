@@ -72,28 +72,31 @@ namespace BitFab.KW1281Test
 
             Thread.Sleep(350);
 
-            var bytes = ReadEeprom(address, length, 32);
-
             var dumpFileName = $"RB8_${address:X6}_eeprom.bin";
+
             Console.WriteLine($"Saving EEPROM dump to {dumpFileName}");
-            File.WriteAllBytes(dumpFileName, bytes.ToArray());
+            DumpMemory(address, length, maxReadLength: 32, dumpFileName);
+            Console.WriteLine($"Saved EEPROM dump to {dumpFileName}");
 
             EcuReset(0x01);
         }
 
-        private List<byte> ReadEeprom(
-            uint startAddr, uint length, byte maxReadLength)
+        private void DumpMemory(
+            uint startAddr, uint length, byte maxReadLength, string fileName)
         {
-            var bytes = new List<byte>();
-
+            using var fs = File.Create(fileName, maxReadLength, FileOptions.WriteThrough);
             for (uint addr = startAddr; addr < (startAddr + length); addr += maxReadLength)
             {
                 var readLength = (byte)Math.Min(startAddr + length - addr, maxReadLength);
-                var blockBytes = ReadMemoryByAddress(addr, readLength).ToList();
-                bytes.AddRange(blockBytes);
+                var blockBytes = ReadMemoryByAddress(addr, readLength);
+                if (blockBytes.Length != readLength)
+                {
+                    throw new InvalidOperationException(
+                        $"Expected {readLength} bytes from ReadMemoryByAddress() but received {blockBytes.Length} bytes");
+                }
+                fs.Write(blockBytes, 0, blockBytes.Length);
+                fs.Flush();
             }
-
-            return bytes;
         }
 
         private void StartDiagnosticSession(byte v1, byte v2)
@@ -200,7 +203,7 @@ namespace BitFab.KW1281Test
             return message;
         }
 
-        private string DumpAscii(IEnumerable<byte> bytes)
+        private static string DumpAscii(IEnumerable<byte> bytes)
         {
             var sb = new StringBuilder();
             foreach (var b in bytes)
@@ -210,7 +213,7 @@ namespace BitFab.KW1281Test
             return sb.ToString();
         }
 
-        private string DumpHex(IEnumerable<byte> bytes)
+        private static string DumpHex(IEnumerable<byte> bytes)
         {
             var sb = new StringBuilder();
             foreach (var b in bytes)
