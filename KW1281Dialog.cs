@@ -55,7 +55,7 @@ namespace BitFab.KW1281Test
 
         public void Login(ushort code, ushort workshopCode, byte unknown)
         {
-            Console.WriteLine("Sending Login block");
+            Logger.WriteLine("Sending Login block");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.Login,
@@ -71,7 +71,7 @@ namespace BitFab.KW1281Test
 
         public ControllerIdent ReadIdent()
         {
-            Console.WriteLine("Sending ReadIdent block");
+            Logger.WriteLine("Sending ReadIdent block");
             SendBlock(new List<byte> { (byte)BlockTitle.ReadIdent });
             var blocks = ReceiveBlocks();
             return new ControllerIdent(blocks.Where(b => !b.IsAckNak));
@@ -85,7 +85,7 @@ namespace BitFab.KW1281Test
         /// <returns>The bytes or null if the bytes could not be read</returns>
         public List<byte> ReadEeprom(ushort address, byte count)
         {
-            Console.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
+            Logger.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.ReadEeprom,
@@ -111,7 +111,7 @@ namespace BitFab.KW1281Test
 
         public bool WriteEeprom(ushort address, List<byte> values)
         {
-            Console.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Values: {DumpBytes(values)}");
+            Logger.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Values: {DumpBytes(values)}");
 
             byte count = (byte)values.Count;
             var sendBody = new List<byte>
@@ -129,27 +129,27 @@ namespace BitFab.KW1281Test
             if (blocks.Count == 1 && blocks[0] is NakBlock)
             {
                 // Permissions issue
-                Console.WriteLine("WriteEeprom failed");
+                Logger.WriteLine("WriteEeprom failed");
                 return false;
             }
 
             blocks = blocks.Where(b => !b.IsAckNak).ToList();
             if (blocks.Count != 1)
             {
-                Console.WriteLine($"WriteEeprom returned {blocks.Count} blocks instead of 1");
+                Logger.WriteLine($"WriteEeprom returned {blocks.Count} blocks instead of 1");
                 return false;
             }
 
             var block = blocks[0];
             if (!(block is WriteEepromResponseBlock))
             {
-                Console.WriteLine($"Expected WriteEepromResponseBlock but got {block.GetType()}");
+                Logger.WriteLine($"Expected WriteEepromResponseBlock but got {block.GetType()}");
                 return false;
             }
 
             if (!Enumerable.SequenceEqual(block.Body, sendBody.Skip(1).Take(4)))
             {
-                Console.WriteLine("WriteEepromResponseBlock body does not match WriteEepromBlock");
+                Logger.WriteLine("WriteEepromResponseBlock body does not match WriteEepromBlock");
                 return false;
             }
 
@@ -158,7 +158,7 @@ namespace BitFab.KW1281Test
 
         public List<byte> ReadRomEeprom(ushort address, byte count)
         {
-            Console.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
+            Logger.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.ReadRomEeprom,
@@ -183,7 +183,7 @@ namespace BitFab.KW1281Test
 
         public List<byte> CustomReadMemory(uint address, byte count)
         {
-            Console.WriteLine($"Sending Custom \"Read Memory\" block (Address: ${address:X6}, Count: ${count:X2})");
+            Logger.WriteLine($"Sending Custom \"Read Memory\" block (Address: ${address:X6}, Count: ${count:X2})");
             var blocks = SendCustom(new List<byte>
             {
                 0x86,
@@ -202,7 +202,7 @@ namespace BitFab.KW1281Test
 
         public void CustomUnlockAdditionalCommands()
         {
-            Console.WriteLine("Sending Custom \"Unlock Additional Commands\" block");
+            Logger.WriteLine("Sending Custom \"Unlock Additional Commands\" block");
             SendCustom(new List<byte> { 0x80, 0x01, 0x02, 0x03, 0x04 });
         }
 
@@ -210,7 +210,7 @@ namespace BitFab.KW1281Test
         {
             var versionBlocks = new Dictionary<int, Block>();
 
-            Console.WriteLine("Sending Custom \"Read Software Version\" blocks");
+            Logger.WriteLine("Sending Custom \"Read Software Version\" blocks");
 
             // The cluster can return 4 variations of software version, specified by the 2nd byte
             // of the block:
@@ -225,11 +225,11 @@ namespace BitFab.KW1281Test
                 {
                     if (variation == 0x00 || variation == 0x03)
                     {
-                        Console.WriteLine($"{variation:X2}: {DumpMixedContent(block)}");
+                        Logger.WriteLine($"{variation:X2}: {DumpMixedContent(block)}");
                     }
                     else
                     {
-                        Console.WriteLine($"{variation:X2}: {DumpBinaryContent(block)}");
+                        Logger.WriteLine($"{variation:X2}: {DumpBinaryContent(block)}");
                     }
                     versionBlocks[variation] = block;
                 }
@@ -299,7 +299,7 @@ namespace BitFab.KW1281Test
 
         public void CustomReset()
         {
-            Console.WriteLine("Sending Custom Reset block");
+            Logger.WriteLine("Sending Custom Reset block");
             SendCustom(new List<byte> { 0x82 });
         }
 
@@ -312,7 +312,7 @@ namespace BitFab.KW1281Test
 
         public void EndCommunication()
         {
-            Console.WriteLine("Sending EndCommunication block");
+            Logger.WriteLine("Sending EndCommunication block");
             SendBlock(new List<byte> { (byte)BlockTitle.End });
         }
 

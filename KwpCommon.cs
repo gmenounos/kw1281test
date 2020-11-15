@@ -26,7 +26,7 @@ namespace BitFab.KW1281Test
         {
             _interface.BitBang5Baud(controllerAddress, evenParity);
 
-            Console.WriteLine("Reading sync byte");
+            Logger.WriteLine("Reading sync byte");
             var syncByte = _interface.ReadByte();
             if (syncByte != 0x55)
             {
@@ -35,13 +35,13 @@ namespace BitFab.KW1281Test
             }
 
             var keywordLsb = _interface.ReadByte();
-            Console.WriteLine($"Keyword Lsb ${keywordLsb:X2}");
+            Logger.WriteLine($"Keyword Lsb ${keywordLsb:X2}");
 
             var keywordMsb = ReadAndAckByte();
-            Console.WriteLine($"Keyword Msb ${keywordMsb:X2}");
+            Logger.WriteLine($"Keyword Msb ${keywordMsb:X2}");
 
             var protocolVersion = ((keywordMsb & 0x7F) << 7) + (keywordLsb & 0x7F);
-            Console.WriteLine($"Protocol is KW {protocolVersion} (8N1)");
+            Logger.WriteLine($"Protocol is KW {protocolVersion} (8N1)");
 
             if (protocolVersion >= 2000)
             {

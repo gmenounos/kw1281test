@@ -12,13 +12,13 @@ namespace BitFab.KW1281Test.Blocks
 
         private void Dump()
         {
-            Console.Write("Received Custom block:");
+            Logger.Write("Received Custom block:");
             for (var i = 3; i < Bytes.Count - 1; i++)
             {
-                Console.Write($" {Bytes[i]:X2}");
+                Logger.Write($" {Bytes[i]:X2}");
             }
 
-            Console.WriteLine();
+            Logger.WriteLine();
         }
     }
 }

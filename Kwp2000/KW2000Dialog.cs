@@ -51,14 +51,14 @@ namespace BitFab.KW1281Test
                             (byte)(key & 0xFF)
                         });
 
-                    Console.WriteLine("Success!!!");
+                    Logger.WriteLine("Success!!!");
                     return true;
                 }
                 catch(NegativeResponseException)
                 {
                     if (i < (maxTries - 1))
                     {
-                        Console.WriteLine("Trying again.");
+                        Logger.WriteLine("Trying again.");
                     }
                 }
             }
@@ -74,9 +74,9 @@ namespace BitFab.KW1281Test
 
             var dumpFileName = $"RB8_${address:X6}_eeprom.bin";
 
-            Console.WriteLine($"Saving EEPROM dump to {dumpFileName}");
+            Logger.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             DumpMemory(address, length, maxReadLength: 32, dumpFileName);
-            Console.WriteLine($"Saved EEPROM dump to {dumpFileName}");
+            Logger.WriteLine($"Saved EEPROM dump to {dumpFileName}");
 
             EcuReset(0x01);
         }
@@ -179,7 +179,7 @@ namespace BitFab.KW1281Test
             }
             _kwpCommon.WriteByte(message.Checksum);
 
-            Console.WriteLine($"Sent: {message}");
+            Logger.WriteLine($"Sent: {message}");
         }
 
         private Kwp2000Message ReceiveMessage()
@@ -199,7 +199,7 @@ namespace BitFab.KW1281Test
 
             var message = new Kwp2000Message(
                 header, destAddress, srcAddress, service, body, checksum);
-            Console.WriteLine($"Received: {message}");
+            Logger.WriteLine($"Received: {message}");
             return message;
         }
 

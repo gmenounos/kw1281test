@@ -25,7 +25,7 @@ namespace BitFab.KW1281Test
                 }
                 else
                 {
-                    Console.WriteLine($"Controller wakeup returned block of type {block.GetType()}");
+                    Logger.WriteLine($"Controller wakeup returned block of type {block.GetType()}");
                 }
             }
             Text = sb.ToString();

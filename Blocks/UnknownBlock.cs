@@ -12,12 +12,12 @@ namespace BitFab.KW1281Test.Blocks
 
         private void Dump()
         {
-            Console.Write("Received unknown block:");
+            Logger.Write("Received unknown block:");
             foreach (var b in Bytes)
             {
-                Console.Write($" 0x{b:X2}");
+                Logger.Write($" 0x{b:X2}");
             }
-            Console.WriteLine();
+            Logger.WriteLine();
         }
     }
 }

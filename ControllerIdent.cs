@@ -21,7 +21,7 @@ namespace BitFab.KW1281Test
                 }
                 else
                 {
-                    Console.WriteLine($"ReadIdent returned block of type {block.GetType()}");
+                    Logger.WriteLine($"ReadIdent returned block of type {block.GetType()}");
                 }
             }
             Text = sb.ToString();
