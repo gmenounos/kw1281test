@@ -457,7 +457,9 @@ namespace BitFab.KW1281Test
             {
                 return new[] { new byte[] { 0x38, 0x3F, 0x40, 0x35 } };
             }
-            else if (Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500LL", 0x20, 0x01)))
+            else if (
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500LL", 0x20, 0x01)) || // 1J0920905L V01
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500MH", 0x10, 0x01)))   // 1J0920925D V06
             {
                 return new[] { new byte[] { 0x01, 0x04, 0x3D, 0x35 } };
             }
@@ -500,6 +502,7 @@ namespace BitFab.KW1281Test
             new byte[] { 0x38, 0x43, 0x38, 0x3F },
             new byte[] { 0x38, 0x47, 0x34, 0x3A },
             new byte[] { 0x39, 0x34, 0x34, 0x40 },
+            new byte[] { 0x01, 0x04, 0x3D, 0x35 },
         };
 
         private IEnumerable<byte> ClusterVersion(
