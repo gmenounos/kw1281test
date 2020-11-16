@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net5.0;net40</TargetFrameworks>
+    <TargetFrameworks>netcoreapp3.1;net40</TargetFrameworks>
     <RootNamespace>BitFab.KW1281Test</RootNamespace>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>

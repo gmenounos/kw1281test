@@ -5,7 +5,7 @@ This tool can send a few KW1281 commands over a dumb serial->KKL or USB->KKL cab
 If you have a legacy Ross-Tech USB cable, you can probably use that cable by
 installing the Virtual COM Port drivers: https://www.ross-tech.com/vag-com/usb/virtual-com-port.php
 
-The tool is written in .NET 5.0 and runs under Windows 10. It may also run under
+The tool is written in .NET Core 3.1 and runs under Windows 10. It may also run under
 Windows 7, macOS and Linux but I have not tried them.
 
 You can download a precompiled version from the Releases page: https://github.com/gmenounos/kw1281test/releases/

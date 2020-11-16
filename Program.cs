@@ -685,8 +685,8 @@ namespace BitFab.KW1281Test
             Logger.WriteLine("                 Reset");
             Logger.WriteLine("                 DelcoVWPremium5SafeCode");
             Logger.WriteLine("                 DumpRB8Eeprom START LENGTH");
-            Logger.WriteLine("                               START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
-            Logger.WriteLine("                               LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)");
+            Logger.WriteLine("                               START  = Start address in decimal (e.g. 66560) or hex (e.g. $10400)");
+            Logger.WriteLine("                               LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)");
         }
     }
 }
