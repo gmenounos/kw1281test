@@ -31,7 +31,7 @@ namespace BitFab.KW1281Test
 
         void Run(string[] args)
         {
-            Logger.WriteLine($"KW1281Test v0.25-beta (https://github.com/gmenounos/kw1281test/releases)");
+            Logger.WriteLine($"KW1281Test v0.26-beta (https://github.com/gmenounos/kw1281test/releases)");
 
             if (args.Length < 4)
             {
@@ -455,7 +455,7 @@ namespace BitFab.KW1281Test
             {
                 return new[] { new byte[] { 0x3A, 0x39, 0x31, 0x43 } };
             }
-            else if (Enumerable.SequenceEqual(softwareVersion, ClusterVersion("V599LLA ", 0x00, 0x01)))
+            else if (Enumerable.SequenceEqual(softwareVersion, ClusterVersion("V599LLA ", 0x00, 0x01))) // 1J0920800L V59
             {
                 return new[] { new byte[] { 0x38, 0x3F, 0x40, 0x35 } };
             }
@@ -614,7 +614,7 @@ namespace BitFab.KW1281Test
         {
             UnlockControllerForEepromReadWrite(kwp1281, ControllerAddress.Cluster);
 
-            const byte blockSize = 0x10;
+            const byte blockSize = 15;
 
             var dumpFileName = $"cluster_mem_${startAddress:X6}.bin";
             Logger.WriteLine($"Saving memory dump to {dumpFileName}");
