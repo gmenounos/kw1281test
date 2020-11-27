@@ -286,10 +286,10 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private void MapClusterEeprom(IKW1281Dialog kwp1281)
+        private static void MapClusterEeprom(IKW1281Dialog kwp1281)
         {
             // Unlock partial EEPROM read
-            var response = kwp1281.SendCustom(new List<byte> { 0x9D, 0x39, 0x34, 0x34, 0x40 });
+            _ = kwp1281.SendCustom(new List<byte> { 0x9D, 0x39, 0x34, 0x34, 0x40 });
 
             var bytes = new List<byte>();
             const byte blockSize = 1;
@@ -306,7 +306,7 @@ namespace BitFab.KW1281Test
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
         }
 
-        private void MapCcmEeprom(IKW1281Dialog kwp1281)
+        private static void MapCcmEeprom(IKW1281Dialog kwp1281)
         {
             kwp1281.Login(19283, 222);
 
@@ -325,7 +325,7 @@ namespace BitFab.KW1281Test
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
         }
 
-        private void DumpCcmRom(IKW1281Dialog kwp1281)
+        private static void DumpCcmRom(IKW1281Dialog kwp1281)
         {
             kwp1281.Login(19283, 222);
 
@@ -409,7 +409,7 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private void ClusterSeedKeyAuthenticate(IKW1281Dialog kwp1281)
+        private static void ClusterSeedKeyAuthenticate(IKW1281Dialog kwp1281)
         {
             // Perform Seed/Key authentication
             Logger.WriteLine("Sending Custom \"Seed request\" block");
@@ -431,7 +431,7 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private bool ClusterRequiresSeedKey(IKW1281Dialog kwp1281)
+        private static bool ClusterRequiresSeedKey(IKW1281Dialog kwp1281)
         {
             Logger.WriteLine("Sending Custom \"Need Seed/Key?\" block");
             var response = kwp1281.SendCustom(new List<byte> { 0x96, 0x04 });
@@ -567,7 +567,7 @@ namespace BitFab.KW1281Test
             new byte[] { 0x3E, 0x35, 0x3D, 0x3A },
         };
 
-        private IEnumerable<byte> ClusterVersion(
+        private static IEnumerable<byte> ClusterVersion(
             string software, byte romMajor, byte romMinor)
         {
             var versionBytes = new List<byte>(Encoding.ASCII.GetBytes(software))
@@ -578,7 +578,7 @@ namespace BitFab.KW1281Test
             return versionBytes;
         }
 
-        private void DumpEeprom(
+        private static void DumpEeprom(
             IKW1281Dialog kwp1281, ushort startAddr, ushort length, byte maxReadLength, string fileName)
         {
             bool succeeded = true;
@@ -609,7 +609,7 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private void WriteEeprom(
+        private static void WriteEeprom(
             IKW1281Dialog kwp1281, ushort startAddr, byte[] bytes, uint maxWriteLength)
         {
             var succeeded = true;
@@ -644,7 +644,7 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Saved EEPROM dump to {dumpFileName}");
         }
 
-        private void DumpClusterEepromRB8(KW2000Dialog kwp2000, uint address, uint length)
+        private static void DumpClusterEepromRB8(KW2000Dialog kwp2000, uint address, uint length)
         {
             kwp2000.SecurityAccess(0xFB);
             kwp2000.DumpEeprom(address, length);
@@ -652,7 +652,7 @@ namespace BitFab.KW1281Test
 
         private void LoadClusterEeprom(IKW1281Dialog kwp1281, ushort address, string filename)
         {
-            var identInfo = kwp1281.ReadIdent();
+            _ = kwp1281.ReadIdent();
 
             UnlockControllerForEepromReadWrite(kwp1281, ControllerAddress.Cluster);
 
@@ -695,7 +695,7 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Saved memory dump to {dumpFileName}");
         }
 
-        private string Dump(IEnumerable<byte> body)
+        private static string Dump(IEnumerable<byte> body)
         {
             var sb = new StringBuilder();
             foreach (var b in body)
@@ -705,13 +705,13 @@ namespace BitFab.KW1281Test
             return sb.ToString();
         }
 
-        private uint ParseUint(string numberString)
+        private static uint ParseUint(string numberString)
         {
             uint number;
 
             if (numberString.StartsWith("$"))
             {
-                number = uint.Parse(numberString.Substring(1), NumberStyles.HexNumber);
+                number = uint.Parse(numberString[1..], NumberStyles.HexNumber);
             }
             else
             {
@@ -721,7 +721,7 @@ namespace BitFab.KW1281Test
             return number;
         }
 
-        private void ShowUsage()
+        private static void ShowUsage()
         {
             Logger.WriteLine("Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]");
             Logger.WriteLine("       PORT    = COM1|COM2|etc.");
