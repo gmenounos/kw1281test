@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 
 namespace BitFab.KW1281Test
 {
@@ -43,6 +44,8 @@ namespace BitFab.KW1281Test
         void SendBlock(List<byte> blockBytes);
 
         List<Block> SendCustom(List<byte> blockCustomBytes);
+
+        List<byte> ReadCcmRom(byte seg, byte msb, byte lsb, byte count);
     }
 
     internal class KW1281Dialog : IKW1281Dialog
@@ -109,6 +112,43 @@ namespace BitFab.KW1281Test
             return blocks[0].Body.ToList();
         }
 
+        /// <summary>
+        /// Reads a range of bytes from the CCM ROM.
+        /// </summary>
+        /// <param name="seg">0-15</param>
+        /// <param name="msb">0-15</param>
+        /// <param name="lsb">0-255</param>
+        /// <param name="count">8(-12?)</param>
+        /// <returns>The bytes or null if the bytes could not be read</returns>
+        public List<byte> ReadCcmRom(byte seg, byte msb, byte lsb, byte count)
+        {
+            Logger.WriteLine(
+                $"Sending ReadEeprom block (Address: ${seg:X2}{msb:X2}{lsb:X2}, Count: ${count:X2})");
+            SendBlock(new List<byte>
+            {
+                (byte)BlockTitle.ReadEeprom,
+                count,
+                msb,
+                lsb,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                (byte)(seg << 4)
+            });
+            var blocks = ReceiveBlocks();
+
+            if (blocks.Count == 1 && blocks[0] is NakBlock)
+            {
+                // Permissions issue
+                return null;
+            }
+
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
+            if (blocks.Count != 1)
+            {
+                throw new InvalidOperationException($"ReadEeprom returned {blocks.Count} blocks instead of 1");
+            }
+            return blocks[0].Body.ToList();
+        }
+
         public bool WriteEeprom(ushort address, List<byte> values)
         {
             Logger.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Values: {DumpBytes(values)}");
@@ -158,7 +198,7 @@ namespace BitFab.KW1281Test
 
         public List<byte> ReadRomEeprom(ushort address, byte count)
         {
-            Logger.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
+            Logger.WriteLine($"Sending ReadRomEeprom block (Address: ${address:X4}, Count: ${count:X2})");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.ReadRomEeprom,
@@ -328,6 +368,7 @@ namespace BitFab.KW1281Test
             foreach (var b in blockBytes)
             {
                 WriteByteAndReadAck(b);
+                // Thread.Sleep(1); // TODO: Is this necessary?
             }
 
             _kwpCommon.WriteByte(0x03); // Block end, does not get ACK'd

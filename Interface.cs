@@ -90,13 +90,13 @@ namespace BitFab.KW1281Test
             stopWatch.Start();
 
             // Delay the appropriate amount and then set/clear the TxD line
-            Action<bool> BitBang = bit =>
+            void BitBang(bool bit)
             {
                 while ((msecPerBit - stopWatch.ElapsedMilliseconds) > 0)
                     ;
                 stopWatch.Restart();
                 _port.BreakState = !bit;
-            };
+            }
 
             BitBang(false); // Start bit
 
@@ -125,8 +125,8 @@ namespace BitFab.KW1281Test
             _port.DiscardInBuffer();
         }
 
-        private SerialPort _port;
+        private readonly SerialPort _port;
 
-        private byte[] _buf = new byte[1];
+        private readonly byte[] _buf = new byte[1];
     }
 }

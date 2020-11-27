@@ -236,6 +236,18 @@ namespace BitFab.KW1281Test
                 }
             }
 
+            if (string.Compare(command, "DumpCcmRom", true) == 0)
+            {
+                if (controllerAddress == (int)ControllerAddress.CCM)
+                {
+                    DumpCcmRom(kwp1281);
+                }
+                else
+                {
+                    Logger.WriteLine("Only supported for CCM");
+                }
+            }
+
             if (string.Compare(command, "Reset", true) == 0)
             {
                 if (controllerAddress == (int)ControllerAddress.Cluster)
@@ -300,9 +312,9 @@ namespace BitFab.KW1281Test
 
             var bytes = new List<byte>();
             const byte blockSize = 1;
-            for (ushort addr = 0; addr < 65535; addr += blockSize)
+            for (int addr = 0; addr <= 65535; addr += blockSize)
             {
-                var blockBytes = kwp1281.ReadEeprom(addr, blockSize);
+                var blockBytes = kwp1281.ReadEeprom((ushort)addr, blockSize);
                 blockBytes = Enumerable.Repeat(
                     blockBytes == null ? (byte)0 : (byte)0xFF,
                     blockSize).ToList();
@@ -311,6 +323,53 @@ namespace BitFab.KW1281Test
             var dumpFileName = "ccm_eeprom_map.bin";
             Logger.WriteLine($"Saving EEPROM map to {dumpFileName}");
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
+        }
+
+        private void DumpCcmRom(IKW1281Dialog kwp1281)
+        {
+            kwp1281.Login(19283, 222);
+
+            var dumpFileName = "ccm_rom_dump.bin";
+            const byte blockSize = 8;
+
+            Logger.WriteLine($"Saving CCM ROM to {dumpFileName}");
+
+            bool succeeded = true;
+            using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
+            {
+                for (int seg = 0; seg < 16; seg++)
+                {
+                    for (int msb = 0; msb < 16; msb++)
+                    {
+                        for (int lsb = 0; lsb < 256; lsb += 8)
+                        {
+                            var blockBytes = kwp1281.ReadCcmRom((byte)seg, (byte)msb, (byte)lsb, blockSize);
+                            if (blockBytes == null)
+                            {
+                                blockBytes = Enumerable.Repeat((byte)0, blockSize).ToList();
+                                succeeded = false;
+                            }
+                            else if (blockBytes.Count < blockSize)
+                            {
+                                blockBytes.AddRange(Enumerable.Repeat((byte)0, blockSize - blockBytes.Count));
+                                succeeded = false;
+                            }
+
+                            fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
+                            fs.Flush();
+                        }
+                    }
+                }
+            }
+
+            if (!succeeded)
+            {
+                Logger.WriteLine();
+                Logger.WriteLine("**********************************************************************");
+                Logger.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
+                Logger.WriteLine("**********************************************************************");
+                Logger.WriteLine();
+            }
         }
 
         private void DumpCcmEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
@@ -690,6 +749,7 @@ namespace BitFab.KW1281Test
             Logger.WriteLine("                 DumpRB8Eeprom START LENGTH");
             Logger.WriteLine("                               START  = Start address in decimal (e.g. 66560) or hex (e.g. $10400)");
             Logger.WriteLine("                               LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)");
+            Logger.WriteLine("                 DumpCcmRom");
         }
     }
 }
