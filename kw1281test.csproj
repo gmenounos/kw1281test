@@ -11,6 +11,7 @@
     <Copyright>Copyright © 2020 Greg Menounos</Copyright>
     <DebugType>embedded</DebugType>
     <DebugSymbols>true</DebugSymbols>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
