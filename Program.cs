@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 
 namespace BitFab.KW1281Test
@@ -31,7 +32,10 @@ namespace BitFab.KW1281Test
 
         void Run(string[] args)
         {
-            Logger.WriteLine($"KW1281Test v0.26-beta (https://github.com/gmenounos/kw1281test/releases)");
+            var version = GetType().GetTypeInfo().Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                .InformationalVersion;
+            Logger.WriteLine($"KW1281Test {version} (https://github.com/gmenounos/kw1281test/releases)");
 
             if (args.Length < 4)
             {
