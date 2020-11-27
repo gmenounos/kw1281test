@@ -31,7 +31,7 @@ namespace BitFab.KW1281Test
 
         void Run(string[] args)
         {
-            Logger.WriteLine($"KW1281Test v0.26-beta (https://github.com/gmenounos/kw1281test/releases)");
+            Logger.WriteLine($"KW1281Test v0.27-beta (https://github.com/gmenounos/kw1281test/releases)");
 
             if (args.Length < 4)
             {
