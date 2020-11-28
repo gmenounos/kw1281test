@@ -46,6 +46,7 @@ namespace BitFab.KW1281Test
         List<Block> SendCustom(List<byte> blockCustomBytes);
 
         List<byte> ReadCcmRom(byte seg, byte msb, byte lsb, byte count);
+        List<byte> CustomReadNecRom(ushort address, byte count);
     }
 
     internal class KW1281Dialog : IKW1281Dialog
@@ -236,6 +237,32 @@ namespace BitFab.KW1281Test
             if (blocks.Count != 1)
             {
                 throw new InvalidOperationException($"Custom \"Read Memory\" returned {blocks.Count} blocks instead of 1");
+            }
+            return blocks[0].Body.ToList();
+        }
+
+        /// <summary>
+        /// Read the low 64KB of the cluster's NEC controller ROM.
+        /// For MFA clusters, that should cover the entire ROM.
+        /// For FIS clusters, the ROM is 128KB and more work is needed to retrieve the high 64KB.
+        /// </summary>
+        /// <param name="address"></param>
+        /// <param name="count"></param>
+        /// <returns></returns>
+        public List<byte> CustomReadNecRom(ushort address, byte count)
+        {
+            Logger.WriteLine($"Sending Custom \"Read NEC ROM\" block (Address: ${address:X4}, Count: ${count:X2})");
+            var blocks = SendCustom(new List<byte>
+            {
+                0xA6,
+                count,
+                (byte)(address & 0xFF),
+                (byte)((address >> 8) & 0xFF),
+            });
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
+            if (blocks.Count != 1)
+            {
+                throw new InvalidOperationException($"Custom \"Read NEC ROM\" returned {blocks.Count} blocks instead of 1");
             }
             return blocks[0].Body.ToList();
         }

@@ -252,6 +252,18 @@ namespace BitFab.KW1281Test
                 }
             }
 
+            if (string.Compare(command, "DumpClusterNecRom", true) == 0)
+            {
+                if (controllerAddress == (int)ControllerAddress.Cluster)
+                {
+                    DumpClusterNecRom(kwp1281);
+                }
+                else
+                {
+                    Logger.WriteLine("Only supported for cluster");
+                }
+            }
+
             if (string.Compare(command, "Reset", true) == 0)
             {
                 if (controllerAddress == (int)ControllerAddress.Cluster)
@@ -345,7 +357,7 @@ namespace BitFab.KW1281Test
                 {
                     for (int msb = 0; msb < 16; msb++)
                     {
-                        for (int lsb = 0; lsb < 256; lsb += 8)
+                        for (int lsb = 0; lsb < 256; lsb += blockSize)
                         {
                             var blockBytes = kwp1281.ReadCcmRom((byte)seg, (byte)msb, (byte)lsb, blockSize);
                             if (blockBytes == null)
@@ -362,6 +374,47 @@ namespace BitFab.KW1281Test
                             fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
                             fs.Flush();
                         }
+                    }
+                }
+            }
+
+            if (!succeeded)
+            {
+                Logger.WriteLine();
+                Logger.WriteLine("**********************************************************************");
+                Logger.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
+                Logger.WriteLine("**********************************************************************");
+                Logger.WriteLine();
+            }
+        }
+
+        private static void DumpClusterNecRom(IKW1281Dialog kwp1281)
+        {
+            var dumpFileName = "cluster_nec_rom_dump.bin";
+            const byte blockSize = 16;
+
+            Logger.WriteLine($"Saving cluster NEC ROM to {dumpFileName}");
+
+            bool succeeded = true;
+            using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
+            {
+                {
+                    for (int address = 0; address < 65536; address += blockSize)
+                    {
+                        var blockBytes = kwp1281.CustomReadNecRom((ushort)address, blockSize);
+                        if (blockBytes == null)
+                        {
+                            blockBytes = Enumerable.Repeat((byte)0, blockSize).ToList();
+                            succeeded = false;
+                        }
+                        else if (blockBytes.Count < blockSize)
+                        {
+                            blockBytes.AddRange(Enumerable.Repeat((byte)0, blockSize - blockBytes.Count));
+                            succeeded = false;
+                        }
+
+                        fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
+                        fs.Flush();
                     }
                 }
             }
@@ -754,6 +807,7 @@ namespace BitFab.KW1281Test
             Logger.WriteLine("                               START  = Start address in decimal (e.g. 66560) or hex (e.g. $10400)");
             Logger.WriteLine("                               LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)");
             Logger.WriteLine("                 DumpCcmRom");
+            Logger.WriteLine("                 DumpClusterNecRom");
         }
     }
 }
