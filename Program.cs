@@ -577,7 +577,8 @@ namespace BitFab.KW1281Test
             }
             else if (
                 Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500LL", 0x20, 0x01)) || // 1J0920905L V01
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500MH", 0x10, 0x01)))   // 1J0920925D V06
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500MH", 0x10, 0x01)) || // 1J0920925D V06
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500MH", 0x20, 0x01)))   // 1J5920825? V01?
             {
                 return new[] { new byte[] { 0x01, 0x04, 0x3D, 0x35 } };
             }

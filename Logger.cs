@@ -7,7 +7,7 @@ namespace BitFab.KW1281Test
     {
         internal static void Open(string filename)
         {
-            _writer = new StreamWriter(filename);
+            _writer = new StreamWriter(filename, append: true);
         }
 
         internal static void Close()

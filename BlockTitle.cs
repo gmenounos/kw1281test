@@ -4,6 +4,7 @@
     {
         ReadIdent = 0x00,
         ReadRomEeprom = 0x03,
+        ActuatorTest = 0x04,
         ClearErrors = 0x05,
         End = 0x06, // end output, end of communication
         GetErrors = 0x07, // get errors, all errors output
@@ -16,6 +17,7 @@
         Login = 0x2B,
         GroupReadingResponse = 0xE7,
         ReadEepromResponse = 0xEF,
+        ActuatorTestResponse = 0xF5,
         AsciiData = 0xF6,
         WriteEepromResponse = 0xF9,
         GetErrorsResponse = 0xFC,

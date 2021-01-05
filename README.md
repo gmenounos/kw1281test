@@ -1,11 +1,12 @@
 # kw1281test
 VW KW1281 Protocol Test Tool
 
-This tool can send a few KW1281 commands over a dumb serial->KKL or USB->KKL cable.
+This tool can send some KW1281 (and a few KW2000) commands over a dumb serial->KKL or USB->KKL cable.
 If you have a legacy Ross-Tech USB cable, you can probably use that cable by
 installing the Virtual COM Port drivers: https://www.ross-tech.com/vag-com/usb/virtual-com-port.php
+Functionality includes reading/writing the EEPROMs of many VW MKIV instrument clusters and Comfort Control Modules.
 
-The tool is written in .NET Core 3.1 and runs under Windows 10. It may also run under
+The tool is written in .NET 5.0 and runs under Windows 10. It may also run under
 Windows 7, macOS and Linux but I have not tried them.
 
 You can download a precompiled version from the Releases page: https://github.com/gmenounos/kw1281test/releases/
