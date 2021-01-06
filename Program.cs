@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace BitFab.KW1281Test
 {
@@ -132,6 +133,10 @@ namespace BitFab.KW1281Test
 
             switch (command.ToLower())
             {
+                case "actuatortest":
+                    ActuatorTest(kwp1281, controllerAddress);
+                    break;
+
                 case "delcovwpremium5safecode":
                     DelcoVWPremium5SafeCode(kwp1281, controllerAddress);
                     break;
@@ -185,6 +190,7 @@ namespace BitFab.KW1281Test
                     break;
 
                 default:
+                    ShowUsage();
                     break;
             }
 
@@ -195,6 +201,58 @@ namespace BitFab.KW1281Test
         }
 
         // Begin top-level commands
+
+        private static void ActuatorTest(IKW1281Dialog kwp1281, int controllerAddress)
+        {
+            bool cancel;
+
+            void keepAlive()
+            {
+                cancel = false;
+                while (!cancel)
+                {
+                    kwp1281.KeepAlive();
+                    Console.Write(".");
+                }
+            }
+
+            // $02 $96 - Tachometer
+            // $02 $95 - Coolant Temp
+            // $02 $98 - Fuel gauge
+            // $02 $97 - Speedometer
+            // $03 $1E - Segment test
+            // $02 $72 - 
+            // $02 $F2 - 
+            // $04 $16 - 
+            // $04 $3A - 
+            // $02 $F3 - 
+            // $01 $F5 - 
+            // $01 $F6 - Immobilizer warning
+            // $04 $17 - Brake warning
+            // $02 $99 - Seatbelt warning
+            // $02 $9A - Gong
+            // $03 $FF - Chime
+            // $04 $AB - End
+
+            ConsoleKeyInfo keyInfo;
+            do
+            {
+                var response = kwp1281.ActuatorTest(0x00);
+                if (response.Count == 0)
+                {
+                    Logger.WriteLine("End of test.");
+                    break;
+                }
+                Logger.WriteLine($"Actuator Test: {Dump(response)}");
+
+                var task = Task.Run(keepAlive);
+                Console.Write("Press a key or 'Q' to quit");
+                keyInfo = Console.ReadKey(intercept: true);
+                cancel = true;
+                task.Wait();
+                Console.WriteLine();
+            } while (keyInfo.Key != ConsoleKey.Q);
+        }
 
         private static void DelcoVWPremium5SafeCode(IKW1281Dialog kwp1281, int controllerAddress)
         {

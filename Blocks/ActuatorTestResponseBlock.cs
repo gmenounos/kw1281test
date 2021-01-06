@@ -2,16 +2,16 @@
 
 namespace BitFab.KW1281Test.Blocks
 {
-    internal class ReadRomEepromResponse : Block
+    internal class ActuatorTestResponseBlock : Block
     {
-        public ReadRomEepromResponse(List<byte> bytes) : base(bytes)
+        public ActuatorTestResponseBlock(List<byte> bytes) : base(bytes)
         {
             Dump();
         }
 
         private void Dump()
         {
-            Logger.Write("Received \"Read ROM/EEPROM Response\" block:");
+            Logger.Write("Received \"Actuator Test Response\" block:");
             foreach (var b in Body)
             {
                 Logger.Write($" {b:X2}");

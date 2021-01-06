@@ -46,7 +46,15 @@ namespace BitFab.KW1281Test
         List<Block> SendCustom(List<byte> blockCustomBytes);
 
         List<byte> ReadCcmRom(byte seg, byte msb, byte lsb, byte count);
+
         List<byte> CustomReadNecRom(ushort address, byte count);
+
+        /// <summary>
+        /// Keep the dialog alive by sending an ACK and receiving a response.
+        /// </summary>
+        void KeepAlive();
+
+        List<byte> ActuatorTest(byte value);
     }
 
     internal class KW1281Dialog : IKW1281Dialog
@@ -70,7 +78,7 @@ namespace BitFab.KW1281Test
                 (byte)(workshopCode & 0xFF)
             });
 
-            var blocks = ReceiveBlocks();
+            _ = ReceiveBlocks();
         }
 
         public ControllerIdent ReadIdent()
@@ -454,13 +462,14 @@ namespace BitFab.KW1281Test
 
             return blockTitle switch
             {
-                (byte)BlockTitle.AsciiData => new AsciiDataBlock(blockBytes),
                 (byte)BlockTitle.ACK => new AckBlock(blockBytes),
+                (byte)BlockTitle.ActuatorTestResponse => new ActuatorTestResponseBlock(blockBytes),
+                (byte)BlockTitle.AsciiData => new AsciiDataBlock(blockBytes),
+                (byte)BlockTitle.Custom => new CustomBlock(blockBytes),
                 (byte)BlockTitle.NAK => new NakBlock(blockBytes),
                 (byte)BlockTitle.ReadEepromResponse => new ReadEepromResponseBlock(blockBytes),
-                (byte)BlockTitle.WriteEepromResponse => new WriteEepromResponseBlock(blockBytes),
                 (byte)BlockTitle.ReadRomEepromResponse => new ReadRomEepromResponse(blockBytes),
-                (byte)BlockTitle.Custom => new CustomBlock(blockBytes),
+                (byte)BlockTitle.WriteEepromResponse => new WriteEepromResponseBlock(blockBytes),
                 _ => new UnknownBlock(blockBytes),
             };
         }
@@ -486,6 +495,44 @@ namespace BitFab.KW1281Test
             }
             _blockCounter++;
             return blockCounter;
+        }
+
+        public void KeepAlive()
+        {
+            SendAckBlock();
+            var block = ReceiveBlock();
+            if (block is not AckBlock)
+            {
+                throw new InvalidOperationException(
+                    $"Received 0x{block.Title:X2} block but expected ACK");
+            }
+        }
+
+        public List<byte> ActuatorTest(byte value)
+        {
+            Logger.WriteLine($"Sending actuator test 0x{value:X2} block");
+            SendBlock(new List<byte>
+            {
+                (byte)BlockTitle.ActuatorTest,
+                value
+            });
+
+            var blocks = ReceiveBlocks();
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
+            if (blocks.Count != 1)
+            {
+                Logger.WriteLine($"ActuatorTest returned {blocks.Count} blocks instead of 1");
+                return new List<byte>();
+            }
+
+            var block = blocks[0];
+            if (!(block is ActuatorTestResponseBlock))
+            {
+                Logger.WriteLine($"Expected ActuatorTestResponseBlock but got {block.GetType()}");
+                return new List<byte>();
+            }
+
+            return block.Body.ToList();
         }
 
         private byte? _blockCounter = null;
