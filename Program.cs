@@ -130,170 +130,62 @@ namespace BitFab.KW1281Test
                 kwp2000 = new KW2000Dialog(kwpCommon, (byte)controllerAddress);
             }
 
-            if (string.Compare(command, "ReadIdent", true) == 0)
+            switch (command.ToLower())
             {
-                var identInfo = kwp1281.ReadIdent();
-                Logger.WriteLine($"Ident: {identInfo}");
-            }
+                case "delcovwpremium5safecode":
+                    DelcoVWPremium5SafeCode(kwp1281, controllerAddress);
+                    break;
 
-            if (string.Compare(command, "ReadSoftwareVersion", true) == 0)
-            {
-                kwp1281.CustomReadSoftwareVersion();
-            }
+                case "dumpccmrom":
+                    DumpCcmRom(kwp1281, controllerAddress);
+                    break;
 
-            if (string.Compare(command, "ReadEeprom", true) == 0)
-            {
-                UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)controllerAddress);
+                case "dumpclusternecrom":
+                    DumpClusterNecRom(kwp1281, controllerAddress);
+                    break;
 
-                var blockBytes = kwp1281.ReadEeprom((ushort)address, 1);
-                if (blockBytes == null)
-                {
-                    Logger.WriteLine("EEPROM read failed");
-                }
-                else
-                {
-                    value = blockBytes[0];
-                    Logger.WriteLine(
-                        $"Address {address} (${address:X4}): Value {value} (${value:X2})");
-                }
-            }
+                case "dumpeeprom":
+                    DumpEeprom(kwp1281, controllerAddress, address, length);
+                    break;
 
-            if (string.Compare(command, "WriteEeprom", true) == 0)
-            {
-                UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)controllerAddress);
+                case "dumpmem":
+                    DumpMem(kwp1281, controllerAddress, address, length);
+                    break;
 
-                kwp1281.WriteEeprom((ushort)address, new List<byte> { value });
-            }
+                case "dumprb8eeprom":
+                    DumpRB8Eeprom(kwp2000, controllerAddress, address, length, kwpVersion);
+                    break;
 
-            if (string.Compare(command, "DumpEeprom", true) == 0)
-            {
-                if (controllerAddress == (int)ControllerAddress.Cluster)
-                {
-                    DumpClusterEeprom(kwp1281, (ushort)address, (ushort)length);
-                }
-                else if (controllerAddress == (int)ControllerAddress.CCM)
-                {
-                    DumpCcmEeprom(kwp1281, (ushort)address, (ushort)length);
-                }
-                else
-                {
-                    Logger.WriteLine("Only supported for cluster and CCM");
-                }
-            }
+                case "loadeeprom":
+                    LoadEeprom(kwp1281, controllerAddress, address, filename);
+                    break;
 
-            if (string.Compare(command, "DumpRB8Eeprom", true) == 0)
-            {
-                if (controllerAddress == (int)ControllerAddress.Cluster)
-                {
-                    if (kwpVersion >= 2000)
-                    {
-                        DumpClusterEepromRB8(kwp2000, address, length);
-                    }
-                    else
-                    {
-                        Logger.WriteLine($"Cluster protocol is KWP{kwpVersion} but needs to be KWP2xxx");
-                    }
-                }
-                else
-                {
-                    Logger.WriteLine("Only supported for cluster (address 17)");
-                }
-            }
+                case "mapeeprom":
+                    MapEeprom(kwp1281, controllerAddress);
+                    break;
 
-            if (string.Compare(command, "LoadEeprom", true) == 0)
-            {
-                if (controllerAddress == (int)ControllerAddress.Cluster)
-                {
-                    LoadClusterEeprom(kwp1281, (ushort)address, filename);
-                }
-                else
-                {
-                    Logger.WriteLine("Only supported for cluster");
-                }
-            }
+                case "readeeprom":
+                    value = ReadEeprom(kwp1281, controllerAddress, address, value);
+                    break;
 
-            if (string.Compare(command, "DumpMem", true) == 0)
-            {
-                if (controllerAddress == (int)ControllerAddress.Cluster)
-                {
-                    DumpClusterMem(kwp1281, address, length);
-                }
-                else
-                {
-                    Logger.WriteLine("Only supported for cluster");
-                }
-            }
+                case "readident":
+                    ReadIdent(kwp1281);
+                    break;
 
-            if (string.Compare(command, "MapEeprom", true) == 0)
-            {
-                if (controllerAddress == (int)ControllerAddress.Cluster)
-                {
-                    MapClusterEeprom(kwp1281);
-                }
-                else if (controllerAddress == (int)ControllerAddress.CCM)
-                {
-                    MapCcmEeprom(kwp1281);
-                }
-                else
-                {
-                    Logger.WriteLine("Only supported for cluster and CCM");
-                }
-            }
+                case "readsoftwareversion":
+                    ReadSoftwareVersion(kwp1281);
+                    break;
 
-            if (string.Compare(command, "DumpCcmRom", true) == 0)
-            {
-                if (controllerAddress == (int)ControllerAddress.CCM)
-                {
-                    DumpCcmRom(kwp1281);
-                }
-                else
-                {
-                    Logger.WriteLine("Only supported for CCM");
-                }
-            }
+                case "reset":
+                    Reset(kwp1281, controllerAddress);
+                    break;
 
-            if (string.Compare(command, "DumpClusterNecRom", true) == 0)
-            {
-                if (controllerAddress == (int)ControllerAddress.Cluster)
-                {
-                    DumpClusterNecRom(kwp1281);
-                }
-                else
-                {
-                    Logger.WriteLine("Only supported for cluster");
-                }
-            }
+                case "writeeeprom":
+                    WriteEeprom(kwp1281, controllerAddress, address, value);
+                    break;
 
-            if (string.Compare(command, "Reset", true) == 0)
-            {
-                if (controllerAddress == (int)ControllerAddress.Cluster)
-                {
-                    kwp1281.CustomReset();
-                }
-                else
-                {
-                    Logger.WriteLine("Only supported for cluster");
-                }
-            }
-
-            if (string.Compare(command, "DelcoVWPremium5SafeCode", true) == 0)
-            {
-                if (controllerAddress == (int)ControllerAddress.RadioManufacturing)
-                {
-                    // Thanks to Mike Naberezny for this (https://github.com/mnaberez)
-                    const string secret = "DELCO";
-                    var code = (ushort)(secret[4] * 256 + secret[3]);
-                    var workshopCode = (ushort)(secret[1] * 256 + secret[0]);
-                    var unknown = (byte)secret[2];
-
-                    kwp1281.Login(code, workshopCode, unknown);
-                    var bytes = kwp1281.ReadRomEeprom(0x0014, 2);
-                    Logger.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
-                }
-                else
-                {
-                    Logger.WriteLine("Only supported for radio manufacturing address 7C");
-                }
+                default:
+                    break;
             }
 
             if (kwpVersion == 1281)
@@ -302,47 +194,35 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private static void MapClusterEeprom(IKW1281Dialog kwp1281)
-        {
-            // Unlock partial EEPROM read
-            _ = kwp1281.SendCustom(new List<byte> { 0x9D, 0x39, 0x34, 0x34, 0x40 });
+        // Begin top-level commands
 
-            var bytes = new List<byte>();
-            const byte blockSize = 1;
-            for (ushort addr = 0; addr < 2048; addr += blockSize)
+        private static void DelcoVWPremium5SafeCode(IKW1281Dialog kwp1281, int controllerAddress)
+        {
+            if (controllerAddress != (int)ControllerAddress.RadioManufacturing)
             {
-                var blockBytes = kwp1281.ReadEeprom(addr, blockSize);
-                blockBytes = Enumerable.Repeat(
-                    blockBytes == null ? (byte)0 : (byte)0xFF,
-                    blockSize).ToList();
-                bytes.AddRange(blockBytes);
+                Logger.WriteLine("Only supported for radio manufacturing address 7C");
+                return;
             }
-            var dumpFileName = "eeprom_map.bin";
-            Logger.WriteLine($"Saving EEPROM map to {dumpFileName}");
-            File.WriteAllBytes(dumpFileName, bytes.ToArray());
+
+            // Thanks to Mike Naberezny for this (https://github.com/mnaberez)
+            const string secret = "DELCO";
+            var code = (ushort)(secret[4] * 256 + secret[3]);
+            var workshopCode = (ushort)(secret[1] * 256 + secret[0]);
+            var unknown = (byte)secret[2];
+
+            kwp1281.Login(code, workshopCode, unknown);
+            var bytes = kwp1281.ReadRomEeprom(0x0014, 2);
+            Logger.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
         }
 
-        private static void MapCcmEeprom(IKW1281Dialog kwp1281)
+        private static void DumpCcmRom(IKW1281Dialog kwp1281, int controllerAddress)
         {
-            kwp1281.Login(19283, 222);
-
-            var bytes = new List<byte>();
-            const byte blockSize = 1;
-            for (int addr = 0; addr <= 65535; addr += blockSize)
+            if (controllerAddress != (int)ControllerAddress.CCM)
             {
-                var blockBytes = kwp1281.ReadEeprom((ushort)addr, blockSize);
-                blockBytes = Enumerable.Repeat(
-                    blockBytes == null ? (byte)0 : (byte)0xFF,
-                    blockSize).ToList();
-                bytes.AddRange(blockBytes);
+                Logger.WriteLine("Only supported for CCM");
+                return;
             }
-            var dumpFileName = "ccm_eeprom_map.bin";
-            Logger.WriteLine($"Saving EEPROM map to {dumpFileName}");
-            File.WriteAllBytes(dumpFileName, bytes.ToArray());
-        }
 
-        private static void DumpCcmRom(IKW1281Dialog kwp1281)
-        {
             kwp1281.Login(19283, 222);
 
             var dumpFileName = "ccm_rom_dump.bin";
@@ -388,8 +268,14 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private static void DumpClusterNecRom(IKW1281Dialog kwp1281)
+        private static void DumpClusterNecRom(IKW1281Dialog kwp1281, int controllerAddress)
         {
+            if (controllerAddress != (int)ControllerAddress.Cluster)
+            {
+                Logger.WriteLine("Only supported for cluster");
+                return;
+            }
+
             var dumpFileName = "cluster_nec_rom_dump.bin";
             const byte blockSize = 16;
 
@@ -427,6 +313,168 @@ namespace BitFab.KW1281Test
                 Logger.WriteLine("**********************************************************************");
                 Logger.WriteLine();
             }
+        }
+
+        private void DumpEeprom(IKW1281Dialog kwp1281, int controllerAddress, uint address, uint length)
+        {
+            switch (controllerAddress)
+            {
+                case (int)ControllerAddress.Cluster:
+                    DumpClusterEeprom(kwp1281, (ushort)address, (ushort)length);
+                    break;
+                case (int)ControllerAddress.CCM:
+                    DumpCcmEeprom(kwp1281, (ushort)address, (ushort)length);
+                    break;
+                default:
+                    Logger.WriteLine("Only supported for cluster and CCM");
+                    break;
+            }
+        }
+
+        private void DumpMem(IKW1281Dialog kwp1281, int controllerAddress, uint address, uint length)
+        {
+            if (controllerAddress != (int)ControllerAddress.Cluster)
+            {
+                Logger.WriteLine("Only supported for cluster");
+                return;
+            }
+
+            DumpClusterMem(kwp1281, address, length);
+        }
+
+        private static void DumpRB8Eeprom(KW2000Dialog kwp2000, int controllerAddress, uint address, uint length, int kwpVersion)
+        {
+            if (controllerAddress != (int)ControllerAddress.Cluster)
+            {
+                Logger.WriteLine("Only supported for cluster (address 17)");
+                return;
+            }
+
+            if (kwpVersion < 2000)
+            {
+                Logger.WriteLine($"Cluster protocol is KWP{kwpVersion} but needs to be KWP2xxx");
+                return;
+            }
+
+            kwp2000.SecurityAccess(0xFB);
+            kwp2000.DumpEeprom(address, length);
+        }
+
+        private void LoadEeprom(IKW1281Dialog kwp1281, int controllerAddress, uint address, string filename)
+        {
+            if (controllerAddress != (int)ControllerAddress.Cluster)
+            {
+                Logger.WriteLine("Only supported for cluster");
+                return;
+            }
+
+            LoadClusterEeprom(kwp1281, (ushort)address, filename);
+        }
+
+        private static void MapEeprom(IKW1281Dialog kwp1281, int controllerAddress)
+        {
+            switch (controllerAddress)
+            {
+                case (int)ControllerAddress.Cluster:
+                    MapClusterEeprom(kwp1281);
+                    break;
+                case (int)ControllerAddress.CCM:
+                    MapCcmEeprom(kwp1281);
+                    break;
+                default:
+                    Logger.WriteLine("Only supported for cluster and CCM");
+                    break;
+            }
+        }
+
+        private byte ReadEeprom(IKW1281Dialog kwp1281, int controllerAddress, uint address, byte value)
+        {
+            UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)controllerAddress);
+
+            var blockBytes = kwp1281.ReadEeprom((ushort)address, 1);
+            if (blockBytes == null)
+            {
+                Logger.WriteLine("EEPROM read failed");
+            }
+            else
+            {
+                value = blockBytes[0];
+                Logger.WriteLine(
+                    $"Address {address} (${address:X4}): Value {value} (${value:X2})");
+            }
+
+            return value;
+        }
+
+        private static void ReadIdent(IKW1281Dialog kwp1281)
+        {
+            var identInfo = kwp1281.ReadIdent();
+            Logger.WriteLine($"Ident: {identInfo}");
+        }
+
+        private static void ReadSoftwareVersion(IKW1281Dialog kwp1281)
+        {
+            kwp1281.CustomReadSoftwareVersion();
+        }
+
+        private static void Reset(IKW1281Dialog kwp1281, int controllerAddress)
+        {
+            if (controllerAddress == (int)ControllerAddress.Cluster)
+            {
+                kwp1281.CustomReset();
+            }
+            else
+            {
+                Logger.WriteLine("Only supported for cluster");
+            }
+        }
+
+        private void WriteEeprom(IKW1281Dialog kwp1281, int controllerAddress, uint address, byte value)
+        {
+            UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)controllerAddress);
+
+            kwp1281.WriteEeprom((ushort)address, new List<byte> { value });
+        }
+
+        // End top-level commands
+
+        private static void MapClusterEeprom(IKW1281Dialog kwp1281)
+        {
+            // Unlock partial EEPROM read
+            _ = kwp1281.SendCustom(new List<byte> { 0x9D, 0x39, 0x34, 0x34, 0x40 });
+
+            var bytes = new List<byte>();
+            const byte blockSize = 1;
+            for (ushort addr = 0; addr < 2048; addr += blockSize)
+            {
+                var blockBytes = kwp1281.ReadEeprom(addr, blockSize);
+                blockBytes = Enumerable.Repeat(
+                    blockBytes == null ? (byte)0 : (byte)0xFF,
+                    blockSize).ToList();
+                bytes.AddRange(blockBytes);
+            }
+            var dumpFileName = "eeprom_map.bin";
+            Logger.WriteLine($"Saving EEPROM map to {dumpFileName}");
+            File.WriteAllBytes(dumpFileName, bytes.ToArray());
+        }
+
+        private static void MapCcmEeprom(IKW1281Dialog kwp1281)
+        {
+            kwp1281.Login(19283, 222);
+
+            var bytes = new List<byte>();
+            const byte blockSize = 1;
+            for (int addr = 0; addr <= 65535; addr += blockSize)
+            {
+                var blockBytes = kwp1281.ReadEeprom((ushort)addr, blockSize);
+                blockBytes = Enumerable.Repeat(
+                    blockBytes == null ? (byte)0 : (byte)0xFF,
+                    blockSize).ToList();
+                bytes.AddRange(blockBytes);
+            }
+            var dumpFileName = "ccm_eeprom_map.bin";
+            Logger.WriteLine($"Saving EEPROM map to {dumpFileName}");
+            File.WriteAllBytes(dumpFileName, bytes.ToArray());
         }
 
         private void DumpCcmEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
@@ -702,12 +750,6 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Saved EEPROM dump to {dumpFileName}");
         }
 
-        private static void DumpClusterEepromRB8(KW2000Dialog kwp2000, uint address, uint length)
-        {
-            kwp2000.SecurityAccess(0xFB);
-            kwp2000.DumpEeprom(address, length);
-        }
-
         private void LoadClusterEeprom(IKW1281Dialog kwp1281, ushort address, string filename)
         {
             _ = kwp1281.ReadIdent();
@@ -785,30 +827,32 @@ namespace BitFab.KW1281Test
             Logger.WriteLine("       PORT    = COM1|COM2|etc.");
             Logger.WriteLine("       BAUD    = 10400|9600|etc.");
             Logger.WriteLine("       ADDRESS = The controller address, e.g. 17 (cluster), 46 (CCM), 56 (radio)");
-            Logger.WriteLine("       COMMAND = ReadIdent");
-            Logger.WriteLine("                 ReadSoftwareVersion");
-            Logger.WriteLine("                 ReadEeprom ADDRESS");
-            Logger.WriteLine("                            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");
-            Logger.WriteLine("                 WriteEeprom ADDRESS VALUE");
-            Logger.WriteLine("                             ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");
-            Logger.WriteLine("                             VALUE   = Value in decimal (e.g. 138) or hex (e.g. $8A)");
+            Logger.WriteLine("       COMMAND =");
+            Logger.WriteLine("                 ActuatorTest");
+            Logger.WriteLine("                 DelcoVWPremium5SafeCode");
+            Logger.WriteLine("                 DumpCcmRom");
+            Logger.WriteLine("                 DumpClusterNecRom");
             Logger.WriteLine("                 DumpEeprom START LENGTH");
             Logger.WriteLine("                            START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
             Logger.WriteLine("                            LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)");
-            Logger.WriteLine("                 LoadEeprom START FILENAME");
-            Logger.WriteLine("                            START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
-            Logger.WriteLine("                            FILENAME = Name of file containing binary data to load into EEPROM");
             Logger.WriteLine("                 DumpMem START LENGTH");
             Logger.WriteLine("                         START  = Start address in decimal (e.g. 8192) or hex (e.g. $2000)");
             Logger.WriteLine("                         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)");
-            Logger.WriteLine("                 MapEeprom");
-            Logger.WriteLine("                 Reset");
-            Logger.WriteLine("                 DelcoVWPremium5SafeCode");
             Logger.WriteLine("                 DumpRB8Eeprom START LENGTH");
             Logger.WriteLine("                               START  = Start address in decimal (e.g. 66560) or hex (e.g. $10400)");
             Logger.WriteLine("                               LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)");
-            Logger.WriteLine("                 DumpCcmRom");
-            Logger.WriteLine("                 DumpClusterNecRom");
+            Logger.WriteLine("                 LoadEeprom START FILENAME");
+            Logger.WriteLine("                            START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
+            Logger.WriteLine("                            FILENAME = Name of file containing binary data to load into EEPROM");
+            Logger.WriteLine("                 MapEeprom");
+            Logger.WriteLine("                 ReadIdent");
+            Logger.WriteLine("                 ReadEeprom ADDRESS");
+            Logger.WriteLine("                            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");
+            Logger.WriteLine("                 ReadSoftwareVersion");
+            Logger.WriteLine("                 Reset");
+            Logger.WriteLine("                 WriteEeprom ADDRESS VALUE");
+            Logger.WriteLine("                             ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");
+            Logger.WriteLine("                             VALUE   = Value in decimal (e.g. 138) or hex (e.g. $8A)");
         }
     }
 }
