@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace BitFab.KW1281Test
 {
@@ -54,7 +55,60 @@ namespace BitFab.KW1281Test
         /// </summary>
         void KeepAlive();
 
-        List<byte> ActuatorTest(byte value);
+        ActuatorTestResponseBlock ActuatorTest(byte value);
+    }
+
+    /// <summary>
+    /// Used for commands such as ActuatorTest which need to be kept alive with ACKs while waiting
+    /// for user input.
+    /// </summary>
+    internal class KW1281KeepAlive : IDisposable
+    {
+        private readonly IKW1281Dialog _kw1281Dialog;
+        private volatile bool _cancel = false;
+        private Task _keepAliveTask = null;
+
+        public KW1281KeepAlive(IKW1281Dialog kw1281Dialog)
+        {
+            _kw1281Dialog = kw1281Dialog;
+        }
+
+        public ActuatorTestResponseBlock ActuatorTest(byte value)
+        {
+            Pause();
+            var result = _kw1281Dialog.ActuatorTest(value);
+            Resume();
+            return result;
+        }
+
+        public void Dispose()
+        {
+            Pause();
+        }
+
+        private void Pause()
+        {
+            _cancel = true;
+            if (_keepAliveTask != null)
+            {
+                _keepAliveTask.Wait();
+            }
+        }
+
+        private void Resume()
+        {
+            _keepAliveTask = Task.Run(KeepAlive);
+        }
+
+        private void KeepAlive()
+        {
+            _cancel = false;
+            while (!_cancel)
+            {
+                _kw1281Dialog.KeepAlive();
+                Console.Write(".");
+            }
+        }
     }
 
     internal class KW1281Dialog : IKW1281Dialog
@@ -508,7 +562,7 @@ namespace BitFab.KW1281Test
             }
         }
 
-        public List<byte> ActuatorTest(byte value)
+        public ActuatorTestResponseBlock ActuatorTest(byte value)
         {
             Logger.WriteLine($"Sending actuator test 0x{value:X2} block");
             SendBlock(new List<byte>
@@ -522,17 +576,17 @@ namespace BitFab.KW1281Test
             if (blocks.Count != 1)
             {
                 Logger.WriteLine($"ActuatorTest returned {blocks.Count} blocks instead of 1");
-                return new List<byte>();
+                return null;
             }
 
             var block = blocks[0];
             if (!(block is ActuatorTestResponseBlock))
             {
                 Logger.WriteLine($"Expected ActuatorTestResponseBlock but got {block.GetType()}");
-                return new List<byte>();
+                return null;
             }
 
-            return block.Body.ToList();
+            return (ActuatorTestResponseBlock)block;
         }
 
         private byte? _blockCounter = null;

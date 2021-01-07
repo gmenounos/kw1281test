@@ -204,52 +204,21 @@ namespace BitFab.KW1281Test
 
         private static void ActuatorTest(IKW1281Dialog kwp1281, int controllerAddress)
         {
-            bool cancel;
-
-            void keepAlive()
-            {
-                cancel = false;
-                while (!cancel)
-                {
-                    kwp1281.KeepAlive();
-                    Console.Write(".");
-                }
-            }
-
-            // $02 $96 - Tachometer
-            // $02 $95 - Coolant Temp
-            // $02 $98 - Fuel gauge
-            // $02 $97 - Speedometer
-            // $03 $1E - Segment test
-            // $02 $72 - 
-            // $02 $F2 - 
-            // $04 $16 - 
-            // $04 $3A - 
-            // $02 $F3 - 
-            // $01 $F5 - 
-            // $01 $F6 - Immobilizer warning
-            // $04 $17 - Brake warning
-            // $02 $99 - Seatbelt warning
-            // $02 $9A - Gong
-            // $03 $FF - Chime
-            // $04 $AB - End
+            using KW1281KeepAlive keepAlive = new(kwp1281);
 
             ConsoleKeyInfo keyInfo;
             do
             {
-                var response = kwp1281.ActuatorTest(0x00);
-                if (response.Count == 0)
+                var response = keepAlive.ActuatorTest(0x00);
+                if (response == null)
                 {
                     Logger.WriteLine("End of test.");
                     break;
                 }
-                Logger.WriteLine($"Actuator Test: {Dump(response)}");
+                Logger.WriteLine($"Actuator Test: {response.ActuatorName}");
 
-                var task = Task.Run(keepAlive);
                 Console.Write("Press a key or 'Q' to quit");
                 keyInfo = Console.ReadKey(intercept: true);
-                cancel = true;
-                task.Wait();
                 Console.WriteLine();
             } while (keyInfo.Key != ConsoleKey.Q);
         }
@@ -581,7 +550,7 @@ namespace BitFab.KW1281Test
             var responseBlocks = response.Where(b => !b.IsAckNak).ToList();
             if (responseBlocks.Count == 1 && responseBlocks[0] is CustomBlock customBlock)
             {
-                Logger.WriteLine($"Block: {Dump(customBlock.Body)}");
+                Logger.WriteLine($"Block: {Utils.Dump(customBlock.Body)}");
 
                 var keyBytes = KeyFinder.FindKey(customBlock.Body.ToArray());
 
@@ -634,7 +603,7 @@ namespace BitFab.KW1281Test
                 if (unlockResponse[0].IsAck)
                 {
                     Logger.WriteLine(
-                        $"Unlock code for software version {KW1281Dialog.DumpMixedContent(softwareVersion)} is {Dump(unlockCode)}");
+                        $"Unlock code for software version {KW1281Dialog.DumpMixedContent(softwareVersion)} is {Utils.Dump(unlockCode)}");
                     if (unlockCodes.Length > 1)
                     {
                         Logger.WriteLine("Please report this to the program maintainer.");
@@ -684,7 +653,7 @@ namespace BitFab.KW1281Test
             else if (
                 Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500LL", 0x20, 0x01)) || // 1J0920905L V01
                 Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500MH", 0x10, 0x01)) || // 1J0920925D V06
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500MH", 0x20, 0x01)))   // 1J5920825? V01?
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500MH", 0x20, 0x01)))   // 1J5920925C V09
             {
                 return new[] { new byte[] { 0x01, 0x04, 0x3D, 0x35 } };
             }
@@ -851,16 +820,6 @@ namespace BitFab.KW1281Test
                 }
             }
             Logger.WriteLine($"Saved memory dump to {dumpFileName}");
-        }
-
-        private static string Dump(IEnumerable<byte> body)
-        {
-            var sb = new StringBuilder();
-            foreach (var b in body)
-            {
-                sb.Append($" {b:X2}");
-            }
-            return sb.ToString();
         }
 
         private static uint ParseUint(string numberString)
