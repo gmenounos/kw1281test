@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace BitFab.KW1281Test
 {
@@ -21,7 +20,7 @@ namespace BitFab.KW1281Test
                 var tester = new Program();
                 tester.Run(args);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.WriteLine($"Unhandled exception: {ex}");
             }
@@ -663,7 +662,7 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private readonly byte[][] _clusterUnlockCodes = new []
+        private readonly byte[][] _clusterUnlockCodes = new[]
         {
             new byte[] { 0x37, 0x39, 0x3C, 0x47 },
             new byte[] { 0x3A, 0x39, 0x31, 0x43 },
