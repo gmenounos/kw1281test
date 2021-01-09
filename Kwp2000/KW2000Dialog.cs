@@ -108,9 +108,9 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private void EcuReset(byte v)
+        private void EcuReset(byte value)
         {
-            var responseMessage = SendReceive(Service.ecuReset, new[] { v });
+            var responseMessage = SendReceive(Service.ecuReset, new[] { value });
         }
 
         private byte[] ReadMemoryByAddress(uint address, byte count)

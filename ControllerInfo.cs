@@ -13,7 +13,7 @@ namespace BitFab.KW1281Test
         public ControllerInfo(IEnumerable<Block> blocks)
         {
             var sb = new StringBuilder();
-            foreach(var block in blocks)
+            foreach (var block in blocks)
             {
                 if (block is AsciiDataBlock asciiBlock)
                 {
@@ -22,6 +22,10 @@ namespace BitFab.KW1281Test
                     {
                         MoreDataAvailable = true;
                     }
+                }
+                else if (block is CodingWscBlock codingBlock)
+                {
+                    sb.Append($"{Environment.NewLine}{codingBlock}");
                 }
                 else
                 {
@@ -34,6 +38,10 @@ namespace BitFab.KW1281Test
         public string Text { get; }
 
         public bool MoreDataAvailable { get; }
+
+        public int SoftwareCoding { get; }
+
+        public int WorkshopCode { get; }
 
         public override string ToString()
         {

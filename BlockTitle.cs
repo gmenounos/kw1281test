@@ -5,12 +5,13 @@
         ReadIdent = 0x00,
         ReadRomEeprom = 0x03,
         ActuatorTest = 0x04,
-        ClearErrors = 0x05,
+        FaultCodesDelete = 0x05,
         End = 0x06, // end output, end of communication
-        GetErrors = 0x07, // get errors, all errors output
+        FaultCodesRead = 0x07, // get errors, all errors output
         ACK = 0x09,
         NAK = 0x0A,
         ReadEeprom = 0x19,
+        SoftwareCoding = 0x10,
         WriteEeprom = 0x1A,
         Custom = 0x1B,
         GroupReading = 0x29,
@@ -20,7 +21,7 @@
         ActuatorTestResponse = 0xF5,
         AsciiData = 0xF6,
         WriteEepromResponse = 0xF9,
-        GetErrorsResponse = 0xFC,
+        FaultCodesResponse = 0xFC,
         ReadRomEepromResponse = 0xFD,
     }
 

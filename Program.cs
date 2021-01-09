@@ -172,6 +172,10 @@ namespace BitFab.KW1281Test
                     value = ReadEeprom(kwp1281, controllerAddress, address, value);
                     break;
 
+                case "readfaultcodes":
+                    ReadFaultCodes(kwp1281, controllerAddress);
+                    break;
+
                 case "readident":
                     ReadIdent(kwp1281);
                     break;
@@ -430,6 +434,16 @@ namespace BitFab.KW1281Test
             }
 
             return value;
+        }
+
+        private static void ReadFaultCodes(IKW1281Dialog kwp1281, int controllerAddress)
+        {
+            var faultCodes = kwp1281.ReadFaultCodes();
+            Logger.WriteLine("Fault codes:");
+            foreach(var faultCode in faultCodes)
+            {
+                Logger.WriteLine($"    {faultCode}");
+            }
         }
 
         private static void ReadIdent(IKW1281Dialog kwp1281)
@@ -861,6 +875,7 @@ namespace BitFab.KW1281Test
             Logger.WriteLine("                            START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
             Logger.WriteLine("                            FILENAME = Name of file containing binary data to load into EEPROM");
             Logger.WriteLine("                 MapEeprom");
+            Logger.WriteLine("                 ReadFaultCodes");
             Logger.WriteLine("                 ReadIdent");
             Logger.WriteLine("                 ReadEeprom ADDRESS");
             Logger.WriteLine("                            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");

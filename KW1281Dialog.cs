@@ -56,6 +56,8 @@ namespace BitFab.KW1281Test
         void KeepAlive();
 
         ActuatorTestResponseBlock ActuatorTest(byte value);
+
+        List<FaultCode> ReadFaultCodes();
     }
 
     /// <summary>
@@ -518,10 +520,12 @@ namespace BitFab.KW1281Test
             {
                 (byte)BlockTitle.ACK => new AckBlock(blockBytes),
                 (byte)BlockTitle.ActuatorTestResponse => new ActuatorTestResponseBlock(blockBytes),
-                (byte)BlockTitle.AsciiData => new AsciiDataBlock(blockBytes),
+                (byte)BlockTitle.AsciiData =>
+                    blockBytes[3] == 0x00 ? new CodingWscBlock(blockBytes) : new AsciiDataBlock(blockBytes),
                 (byte)BlockTitle.Custom => new CustomBlock(blockBytes),
                 (byte)BlockTitle.NAK => new NakBlock(blockBytes),
                 (byte)BlockTitle.ReadEepromResponse => new ReadEepromResponseBlock(blockBytes),
+                (byte)BlockTitle.FaultCodesResponse => new FaultCodesBlock(blockBytes),
                 (byte)BlockTitle.ReadRomEepromResponse => new ReadRomEepromResponse(blockBytes),
                 (byte)BlockTitle.WriteEepromResponse => new WriteEepromResponseBlock(blockBytes),
                 _ => new UnknownBlock(blockBytes),
@@ -587,6 +591,33 @@ namespace BitFab.KW1281Test
             }
 
             return (ActuatorTestResponseBlock)block;
+        }
+
+        public List<FaultCode> ReadFaultCodes()
+        {
+            Logger.WriteLine($"Sending ReadFaultCodes block");
+            SendBlock(new List<byte>
+            {
+                (byte)BlockTitle.FaultCodesRead
+            });
+
+            var blocks = ReceiveBlocks();
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
+
+            var faultCodes = new List<FaultCode>();
+            foreach (var block in blocks)
+            {
+                if (!(block is FaultCodesBlock))
+                {
+                    Logger.WriteLine($"Expected FaultCodesBlock but got {block.GetType()}");
+                    return null;
+                }
+
+                var faultCodesBlock = (FaultCodesBlock)block;
+                faultCodes.AddRange(faultCodesBlock.FaultCodes);
+            }
+
+            return faultCodes;
         }
 
         private byte? _blockCounter = null;
