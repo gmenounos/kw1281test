@@ -52,6 +52,8 @@ namespace BitFab.KW1281Test
             byte value = 0;
             string filename = null;
             bool evenParityWakeup = false;
+            int softwareCoding = 0;
+            int workshopCode = 0;
 
             if (string.Compare(command, "ReadEeprom", true) == 0)
             {
@@ -102,6 +104,17 @@ namespace BitFab.KW1281Test
 
                 address = ParseUint(args[4]);
                 filename = args[5];
+            }
+            else if (string.Compare(command, "SetSoftwareCoding", true) == 0)
+            {
+                if (args.Length < 6)
+                {
+                    ShowUsage();
+                    return;
+                }
+
+                softwareCoding = (int)ParseUint(args[4]);
+                workshopCode = (int)ParseUint(args[5]);
             }
 
             Logger.WriteLine($"Opening serial port {portName}");
@@ -190,6 +203,10 @@ namespace BitFab.KW1281Test
 
                 case "reset":
                     Reset(kwp1281, controllerAddress);
+                    break;
+
+                case "setsoftwarecoding":
+                    SetSoftwareCoding(kwp1281, controllerAddress, softwareCoding, workshopCode);
                     break;
 
                 case "writeeeprom":
@@ -483,6 +500,20 @@ namespace BitFab.KW1281Test
             else
             {
                 Logger.WriteLine("Only supported for cluster");
+            }
+        }
+
+        private static void SetSoftwareCoding(
+            IKW1281Dialog kwp1281, int controllerAddress, int softwareCoding, int workshopCode)
+        {
+            var succeeded = kwp1281.SetSoftwareCoding(controllerAddress, softwareCoding, workshopCode);
+            if (succeeded)
+            {
+                Logger.WriteLine("Software coding set.");
+            }
+            else
+            {
+                Logger.WriteLine("Failed to set software coding.");
             }
         }
 
@@ -899,6 +930,9 @@ namespace BitFab.KW1281Test
             Logger.WriteLine("                            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");
             Logger.WriteLine("                 ReadSoftwareVersion");
             Logger.WriteLine("                 Reset");
+            Logger.WriteLine("                 SetSoftwareCoding CODING WORKSHOP");
+            Logger.WriteLine("                            CODING   = Software coding in decimal (e.g. 4361) or hex (e.g. $1109)");
+            Logger.WriteLine("                            WORKSHOP = Workshop code in decimal (e.g. 4361) or hex (e.g. $1109)");
             Logger.WriteLine("                 WriteEeprom ADDRESS VALUE");
             Logger.WriteLine("                             ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");
             Logger.WriteLine("                             VALUE   = Value in decimal (e.g. 138) or hex (e.g. $8A)");

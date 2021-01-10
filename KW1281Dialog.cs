@@ -65,59 +65,15 @@ namespace BitFab.KW1281Test
         /// <param name="controllerAddress"></param>
         /// <returns>True if successful.</returns>
         bool ClearFaultCodes(int controllerAddress);
-    }
 
-    /// <summary>
-    /// Used for commands such as ActuatorTest which need to be kept alive with ACKs while waiting
-    /// for user input.
-    /// </summary>
-    internal class KW1281KeepAlive : IDisposable
-    {
-        private readonly IKW1281Dialog _kw1281Dialog;
-        private volatile bool _cancel = false;
-        private Task _keepAliveTask = null;
-
-        public KW1281KeepAlive(IKW1281Dialog kw1281Dialog)
-        {
-            _kw1281Dialog = kw1281Dialog;
-        }
-
-        public ActuatorTestResponseBlock ActuatorTest(byte value)
-        {
-            Pause();
-            var result = _kw1281Dialog.ActuatorTest(value);
-            Resume();
-            return result;
-        }
-
-        public void Dispose()
-        {
-            Pause();
-        }
-
-        private void Pause()
-        {
-            _cancel = true;
-            if (_keepAliveTask != null)
-            {
-                _keepAliveTask.Wait();
-            }
-        }
-
-        private void Resume()
-        {
-            _keepAliveTask = Task.Run(KeepAlive);
-        }
-
-        private void KeepAlive()
-        {
-            _cancel = false;
-            while (!_cancel)
-            {
-                _kw1281Dialog.KeepAlive();
-                Console.Write(".");
-            }
-        }
+        /// <summary>
+        /// Set the controller's software coding and workshop code.
+        /// </summary>
+        /// <param name="controllerAddress"></param>
+        /// <param name="softwareCoding"></param>
+        /// <param name="workshopCode"></param>
+        /// <returns>True if successful.</returns>
+        bool SetSoftwareCoding(int controllerAddress, int softwareCoding, int workshopCode);
     }
 
     internal class KW1281Dialog : IKW1281Dialog
@@ -658,6 +614,31 @@ namespace BitFab.KW1281Test
             }
         }
 
+        public bool SetSoftwareCoding(int controllerAddress, int softwareCoding, int workshopCode)
+        {
+            Logger.WriteLine($"Sending SoftwareCoding block");
+            SendBlock(new List<byte>
+            {
+                (byte)BlockTitle.SoftwareCoding,
+                // For some reason the software coding is sent shifted to the left by 1 bit.
+                (byte)((softwareCoding * 2) / 256),
+                (byte)((softwareCoding * 2) % 256),
+                (byte)(workshopCode / 256),
+                (byte)(workshopCode % 256)
+            });
+
+            var blocks = ReceiveBlocks();
+            if (blocks.Count == 1 && blocks[0] is NakBlock)
+            {
+                return false;
+            }
+
+            var controllerInfo = new ControllerInfo(blocks.Where(b => !b.IsAckNak));
+            return
+                controllerInfo.SoftwareCoding == softwareCoding &&
+                controllerInfo.WorkshopCode == workshopCode;
+        }
+
         private byte? _blockCounter = null;
 
         private readonly IKwpCommon _kwpCommon;
@@ -665,6 +646,59 @@ namespace BitFab.KW1281Test
         public KW1281Dialog(IKwpCommon kwpCommon)
         {
             _kwpCommon = kwpCommon;
+        }
+    }
+
+    /// <summary>
+    /// Used for commands such as ActuatorTest which need to be kept alive with ACKs while waiting
+    /// for user input.
+    /// </summary>
+    internal class KW1281KeepAlive : IDisposable
+    {
+        private readonly IKW1281Dialog _kw1281Dialog;
+        private volatile bool _cancel = false;
+        private Task _keepAliveTask = null;
+
+        public KW1281KeepAlive(IKW1281Dialog kw1281Dialog)
+        {
+            _kw1281Dialog = kw1281Dialog;
+        }
+
+        public ActuatorTestResponseBlock ActuatorTest(byte value)
+        {
+            Pause();
+            var result = _kw1281Dialog.ActuatorTest(value);
+            Resume();
+            return result;
+        }
+
+        public void Dispose()
+        {
+            Pause();
+        }
+
+        private void Pause()
+        {
+            _cancel = true;
+            if (_keepAliveTask != null)
+            {
+                _keepAliveTask.Wait();
+            }
+        }
+
+        private void Resume()
+        {
+            _keepAliveTask = Task.Run(KeepAlive);
+        }
+
+        private void KeepAlive()
+        {
+            _cancel = false;
+            while (!_cancel)
+            {
+                _kw1281Dialog.KeepAlive();
+                Console.Write(".");
+            }
         }
     }
 }

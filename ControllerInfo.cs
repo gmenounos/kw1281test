@@ -26,6 +26,8 @@ namespace BitFab.KW1281Test
                 else if (block is CodingWscBlock codingBlock)
                 {
                     sb.Append($"{Environment.NewLine}{codingBlock}");
+                    SoftwareCoding = codingBlock.SoftwareCoding;
+                    WorkshopCode = codingBlock.WorkshopCode;
                 }
                 else
                 {
