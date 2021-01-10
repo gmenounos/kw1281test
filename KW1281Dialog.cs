@@ -616,16 +616,23 @@ namespace BitFab.KW1281Test
 
         public bool SetSoftwareCoding(int controllerAddress, int softwareCoding, int workshopCode)
         {
-            Logger.WriteLine($"Sending SoftwareCoding block");
-            SendBlock(new List<byte>
+            // Workshop codes > 65535 overflow into the low bit of the software coding
+            var bytes = new List<byte>
             {
                 (byte)BlockTitle.SoftwareCoding,
-                // For some reason the software coding is sent shifted to the left by 1 bit.
                 (byte)((softwareCoding * 2) / 256),
                 (byte)((softwareCoding * 2) % 256),
-                (byte)(workshopCode / 256),
+                (byte)((workshopCode & 65535) / 256),
                 (byte)(workshopCode % 256)
-            });
+            };
+
+            if (workshopCode > 65535)
+            {
+                bytes[2]++;
+            }
+
+            Logger.WriteLine($"Sending SoftwareCoding block");
+            SendBlock(bytes);
 
             var blocks = ReceiveBlocks();
             if (blocks.Count == 1 && blocks[0] is NakBlock)

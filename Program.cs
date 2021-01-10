@@ -36,6 +36,7 @@ namespace BitFab.KW1281Test
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
                 .InformationalVersion;
             Logger.WriteLine($"KW1281Test {version} (https://github.com/gmenounos/kw1281test/releases)");
+            Logger.WriteLine($"Args: {string.Join(' ', args)}");
 
             if (args.Length < 4)
             {
@@ -114,7 +115,17 @@ namespace BitFab.KW1281Test
                 }
 
                 softwareCoding = (int)ParseUint(args[4]);
+                if (softwareCoding > 32767)
+                {
+                    Logger.WriteLine("SoftwareCoding cannot be greater than 32767.");
+                    return;
+                }
                 workshopCode = (int)ParseUint(args[5]);
+                if (workshopCode > 99999)
+                {
+                    Logger.WriteLine("WorkshopCode cannot be greater than 99999.");
+                    return;
+                }
             }
 
             Logger.WriteLine($"Opening serial port {portName}");
