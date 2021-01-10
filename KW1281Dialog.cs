@@ -58,6 +58,13 @@ namespace BitFab.KW1281Test
         ActuatorTestResponseBlock ActuatorTest(byte value);
 
         List<FaultCode> ReadFaultCodes();
+
+        /// <summary>
+        /// Clear all of the controllers fault codes.
+        /// </summary>
+        /// <param name="controllerAddress"></param>
+        /// <returns>True if successful.</returns>
+        bool ClearFaultCodes(int controllerAddress);
     }
 
     /// <summary>
@@ -618,6 +625,37 @@ namespace BitFab.KW1281Test
             }
 
             return faultCodes;
+        }
+
+        public bool ClearFaultCodes(int controllerAddress)
+        {
+            Logger.WriteLine($"Sending ClearFaultCodes block");
+            SendBlock(new List<byte>
+            {
+                (byte)BlockTitle.FaultCodesDelete
+            });
+
+            var blocks = ReceiveBlocks();
+            if (blocks.Count == 1)
+            {
+                var block = blocks[0];
+                if (block is NakBlock)
+                {
+                    return false;
+                }
+                else if (block is AckBlock)
+                {
+                    return true;
+                }
+                else
+                {
+                    throw new InvalidOperationException($"ClearFaultCodes returned {block.GetType()} block instead of ACK/NAK");
+                }
+            }
+            else
+            {
+                throw new InvalidOperationException($"ClearFaultCodes returned {blocks.Count} blocks instead of 1");
+            }
         }
 
         private byte? _blockCounter = null;

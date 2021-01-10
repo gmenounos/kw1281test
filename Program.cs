@@ -136,6 +136,10 @@ namespace BitFab.KW1281Test
                     ActuatorTest(kwp1281, controllerAddress);
                     break;
 
+                case "clearfaultcodes":
+                    ClearFaultCodes(kwp1281, controllerAddress);
+                    break;
+
                 case "delcovwpremium5safecode":
                     DelcoVWPremium5SafeCode(kwp1281, controllerAddress);
                     break;
@@ -224,6 +228,19 @@ namespace BitFab.KW1281Test
                 keyInfo = Console.ReadKey(intercept: true);
                 Console.WriteLine();
             } while (keyInfo.Key != ConsoleKey.Q);
+        }
+
+        private static void ClearFaultCodes(IKW1281Dialog kwp1281, int controllerAddress)
+        {
+            var succeeded = kwp1281.ClearFaultCodes(controllerAddress);
+            if (succeeded)
+            {
+                Logger.WriteLine("Fault codes cleared.");
+            }
+            else
+            {
+                Logger.WriteLine("Failed to clear fault codes.");
+            }
         }
 
         private static void DelcoVWPremium5SafeCode(IKW1281Dialog kwp1281, int controllerAddress)
@@ -859,6 +876,7 @@ namespace BitFab.KW1281Test
             Logger.WriteLine("       ADDRESS = The controller address, e.g. 17 (cluster), 46 (CCM), 56 (radio)");
             Logger.WriteLine("       COMMAND =");
             Logger.WriteLine("                 ActuatorTest");
+            Logger.WriteLine("                 ClearFaultCodes");
             Logger.WriteLine("                 DelcoVWPremium5SafeCode");
             Logger.WriteLine("                 DumpCcmRom");
             Logger.WriteLine("                 DumpClusterNecRom");
