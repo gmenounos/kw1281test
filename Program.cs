@@ -245,15 +245,19 @@ namespace BitFab.KW1281Test
             do
             {
                 var response = keepAlive.ActuatorTest(0x00);
-                if (response == null)
+                if (response == null || response.ActuatorName == "End")
                 {
                     Logger.WriteLine("End of test.");
                     break;
                 }
                 Logger.WriteLine($"Actuator Test: {response.ActuatorName}");
 
-                Console.Write("Press a key or 'Q' to quit");
-                keyInfo = Console.ReadKey(intercept: true);
+                // Press any key to advance to next test or press Q to exit
+                Console.Write("Press 'N' to advance to next test or 'Q' to quit");
+                do
+                {
+                    keyInfo = Console.ReadKey(intercept: true);
+                } while (keyInfo.Key != ConsoleKey.N && keyInfo.Key != ConsoleKey.Q);
                 Console.WriteLine();
             } while (keyInfo.Key != ConsoleKey.Q);
         }
