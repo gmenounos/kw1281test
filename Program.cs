@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 
 namespace BitFab.KW1281Test
 {
@@ -46,12 +47,11 @@ namespace BitFab.KW1281Test
 
             string portName = args[0];
             var baudRate = int.Parse(args[1]);
-            var controllerAddress = int.Parse(args[2], NumberStyles.HexNumber);
+            _controllerAddress = int.Parse(args[2], NumberStyles.HexNumber);
             var command = args[3];
             uint address = 0;
             uint length = 0;
             byte value = 0;
-            string filename = null;
             bool evenParityWakeup = false;
             int softwareCoding = 0;
             int workshopCode = 0;
@@ -79,6 +79,11 @@ namespace BitFab.KW1281Test
                 address = ParseUint(args[4]);
                 length = ParseUint(args[5]);
 
+                if (args.Length > 6)
+                {
+                    _filename = args[6];
+                }
+
                 if (string.Compare(command, "DumpRB8Eeprom", true) == 0)
                 {
                     evenParityWakeup = true;
@@ -104,7 +109,7 @@ namespace BitFab.KW1281Test
                 }
 
                 address = ParseUint(args[4]);
-                filename = args[5];
+                _filename = args[5];
             }
             else if (string.Compare(command, "SetSoftwareCoding", true) == 0)
             {
@@ -130,78 +135,77 @@ namespace BitFab.KW1281Test
 
             Logger.WriteLine($"Opening serial port {portName}");
             using IInterface @interface = new Interface(portName, baudRate);
-            IKwpCommon kwpCommon = new KwpCommon(@interface);
+            _kwpCommon = new KwpCommon(@interface);
 
             Logger.WriteLine("Sending wakeup message");
-            var kwpVersion = kwpCommon.WakeUp((byte)controllerAddress, evenParityWakeup);
+            var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParityWakeup);
 
             IKW1281Dialog kwp1281 = null;
             KW2000Dialog kwp2000 = null;
             if (kwpVersion == 1281)
             {
-                kwp1281 = new KW1281Dialog(kwpCommon);
+                kwp1281 = new KW1281Dialog(_kwpCommon);
 
                 var ecuInfo = kwp1281.ReadEcuInfo();
                 Logger.WriteLine($"ECU: {ecuInfo}");
-
-                if (controllerAddress == (int)ControllerAddress.Cluster)
-                {
-                    kwp1281.CustomUnlockAdditionalCommands();
-                }
             }
             else
             {
-                kwp2000 = new KW2000Dialog(kwpCommon, (byte)controllerAddress);
+                kwp2000 = new KW2000Dialog(_kwpCommon, (byte)_controllerAddress);
             }
 
             switch (command.ToLower())
             {
                 case "actuatortest":
-                    ActuatorTest(kwp1281, controllerAddress);
+                    ActuatorTest(kwp1281);
                     break;
 
                 case "clearfaultcodes":
-                    ClearFaultCodes(kwp1281, controllerAddress);
+                    ClearFaultCodes(kwp1281);
                     break;
 
                 case "delcovwpremium5safecode":
-                    DelcoVWPremium5SafeCode(kwp1281, controllerAddress);
+                    DelcoVWPremium5SafeCode(kwp1281);
                     break;
 
+                case "dumpbeetleeeprom":
+                    DumpBeetleEeprom(kwp1281);
+                    return;
+
                 case "dumpccmrom":
-                    DumpCcmRom(kwp1281, controllerAddress);
+                    DumpCcmRom(kwp1281);
                     break;
 
                 case "dumpclusternecrom":
-                    DumpClusterNecRom(kwp1281, controllerAddress);
+                    DumpClusterNecRom(kwp1281);
                     break;
 
                 case "dumpeeprom":
-                    DumpEeprom(kwp1281, controllerAddress, address, length);
+                    DumpEeprom(kwp1281, address, length);
                     break;
 
                 case "dumpmem":
-                    DumpMem(kwp1281, controllerAddress, address, length);
+                    DumpMem(kwp1281, address, length);
                     break;
 
                 case "dumprb8eeprom":
-                    DumpRB8Eeprom(kwp2000, controllerAddress, address, length, kwpVersion);
+                    DumpRB8Eeprom(kwp2000, address, length, kwpVersion);
                     break;
 
                 case "loadeeprom":
-                    LoadEeprom(kwp1281, controllerAddress, address, filename);
+                    LoadEeprom(kwp1281, address);
                     break;
 
                 case "mapeeprom":
-                    MapEeprom(kwp1281, controllerAddress);
+                    MapEeprom(kwp1281);
                     break;
 
                 case "readeeprom":
-                    value = ReadEeprom(kwp1281, controllerAddress, address, value);
+                    value = ReadEeprom(kwp1281, address, value);
                     break;
 
                 case "readfaultcodes":
-                    ReadFaultCodes(kwp1281, controllerAddress);
+                    ReadFaultCodes(kwp1281);
                     break;
 
                 case "readident":
@@ -213,15 +217,15 @@ namespace BitFab.KW1281Test
                     break;
 
                 case "reset":
-                    Reset(kwp1281, controllerAddress);
+                    Reset(kwp1281);
                     break;
 
                 case "setsoftwarecoding":
-                    SetSoftwareCoding(kwp1281, controllerAddress, softwareCoding, workshopCode);
+                    SetSoftwareCoding(kwp1281, softwareCoding, workshopCode);
                     break;
 
                 case "writeeeprom":
-                    WriteEeprom(kwp1281, controllerAddress, address, value);
+                    WriteEeprom(kwp1281, address, value);
                     break;
 
                 default:
@@ -237,7 +241,7 @@ namespace BitFab.KW1281Test
 
         // Begin top-level commands
 
-        private static void ActuatorTest(IKW1281Dialog kwp1281, int controllerAddress)
+        private static void ActuatorTest(IKW1281Dialog kwp1281)
         {
             using KW1281KeepAlive keepAlive = new(kwp1281);
 
@@ -262,9 +266,9 @@ namespace BitFab.KW1281Test
             } while (keyInfo.Key != ConsoleKey.Q);
         }
 
-        private static void ClearFaultCodes(IKW1281Dialog kwp1281, int controllerAddress)
+        private void ClearFaultCodes(IKW1281Dialog kwp1281)
         {
-            var succeeded = kwp1281.ClearFaultCodes(controllerAddress);
+            var succeeded = kwp1281.ClearFaultCodes(_controllerAddress);
             if (succeeded)
             {
                 Logger.WriteLine("Fault codes cleared.");
@@ -275,9 +279,9 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private static void DelcoVWPremium5SafeCode(IKW1281Dialog kwp1281, int controllerAddress)
+        private void DelcoVWPremium5SafeCode(IKW1281Dialog kwp1281)
         {
-            if (controllerAddress != (int)ControllerAddress.RadioManufacturing)
+            if (_controllerAddress != (int)ControllerAddress.RadioManufacturing)
             {
                 Logger.WriteLine("Only supported for radio manufacturing address 7C");
                 return;
@@ -294,9 +298,97 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
         }
 
-        private static void DumpCcmRom(IKW1281Dialog kwp1281, int controllerAddress)
+        private void DumpBeetleEeprom(IKW1281Dialog kwp1281)
         {
-            if (controllerAddress != (int)ControllerAddress.CCM)
+            if (_controllerAddress != (int)ControllerAddress.Cluster)
+            {
+                Logger.WriteLine("Only supported for clusters");
+                return;
+            }
+
+            Logger.WriteLine("Sending block 0x6C");
+            kwp1281.SendBlock(new List<byte> { 0x6C });
+
+            Thread.Sleep(250);
+
+            Logger.WriteLine("Writing request 1");
+            var request = new byte[]
+            {
+                0x00, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x50, 0x50, 0x34, 0x02, 0x00,
+                0x00, 0xE7
+            };
+            foreach (var b in request)
+            {
+                _kwpCommon.WriteByte(b);
+            }
+
+            var expectedAck = new byte[] { 0x03, 0x09, 0x00, 0x0C };
+
+            Logger.WriteLine("Receiving ACK");
+            var ack = new List<byte>();
+            for (int i = 0; i < 4; i++)
+            {
+                var b = _kwpCommon.ReadByte();
+                ack.Add(b);
+                Console.Write(".");
+            }
+            if (!ack.SequenceEqual(expectedAck))
+            {
+                Logger.WriteLine($"Expected ACK but received {Utils.Dump(ack)}");
+                return;
+            }
+
+            Logger.WriteLine("Writing request 2");
+            request = new byte[]
+            {
+                0x00, 0x3B, 0x02, 0x00, 0x14, 0x50, 0x07, 0x29,
+                0xC7, 0x7B, 0x08, 0xC8, 0xC6, 0x34, 0x7B, 0x08,
+                0xC9, 0xC6, 0x08, 0x7B, 0x08, 0xCB, 0xCE, 0x0C,
+                0x00, 0xA6, 0x30, 0x07, 0x06, 0x8E, 0x10, 0x00,
+                0x25, 0xF7, 0x3D, 0xF6, 0x08, 0xCC, 0x7A, 0x08,
+                0xCF, 0x07, 0x06, 0x1F, 0x08, 0xCC, 0x80, 0xF9,
+                0x3D, 0xCC, 0x55, 0xAA, 0x7B, 0x08, 0x17, 0x7A,
+                0x08, 0x17, 0x3D, 0x14, 0x05
+            };
+            foreach(var b in request)
+            {
+                _kwpCommon.WriteByte(b);
+            }
+
+            Logger.WriteLine("Receiving ACK");
+            ack = new List<byte>();
+            for (int i = 0; i < 4; i++)
+            {
+                var b = _kwpCommon.ReadByte();
+                ack.Add(b);
+                Console.Write(".");
+            }
+            if (!ack.SequenceEqual(expectedAck))
+            {
+                Logger.WriteLine($"Expected ACK but received {Utils.Dump(ack)}");
+                return;
+            }
+
+            Logger.WriteLine("Receiving EEPROM");
+            var eeprom = new List<byte>();
+            for (int i = 0; i < 1024; i++)
+            {
+                var b = _kwpCommon.ReadByte();
+                eeprom.Add(b);
+            }
+
+            var dumpFileName = _filename ?? $"beetle_eeprom_${0:X4}.bin";
+
+            File.WriteAllBytes(dumpFileName, eeprom.ToArray());
+            Logger.WriteLine($"Saved EEPROM dump to {dumpFileName}");
+
+            Logger.WriteLine("Done");
+        }
+
+        private void DumpCcmRom(IKW1281Dialog kwp1281)
+        {
+            if (_controllerAddress != (int)ControllerAddress.CCM)
             {
                 Logger.WriteLine("Only supported for CCM");
                 return;
@@ -304,7 +396,7 @@ namespace BitFab.KW1281Test
 
             kwp1281.Login(19283, 222);
 
-            var dumpFileName = "ccm_rom_dump.bin";
+            var dumpFileName = _filename ?? "ccm_rom_dump.bin";
             const byte blockSize = 8;
 
             Logger.WriteLine($"Saving CCM ROM to {dumpFileName}");
@@ -347,15 +439,15 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private static void DumpClusterNecRom(IKW1281Dialog kwp1281, int controllerAddress)
+        private void DumpClusterNecRom(IKW1281Dialog kwp1281)
         {
-            if (controllerAddress != (int)ControllerAddress.Cluster)
+            if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
                 Logger.WriteLine("Only supported for cluster");
                 return;
             }
 
-            var dumpFileName = "cluster_nec_rom_dump.bin";
+            var dumpFileName = _filename ?? "cluster_nec_rom_dump.bin";
             const byte blockSize = 16;
 
             Logger.WriteLine($"Saving cluster NEC ROM to {dumpFileName}");
@@ -394,9 +486,9 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private void DumpEeprom(IKW1281Dialog kwp1281, int controllerAddress, uint address, uint length)
+        private void DumpEeprom(IKW1281Dialog kwp1281, uint address, uint length)
         {
-            switch (controllerAddress)
+            switch (_controllerAddress)
             {
                 case (int)ControllerAddress.Cluster:
                     DumpClusterEeprom(kwp1281, (ushort)address, (ushort)length);
@@ -410,9 +502,9 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private void DumpMem(IKW1281Dialog kwp1281, int controllerAddress, uint address, uint length)
+        private void DumpMem(IKW1281Dialog kwp1281, uint address, uint length)
         {
-            if (controllerAddress != (int)ControllerAddress.Cluster)
+            if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
                 Logger.WriteLine("Only supported for cluster");
                 return;
@@ -421,9 +513,9 @@ namespace BitFab.KW1281Test
             DumpClusterMem(kwp1281, address, length);
         }
 
-        private static void DumpRB8Eeprom(KW2000Dialog kwp2000, int controllerAddress, uint address, uint length, int kwpVersion)
+        private void DumpRB8Eeprom(KW2000Dialog kwp2000, uint address, uint length, int kwpVersion)
         {
-            if (controllerAddress != (int)ControllerAddress.Cluster)
+            if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
                 Logger.WriteLine("Only supported for cluster (address 17)");
                 return;
@@ -435,24 +527,26 @@ namespace BitFab.KW1281Test
                 return;
             }
 
+            var dumpFileName = _filename ?? $"RB8_${address:X6}_eeprom.bin";
+
             kwp2000.SecurityAccess(0xFB);
-            kwp2000.DumpEeprom(address, length);
+            kwp2000.DumpEeprom(address, length, dumpFileName);
         }
 
-        private void LoadEeprom(IKW1281Dialog kwp1281, int controllerAddress, uint address, string filename)
+        private void LoadEeprom(IKW1281Dialog kwp1281, uint address)
         {
-            if (controllerAddress != (int)ControllerAddress.Cluster)
+            if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
                 Logger.WriteLine("Only supported for cluster");
                 return;
             }
 
-            LoadClusterEeprom(kwp1281, (ushort)address, filename);
+            LoadClusterEeprom(kwp1281, (ushort)address, _filename);
         }
 
-        private static void MapEeprom(IKW1281Dialog kwp1281, int controllerAddress)
+        private void MapEeprom(IKW1281Dialog kwp1281)
         {
-            switch (controllerAddress)
+            switch (_controllerAddress)
             {
                 case (int)ControllerAddress.Cluster:
                     MapClusterEeprom(kwp1281);
@@ -466,9 +560,9 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private byte ReadEeprom(IKW1281Dialog kwp1281, int controllerAddress, uint address, byte value)
+        private byte ReadEeprom(IKW1281Dialog kwp1281, uint address, byte value)
         {
-            UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)controllerAddress);
+            UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)_controllerAddress);
 
             var blockBytes = kwp1281.ReadEeprom((ushort)address, 1);
             if (blockBytes == null)
@@ -485,7 +579,7 @@ namespace BitFab.KW1281Test
             return value;
         }
 
-        private static void ReadFaultCodes(IKW1281Dialog kwp1281, int controllerAddress)
+        private void ReadFaultCodes(IKW1281Dialog kwp1281)
         {
             var faultCodes = kwp1281.ReadFaultCodes();
             Logger.WriteLine("Fault codes:");
@@ -506,9 +600,9 @@ namespace BitFab.KW1281Test
             kwp1281.CustomReadSoftwareVersion();
         }
 
-        private static void Reset(IKW1281Dialog kwp1281, int controllerAddress)
+        private void Reset(IKW1281Dialog kwp1281)
         {
-            if (controllerAddress == (int)ControllerAddress.Cluster)
+            if (_controllerAddress == (int)ControllerAddress.Cluster)
             {
                 kwp1281.CustomReset();
             }
@@ -518,10 +612,10 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private static void SetSoftwareCoding(
-            IKW1281Dialog kwp1281, int controllerAddress, int softwareCoding, int workshopCode)
+        private void SetSoftwareCoding(
+            IKW1281Dialog kwp1281, int softwareCoding, int workshopCode)
         {
-            var succeeded = kwp1281.SetSoftwareCoding(controllerAddress, softwareCoding, workshopCode);
+            var succeeded = kwp1281.SetSoftwareCoding(_controllerAddress, softwareCoding, workshopCode);
             if (succeeded)
             {
                 Logger.WriteLine("Software coding set.");
@@ -532,16 +626,16 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private void WriteEeprom(IKW1281Dialog kwp1281, int controllerAddress, uint address, byte value)
+        private void WriteEeprom(IKW1281Dialog kwp1281, uint address, byte value)
         {
-            UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)controllerAddress);
+            UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)_controllerAddress);
 
             kwp1281.WriteEeprom((ushort)address, new List<byte> { value });
         }
 
         // End top-level commands
 
-        private static void MapClusterEeprom(IKW1281Dialog kwp1281)
+        private void MapClusterEeprom(IKW1281Dialog kwp1281)
         {
             // Unlock partial EEPROM read
             _ = kwp1281.SendCustom(new List<byte> { 0x9D, 0x39, 0x34, 0x34, 0x40 });
@@ -556,12 +650,12 @@ namespace BitFab.KW1281Test
                     blockSize).ToList();
                 bytes.AddRange(blockBytes);
             }
-            var dumpFileName = "eeprom_map.bin";
+            var dumpFileName = _filename ?? "eeprom_map.bin";
             Logger.WriteLine($"Saving EEPROM map to {dumpFileName}");
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
         }
 
-        private static void MapCcmEeprom(IKW1281Dialog kwp1281)
+        private void MapCcmEeprom(IKW1281Dialog kwp1281)
         {
             kwp1281.Login(19283, 222);
 
@@ -575,7 +669,7 @@ namespace BitFab.KW1281Test
                     blockSize).ToList();
                 bytes.AddRange(blockBytes);
             }
-            var dumpFileName = "ccm_eeprom_map.bin";
+            var dumpFileName = _filename ?? "ccm_eeprom_map.bin";
             Logger.WriteLine($"Saving EEPROM map to {dumpFileName}");
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
         }
@@ -584,7 +678,7 @@ namespace BitFab.KW1281Test
         {
             UnlockControllerForEepromReadWrite(kwp1281, ControllerAddress.CCM);
 
-            var dumpFileName = $"ccm_eeprom_${startAddress:X4}.bin";
+            var dumpFileName = _filename ?? $"ccm_eeprom_${startAddress:X4}.bin";
 
             Logger.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             DumpEeprom(kwp1281, startAddress, length, maxReadLength: 12, dumpFileName);
@@ -846,7 +940,7 @@ namespace BitFab.KW1281Test
 
             UnlockControllerForEepromReadWrite(kwp1281, ControllerAddress.Cluster);
 
-            var dumpFileName = $"{identInfo}_${startAddress:X4}_eeprom.bin";
+            var dumpFileName = _filename ?? $"{identInfo}_${startAddress:X4}_eeprom.bin";
 
             Logger.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             DumpEeprom(kwp1281, startAddress, length, maxReadLength: 16, dumpFileName);
@@ -878,7 +972,7 @@ namespace BitFab.KW1281Test
 
             const byte blockSize = 15;
 
-            var dumpFileName = $"cluster_mem_${startAddress:X6}.bin";
+            var dumpFileName = _filename ?? $"cluster_mem_${startAddress:X6}.bin";
             Logger.WriteLine($"Saving memory dump to {dumpFileName}");
             using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
             {
@@ -926,15 +1020,18 @@ namespace BitFab.KW1281Test
             Logger.WriteLine("                 DelcoVWPremium5SafeCode");
             Logger.WriteLine("                 DumpCcmRom");
             Logger.WriteLine("                 DumpClusterNecRom");
-            Logger.WriteLine("                 DumpEeprom START LENGTH");
-            Logger.WriteLine("                            START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
-            Logger.WriteLine("                            LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)");
-            Logger.WriteLine("                 DumpMem START LENGTH");
-            Logger.WriteLine("                         START  = Start address in decimal (e.g. 8192) or hex (e.g. $2000)");
-            Logger.WriteLine("                         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)");
-            Logger.WriteLine("                 DumpRB8Eeprom START LENGTH");
-            Logger.WriteLine("                               START  = Start address in decimal (e.g. 66560) or hex (e.g. $10400)");
-            Logger.WriteLine("                               LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)");
+            Logger.WriteLine("                 DumpEeprom START LENGTH [FILENAME]");
+            Logger.WriteLine("                            START    = Start address in decimal (e.g. 0) or hex (e.g. $0)");
+            Logger.WriteLine("                            LENGTH   = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)");
+            Logger.WriteLine("                            FILENAME = Optional filename");
+            Logger.WriteLine("                 DumpMem START LENGTH [FILENAME]");
+            Logger.WriteLine("                         START    = Start address in decimal (e.g. 8192) or hex (e.g. $2000)");
+            Logger.WriteLine("                         LENGTH   = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)");
+            Logger.WriteLine("                         FILENAME = Optional filename");
+            Logger.WriteLine("                 DumpRB8Eeprom START LENGTH [FILENAME]");
+            Logger.WriteLine("                               START    = Start address in decimal (e.g. 66560) or hex (e.g. $10400)");
+            Logger.WriteLine("                               LENGTH   = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)");
+            Logger.WriteLine("                               FILENAME = Optional filename");
             Logger.WriteLine("                 LoadEeprom START FILENAME");
             Logger.WriteLine("                            START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
             Logger.WriteLine("                            FILENAME = Name of file containing binary data to load into EEPROM");
@@ -952,5 +1049,9 @@ namespace BitFab.KW1281Test
             Logger.WriteLine("                             ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");
             Logger.WriteLine("                             VALUE   = Value in decimal (e.g. 138) or hex (e.g. $8A)");
         }
+
+        private IKwpCommon _kwpCommon;
+        private int _controllerAddress;
+        private string _filename = null;
     }
 }

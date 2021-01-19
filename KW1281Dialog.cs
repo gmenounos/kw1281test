@@ -29,12 +29,6 @@ namespace BitFab.KW1281Test
 
         /// <summary>
         /// http://www.maltchev.com/kiti/VAG_guide.txt
-        /// This unlocks additional custom commands $81-$AF
-        /// </summary>
-        void CustomUnlockAdditionalCommands();
-
-        /// <summary>
-        /// http://www.maltchev.com/kiti/VAG_guide.txt
         /// </summary>
         Dictionary<int, Block> CustomReadSoftwareVersion();
 
@@ -294,7 +288,11 @@ namespace BitFab.KW1281Test
             return blocks[0].Body.ToList();
         }
 
-        public void CustomUnlockAdditionalCommands()
+        /// <summary>
+        /// http://www.maltchev.com/kiti/VAG_guide.txt
+        /// This unlocks additional custom commands $81-$AF
+        /// </summary>
+        private void CustomUnlockAdditionalCommands()
         {
             Logger.WriteLine("Sending Custom \"Unlock Additional Commands\" block");
             SendCustom(new List<byte> { 0x80, 0x01, 0x02, 0x03, 0x04 });
@@ -399,6 +397,12 @@ namespace BitFab.KW1281Test
 
         public List<Block> SendCustom(List<byte> blockCustomBytes)
         {
+            if (blockCustomBytes[0] > 0x80 && !_additionalCustomCommandsUnlocked)
+            {
+                CustomUnlockAdditionalCommands();
+                _additionalCustomCommandsUnlocked = true;
+            }
+
             blockCustomBytes.Insert(0, (byte)BlockTitle.Custom);
             SendBlock(blockCustomBytes);
             return ReceiveBlocks();
@@ -648,11 +652,14 @@ namespace BitFab.KW1281Test
 
         private byte? _blockCounter = null;
 
+        private bool _additionalCustomCommandsUnlocked;
+
         private readonly IKwpCommon _kwpCommon;
 
         public KW1281Dialog(IKwpCommon kwpCommon)
         {
             _kwpCommon = kwpCommon;
+            _additionalCustomCommandsUnlocked = false;
         }
     }
 

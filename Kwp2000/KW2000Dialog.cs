@@ -66,13 +66,11 @@ namespace BitFab.KW1281Test
             return false;
         }
 
-        internal void DumpEeprom(uint address, uint length)
+        internal void DumpEeprom(uint address, uint length, string dumpFileName)
         {
             StartDiagnosticSession(0x84, 0x14);
 
             Thread.Sleep(350);
-
-            var dumpFileName = $"RB8_${address:X6}_eeprom.bin";
 
             Logger.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             DumpMemory(address, length, maxReadLength: 32, dumpFileName);
