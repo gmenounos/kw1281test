@@ -311,14 +311,15 @@ namespace BitFab.KW1281Test
 
             Thread.Sleep(250);
 
-            Logger.WriteLine("Writing request 1");
-            var request = new byte[]
+            Logger.WriteLine("Writing data to cluster microcontroller");
+            var data = new byte[]
             {
-                0x00, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
-                0x00, 0x00, 0x00, 0x50, 0x50, 0x34, 0x02, 0x00,
-                0x00, 0xE7
+                0x00, 0x10, // 0x0010 bytes following
+                0x00, 0x01, // Address 0x0001 ?
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x50, 0x34, 0x02, 0x00,
+                0x00, 0xE7 // 16-bit sum of previous bytes
             };
-            foreach (var b in request)
+            foreach (var b in data)
             {
                 _kwpCommon.WriteByte(b);
             }
@@ -339,22 +340,51 @@ namespace BitFab.KW1281Test
                 return;
             }
 
-            Logger.WriteLine("Writing request 2");
-            request = new byte[]
+            // Now we write a small EEPROM dump program to the 68HC12 processor
+
+            Logger.WriteLine("Writing EEPROM dump program to cluster microcontroller");
+
+            var program = new byte[]
             {
-                0x00, 0x3B, 0x02, 0x00, 0x14, 0x50, 0x07, 0x29,
-                0xC7, 0x7B, 0x08, 0xC8, 0xC6, 0x34, 0x7B, 0x08,
-                0xC9, 0xC6, 0x08, 0x7B, 0x08, 0xCB, 0xCE, 0x0C,
-                0x00, 0xA6, 0x30, 0x07, 0x06, 0x8E, 0x10, 0x00,
-                0x25, 0xF7, 0x3D, 0xF6, 0x08, 0xCC, 0x7A, 0x08,
-                0xCF, 0x07, 0x06, 0x1F, 0x08, 0xCC, 0x80, 0xF9,
-                0x3D, 0xCC, 0x55, 0xAA, 0x7B, 0x08, 0x17, 0x7A,
-                0x08, 0x17, 0x3D, 0x14, 0x05
+                0x00, 0x3B, // 0x003B bytes following
+                0x02, 0x00, // Address 0x0200 ?
+                0x14, 0x50,                     // orcc #$50
+                0x07, 0x29,                     // bsr L0031
+                0xC7,                           // clrb
+                0x7B, 0x08, 0xC8,               // stab $08C8
+                0xC6, 0x34,                     // ldab #$34
+                0x7B, 0x08, 0xC9,               // stab $08C9
+                0xC6, 0x08,                     // ldab #$08
+                0x7B, 0x08, 0xCB,               // stab $08CB
+                0xCE, 0x0C, 0x00,               // ldx #$0C00
+                // L0019
+                0xA6, 0x30,                     // ldaa 1,X+
+                0x07, 0x06,                     // bsr L0023
+                0x8E, 0x10, 0x00,               // cpx #$1000
+                0x25, 0xF7,                     // blo L0019
+                0x3D,                           // rts
+                // L0023
+                0xF6, 0x08, 0xCC,               // ldab $08CC
+                0x7A, 0x08, 0xCF,               // staa $08CF
+                // L0029
+                0x07, 0x06,                     // bsr L0031
+                0x1F, 0x08, 0xCC, 0x80, 0xF9,   // brclr $08CC,$80,L0029
+                0x3D,                           // rts
+                // L0031
+                0xCC, 0x55, 0xAA,               // ldd #$55AA
+                0x7B, 0x08, 0x17,               // stab $0817
+                0x7A, 0x08, 0x17,               // staa $0817
+                0x3D,                           // rts
+                // 0x14, 0x05 // 16-bit sum of previous bytes
             };
-            foreach(var b in request)
+            ushort sum = 0;
+            foreach(var b in program)
             {
                 _kwpCommon.WriteByte(b);
+                sum += b;
             }
+            _kwpCommon.WriteByte((byte)(sum / 256));
+            _kwpCommon.WriteByte((byte)(sum % 256));
 
             Logger.WriteLine("Receiving ACK");
             ack = new List<byte>();
