@@ -66,7 +66,8 @@ namespace BitFab.KW1281Test
 
                 address = ParseUint(args[4]);
             }
-            else if (string.Compare(command, "DumpEeprom", true) == 0 ||
+            else if (string.Compare(command, "DumpBeetleMem", true) == 0 ||
+                     string.Compare(command, "DumpEeprom", true) == 0 ||
                      string.Compare(command, "DumpMem", true) == 0 ||
                      string.Compare(command, "DumpRB8Eeprom", true) == 0)
             {
@@ -168,8 +169,8 @@ namespace BitFab.KW1281Test
                     DelcoVWPremium5SafeCode(kwp1281);
                     break;
 
-                case "dumpbeetleeeprom":
-                    DumpBeetleEeprom(kwp1281);
+                case "dumpbeetlemem":
+                    DumpBeetleMem(kwp1281, (ushort)address, (ushort)length);
                     return;
 
                 case "dumpccmrom":
@@ -298,7 +299,7 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
         }
 
-        private void DumpBeetleEeprom(IKW1281Dialog kwp1281)
+        private void DumpBeetleMem(IKW1281Dialog kwp1281, ushort address, ushort count)
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
@@ -315,8 +316,8 @@ namespace BitFab.KW1281Test
             var data = new byte[]
             {
                 0x00, 0x10, // 0x0010 bytes following
-                0x00, 0x01, // Address 0x0001 ?
-                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x50, 0x34, 0x02, 0x00,
+                0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x50, 0x34,
+                0x02, 0x00, // Entry point 0x0200 ?
                 0x00, 0xE7 // 16-bit sum of previous bytes
             };
             foreach (var b in data)
@@ -340,42 +341,56 @@ namespace BitFab.KW1281Test
                 return;
             }
 
-            // Now we write a small EEPROM dump program to the 68HC12 processor
+            // Now we write a small memory dump program to the 68HC12 processor
 
-            Logger.WriteLine("Writing EEPROM dump program to cluster microcontroller");
+            Logger.WriteLine("Writing memory dump program to cluster microcontroller");
+
+            var startH = (byte)(address / 256);
+            var startL = (byte)(address % 256);
+
+            var end = address + count;
+            var endH = (byte)(end / 256);
+            var endL = (byte)(end % 256);
 
             var program = new byte[]
             {
                 0x00, 0x3B, // 0x003B bytes following
-                0x02, 0x00, // Address 0x0200 ?
+                0x02, 0x00, // Address 0x0200
                 0x14, 0x50,                     // orcc #$50
-                0x07, 0x29,                     // bsr L0031
+                0x07, 0x29,                     // bsr FeedWatchdog
+
+                // Set baud rate to 9600
                 0xC7,                           // clrb
-                0x7B, 0x08, 0xC8,               // stab $08C8
+                0x7B, 0x08, 0xC8,               // stab $08C8   ; SC1BDH
                 0xC6, 0x34,                     // ldab #$34
-                0x7B, 0x08, 0xC9,               // stab $08C9
+                0x7B, 0x08, 0xC9,               // stab $08C9   ; SC1BDL
+
+                // Enable transmit, disable UART interrupts
                 0xC6, 0x08,                     // ldab #$08
-                0x7B, 0x08, 0xCB,               // stab $08CB
-                0xCE, 0x0C, 0x00,               // ldx #$0C00
-                // L0019
+                0x7B, 0x08, 0xCB,               // stab $08CB   ; SC1CR2
+
+                0xCE, startH, startL,           // ldx #start
+                // SendLoop
                 0xA6, 0x30,                     // ldaa 1,X+
-                0x07, 0x06,                     // bsr L0023
-                0x8E, 0x10, 0x00,               // cpx #$1000
-                0x25, 0xF7,                     // blo L0019
+                0x07, 0x06,                     // bsr SendByte
+                0x8E, endH, endL,               // cpx #end
+                0x26, 0xF7,                     // bne SendLoop
                 0x3D,                           // rts
-                // L0023
-                0xF6, 0x08, 0xCC,               // ldab $08CC
-                0x7A, 0x08, 0xCF,               // staa $08CF
-                // L0029
-                0x07, 0x06,                     // bsr L0031
-                0x1F, 0x08, 0xCC, 0x80, 0xF9,   // brclr $08CC,$80,L0029
+
+                // SendByte
+                0xF6, 0x08, 0xCC,               // ldab $08CC   ; SC1SR1
+                0x7A, 0x08, 0xCF,               // staa $08CF   ; SC1DRL
+                // TxBusy
+                0x07, 0x06,                     // bsr FeedWatchdog
+                0x1F, 0x08, 0xCC, 0x80, 0xF9,   // brclr $08CC,$80,TxBusy   ; SC1SR1
                 0x3D,                           // rts
-                // L0031
+
+                // FeedWatchdog
                 0xCC, 0x55, 0xAA,               // ldd #$55AA
-                0x7B, 0x08, 0x17,               // stab $0817
-                0x7A, 0x08, 0x17,               // staa $0817
+                0x7B, 0x08, 0x17,               // stab $0817   ; COPRST
+                0x7A, 0x08, 0x17,               // staa $0817   ; COPRST
                 0x3D,                           // rts
-                // 0x14, 0x05 // 16-bit sum of previous bytes
+                // 0xHH, 0xLL // 16-bit sum of previous bytes
             };
             ushort sum = 0;
             foreach(var b in program)
@@ -400,15 +415,15 @@ namespace BitFab.KW1281Test
                 return;
             }
 
-            Logger.WriteLine("Receiving EEPROM");
+            Logger.WriteLine("Receiving memory dump");
             var eeprom = new List<byte>();
-            for (int i = 0; i < 1024; i++)
+            for (int i = 0; i < count; i++)
             {
                 var b = _kwpCommon.ReadByte();
                 eeprom.Add(b);
             }
 
-            var dumpFileName = _filename ?? $"beetle_eeprom_${0:X4}.bin";
+            var dumpFileName = _filename ?? $"beetle_mem_${address:X4}.bin";
 
             File.WriteAllBytes(dumpFileName, eeprom.ToArray());
             Logger.WriteLine($"Saved EEPROM dump to {dumpFileName}");
@@ -1040,44 +1055,48 @@ namespace BitFab.KW1281Test
 
         private static void ShowUsage()
         {
-            Logger.WriteLine("Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]");
-            Logger.WriteLine("       PORT    = COM1|COM2|etc.");
-            Logger.WriteLine("       BAUD    = 10400|9600|etc.");
-            Logger.WriteLine("       ADDRESS = The controller address, e.g. 17 (cluster), 46 (CCM), 56 (radio)");
-            Logger.WriteLine("       COMMAND =");
-            Logger.WriteLine("                 ActuatorTest");
-            Logger.WriteLine("                 ClearFaultCodes");
-            Logger.WriteLine("                 DelcoVWPremium5SafeCode");
-            Logger.WriteLine("                 DumpCcmRom");
-            Logger.WriteLine("                 DumpClusterNecRom");
-            Logger.WriteLine("                 DumpEeprom START LENGTH [FILENAME]");
-            Logger.WriteLine("                            START    = Start address in decimal (e.g. 0) or hex (e.g. $0)");
-            Logger.WriteLine("                            LENGTH   = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)");
-            Logger.WriteLine("                            FILENAME = Optional filename");
-            Logger.WriteLine("                 DumpMem START LENGTH [FILENAME]");
-            Logger.WriteLine("                         START    = Start address in decimal (e.g. 8192) or hex (e.g. $2000)");
-            Logger.WriteLine("                         LENGTH   = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)");
-            Logger.WriteLine("                         FILENAME = Optional filename");
-            Logger.WriteLine("                 DumpRB8Eeprom START LENGTH [FILENAME]");
-            Logger.WriteLine("                               START    = Start address in decimal (e.g. 66560) or hex (e.g. $10400)");
-            Logger.WriteLine("                               LENGTH   = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)");
-            Logger.WriteLine("                               FILENAME = Optional filename");
-            Logger.WriteLine("                 LoadEeprom START FILENAME");
-            Logger.WriteLine("                            START  = Start address in decimal (e.g. 0) or hex (e.g. $0)");
-            Logger.WriteLine("                            FILENAME = Name of file containing binary data to load into EEPROM");
-            Logger.WriteLine("                 MapEeprom");
-            Logger.WriteLine("                 ReadFaultCodes");
-            Logger.WriteLine("                 ReadIdent");
-            Logger.WriteLine("                 ReadEeprom ADDRESS");
-            Logger.WriteLine("                            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");
-            Logger.WriteLine("                 ReadSoftwareVersion");
-            Logger.WriteLine("                 Reset");
-            Logger.WriteLine("                 SetSoftwareCoding CODING WORKSHOP");
-            Logger.WriteLine("                            CODING   = Software coding in decimal (e.g. 4361) or hex (e.g. $1109)");
-            Logger.WriteLine("                            WORKSHOP = Workshop code in decimal (e.g. 4361) or hex (e.g. $1109)");
-            Logger.WriteLine("                 WriteEeprom ADDRESS VALUE");
-            Logger.WriteLine("                             ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)");
-            Logger.WriteLine("                             VALUE   = Value in decimal (e.g. 138) or hex (e.g. $8A)");
+            Logger.WriteLine(@"Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
+    PORT = COM1|COM2|etc.
+    BAUD = 10400|9600|etc.
+    ADDRESS = The controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
+    COMMAND =
+        ActuatorTest
+        ClearFaultCodes
+        DelcoVWPremium5SafeCode
+        DumpBeetleMem START LENGTH [FILENAME]
+            START = Start address in decimal (e.g. 3072) or hex (e.g. $C00)
+            LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
+            FILENAME = Optional filename
+        DumpCcmRom
+        DumpClusterNecRom
+        DumpEeprom START LENGTH [FILENAME]
+            START = Start address in decimal (e.g. 0) or hex (e.g. $0)
+            LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)
+            FILENAME = Optional filename
+        DumpMem START LENGTH [FILENAME]
+            START = Start address in decimal (e.g. 8192) or hex (e.g. $2000)
+            LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)
+            FILENAME = Optional filename
+        DumpRB8Eeprom START LENGTH [FILENAME]
+            START = Start address in decimal (e.g. 66560) or hex (e.g. $10400)
+            LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
+            FILENAME = Optional filename
+        LoadEeprom START FILENAME
+            START = Start address in decimal (e.g. 0) or hex (e.g. $0)
+            FILENAME = Name of file containing binary data to load into EEPROM
+        MapEeprom
+        ReadFaultCodes
+        ReadIdent
+        ReadEeprom ADDRESS
+            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
+        ReadSoftwareVersion
+        Reset
+        SetSoftwareCoding CODING WORKSHOP
+            CODING = Software coding in decimal (e.g. 4361) or hex (e.g. $1109)
+            WORKSHOP = Workshop code in decimal (e.g. 4361) or hex (e.g. $1109)
+        WriteEeprom ADDRESS VALUE
+            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
+            VALUE = Value in decimal (e.g. 138) or hex (e.g. $8A)");
         }
 
         private IKwpCommon _kwpCommon;
