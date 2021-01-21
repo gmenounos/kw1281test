@@ -416,17 +416,17 @@ namespace BitFab.KW1281Test
             }
 
             Logger.WriteLine("Receiving memory dump");
-            var eeprom = new List<byte>();
+            var mem = new List<byte>();
             for (int i = 0; i < count; i++)
             {
                 var b = _kwpCommon.ReadByte();
-                eeprom.Add(b);
+                mem.Add(b);
             }
 
             var dumpFileName = _filename ?? $"beetle_mem_${address:X4}.bin";
 
-            File.WriteAllBytes(dumpFileName, eeprom.ToArray());
-            Logger.WriteLine($"Saved EEPROM dump to {dumpFileName}");
+            File.WriteAllBytes(dumpFileName, mem.ToArray());
+            Logger.WriteLine($"Saved memory dump to {dumpFileName}");
 
             Logger.WriteLine("Done");
         }
