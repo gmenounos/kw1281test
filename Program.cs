@@ -433,9 +433,10 @@ namespace BitFab.KW1281Test
 
         private void DumpCcmRom(IKW1281Dialog kwp1281)
         {
-            if (_controllerAddress != (int)ControllerAddress.CCM)
+            if (_controllerAddress != (int)ControllerAddress.CCM &&
+                _controllerAddress != (int)ControllerAddress.CentralLocking)
             {
-                Logger.WriteLine("Only supported for CCM");
+                Logger.WriteLine("Only supported for CCM and Central Locking");
                 return;
             }
 
@@ -539,10 +540,11 @@ namespace BitFab.KW1281Test
                     DumpClusterEeprom(kwp1281, (ushort)address, (ushort)length);
                     break;
                 case (int)ControllerAddress.CCM:
+                case (int)ControllerAddress.CentralLocking:
                     DumpCcmEeprom(kwp1281, (ushort)address, (ushort)length);
                     break;
                 default:
-                    Logger.WriteLine("Only supported for cluster and CCM");
+                    Logger.WriteLine("Only supported for cluster, CCM and Central Locking");
                     break;
             }
         }
@@ -597,17 +599,18 @@ namespace BitFab.KW1281Test
                     MapClusterEeprom(kwp1281);
                     break;
                 case (int)ControllerAddress.CCM:
+                case (int)ControllerAddress.CentralLocking:
                     MapCcmEeprom(kwp1281);
                     break;
                 default:
-                    Logger.WriteLine("Only supported for cluster and CCM");
+                    Logger.WriteLine("Only supported for cluster, CCM and Central Locking");
                     break;
             }
         }
 
         private byte ReadEeprom(IKW1281Dialog kwp1281, uint address, byte value)
         {
-            UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)_controllerAddress);
+            UnlockControllerForEepromReadWrite(kwp1281);
 
             var blockBytes = kwp1281.ReadEeprom((ushort)address, 1);
             if (blockBytes == null)
@@ -673,7 +676,7 @@ namespace BitFab.KW1281Test
 
         private void WriteEeprom(IKW1281Dialog kwp1281, uint address, byte value)
         {
-            UnlockControllerForEepromReadWrite(kwp1281, (ControllerAddress)_controllerAddress);
+            UnlockControllerForEepromReadWrite(kwp1281);
 
             kwp1281.WriteEeprom((ushort)address, new List<byte> { value });
         }
@@ -721,7 +724,7 @@ namespace BitFab.KW1281Test
 
         private void DumpCcmEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
         {
-            UnlockControllerForEepromReadWrite(kwp1281, ControllerAddress.CCM);
+            UnlockControllerForEepromReadWrite(kwp1281);
 
             var dumpFileName = _filename ?? $"ccm_eeprom_${startAddress:X4}.bin";
 
@@ -730,29 +733,31 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Saved EEPROM dump to {dumpFileName}");
         }
 
-        private void UnlockControllerForEepromReadWrite(
-            IKW1281Dialog kwp1281, ControllerAddress controllerAddress)
+        private void UnlockControllerForEepromReadWrite(IKW1281Dialog kwp1281)
         {
-            if (controllerAddress == ControllerAddress.CCM)
+            switch ((ControllerAddress)_controllerAddress)
             {
-                kwp1281.Login(code: 19283, workshopCode: 222); // This is what VDS-PRO uses
-            }
-            else if (controllerAddress == ControllerAddress.Cluster)
-            {
-                // TODO:UnlockCluster() is only needed for EEPROM read, not memory read
-                if (!UnlockCluster(kwp1281))
-                {
-                    Logger.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
-                }
+                case ControllerAddress.CCM:
+                case ControllerAddress.CentralLocking:
+                    kwp1281.Login(code: 19283, workshopCode: 222); // This is what VDS-PRO uses
+                    break;
 
-                if (!ClusterRequiresSeedKey(kwp1281))
-                {
-                    Logger.WriteLine(
-                        "Cluster is unlocked for EEPROM access. Skipping Seed/Key login.");
-                    return;
-                }
+                case ControllerAddress.Cluster:
+                    // TODO:UnlockCluster() is only needed for EEPROM read, not memory read
+                    if (!UnlockCluster(kwp1281))
+                    {
+                        Logger.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
+                    }
 
-                ClusterSeedKeyAuthenticate(kwp1281);
+                    if (!ClusterRequiresSeedKey(kwp1281))
+                    {
+                        Logger.WriteLine(
+                            "Cluster is unlocked for EEPROM access. Skipping Seed/Key login.");
+                        return;
+                    }
+
+                    ClusterSeedKeyAuthenticate(kwp1281);
+                    break;
             }
         }
 
@@ -983,7 +988,7 @@ namespace BitFab.KW1281Test
         {
             var identInfo = kwp1281.ReadIdent().ToString().Replace(' ', '_').Replace(":", "");
 
-            UnlockControllerForEepromReadWrite(kwp1281, ControllerAddress.Cluster);
+            UnlockControllerForEepromReadWrite(kwp1281);
 
             var dumpFileName = _filename ?? $"{identInfo}_${startAddress:X4}_eeprom.bin";
 
@@ -996,7 +1001,7 @@ namespace BitFab.KW1281Test
         {
             _ = kwp1281.ReadIdent();
 
-            UnlockControllerForEepromReadWrite(kwp1281, ControllerAddress.Cluster);
+            UnlockControllerForEepromReadWrite(kwp1281);
 
             if (!File.Exists(filename))
             {
@@ -1013,7 +1018,7 @@ namespace BitFab.KW1281Test
 
         private void DumpClusterMem(IKW1281Dialog kwp1281, uint startAddress, uint length)
         {
-            UnlockControllerForEepromReadWrite(kwp1281, ControllerAddress.Cluster);
+            UnlockControllerForEepromReadWrite(kwp1281);
 
             const byte blockSize = 15;
 
