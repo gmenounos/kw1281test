@@ -10,8 +10,8 @@
         FaultCodesRead = 0x07, // get errors, all errors output
         ACK = 0x09,
         NAK = 0x0A,
-        ReadEeprom = 0x19,
         SoftwareCoding = 0x10,
+        ReadEeprom = 0x19,
         WriteEeprom = 0x1A,
         Custom = 0x1B,
         GroupReading = 0x29,
