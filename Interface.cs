@@ -77,28 +77,30 @@ namespace BitFab.KW1281Test
 
         public void BitBang5Baud(byte b, bool evenParity)
         {
-            // Disable garbage collection during this time-critical code
+            // Disable garbage collection int this time-critical method
             bool noGc = GC.TryStartNoGCRegion(1024 * 1024);
 
             const int bitsPerSec = 5;
-            const int msecPerSec = 1000;
-            const int msecPerBit = msecPerSec / bitsPerSec;
+            long ticksPerBit = Stopwatch.Frequency / bitsPerSec;
 
             var stopWatch = new Stopwatch();
-            stopWatch.Start();
+            long maxTick = 0;
 
             // Delay the appropriate amount and then set/clear the TxD line
             void BitBang(bool bit)
             {
-                while ((msecPerBit - stopWatch.ElapsedMilliseconds) > 0)
+                while (stopWatch.ElapsedTicks < maxTick)
                     ;
-                stopWatch.Restart();
                 _port.BreakState = !bit;
+                maxTick += ticksPerBit;
             }
+
+            bool parity = !evenParity; // XORed with each bit to calculate parity bit
+
+            stopWatch.Start();
 
             BitBang(false); // Start bit
 
-            bool parity = !evenParity; // XORed with each bit to calculate parity bit
             for (int i = 0; i < 7; i++)
             {
                 bool bit = (b & 1) == 1;
