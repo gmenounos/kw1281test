@@ -143,11 +143,12 @@ namespace BitFab.KW1281Test
 
             IKW1281Dialog kwp1281 = null;
             KW2000Dialog kwp2000 = null;
+            ControllerInfo ecuInfo = null;
             if (kwpVersion == 1281)
             {
                 kwp1281 = new KW1281Dialog(_kwpCommon);
 
-                var ecuInfo = kwp1281.ReadEcuInfo();
+                ecuInfo = kwp1281.ReadEcuInfo();
                 Logger.WriteLine($"ECU: {ecuInfo}");
             }
             else
@@ -170,7 +171,7 @@ namespace BitFab.KW1281Test
                     break;
 
                 case "dumpbeetlemem":
-                    DumpBeetleMem(kwp1281, (ushort)address, (ushort)length);
+                    DumpBeetleMem(kwp1281, ecuInfo, (ushort)address, (ushort)length);
                     return;
 
                 case "dumpccmrom":
@@ -299,11 +300,31 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
         }
 
-        private void DumpBeetleMem(IKW1281Dialog kwp1281, ushort address, ushort count)
+        private void DumpBeetleMem(
+            IKW1281Dialog kwp1281, ControllerInfo ecuInfo, ushort address, ushort count)
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
                 Logger.WriteLine("Only supported for clusters");
+                return;
+            }
+
+            byte entryH; // High byte of code entry point
+            byte regBlockH; // High byte of register block
+
+            if (ecuInfo.Text.Contains("M73 V07"))
+            {
+                entryH = 0x02;
+                regBlockH = 0x08;
+            }
+            else if (ecuInfo.Text.Contains("M73 V08"))
+            {
+                entryH = 0x18;
+                regBlockH = 0x20;
+            }
+            else
+            {
+                Logger.WriteLine("Unsupported cluster software version");
                 return;
             }
 
@@ -315,29 +336,11 @@ namespace BitFab.KW1281Test
             Logger.WriteLine("Writing data to cluster microcontroller");
             var data = new byte[]
             {
-                0x00, 0x10, // 0x0010 bytes following
                 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x50, 0x34,
-                0x02, 0x00, // Entry point 0x0200 ?
-                0x00, 0xE7 // 16-bit sum of previous bytes
+                entryH, 0x00, // Entry point $xx00
             };
-            foreach (var b in data)
+            if (!WriteBeetleBlockAndReadAck(data))
             {
-                _kwpCommon.WriteByte(b);
-            }
-
-            var expectedAck = new byte[] { 0x03, 0x09, 0x00, 0x0C };
-
-            Logger.WriteLine("Receiving ACK");
-            var ack = new List<byte>();
-            for (int i = 0; i < 4; i++)
-            {
-                var b = _kwpCommon.ReadByte();
-                ack.Add(b);
-                Console.Write(".");
-            }
-            if (!ack.SequenceEqual(expectedAck))
-            {
-                Logger.WriteLine($"Expected ACK but received {Utils.Dump(ack)}");
                 return;
             }
 
@@ -354,68 +357,55 @@ namespace BitFab.KW1281Test
 
             var program = new byte[]
             {
-                0x00, 0x3B, // 0x003B bytes following
-                0x02, 0x00, // Address 0x0200
+                entryH, 0x00, // Address $xx00 
+
                 0x14, 0x50,                     // orcc #$50
-                0x07, 0x29,                     // bsr FeedWatchdog
+                0x07, 0x32,                     // bsr FeedWatchdog
 
                 // Set baud rate to 9600
                 0xC7,                           // clrb
-                0x7B, 0x08, 0xC8,               // stab $08C8   ; SC1BDH
+                0x7B, regBlockH, 0xC8,          // stab $xxC8   ; SC1BDH
                 0xC6, 0x34,                     // ldab #$34
-                0x7B, 0x08, 0xC9,               // stab $08C9   ; SC1BDL
+                0x7B, regBlockH, 0xC9,          // stab $xxC9   ; SC1BDL
 
                 // Enable transmit, disable UART interrupts
                 0xC6, 0x08,                     // ldab #$08
-                0x7B, 0x08, 0xCB,               // stab $08CB   ; SC1CR2
+                0x7B, regBlockH, 0xCB,          // stab $xxCB   ; SC1CR2
 
                 0xCE, startH, startL,           // ldx #start
-                // SendLoop
+                // SendLoop:
                 0xA6, 0x30,                     // ldaa 1,X+
-                0x07, 0x06,                     // bsr SendByte
+                0x07, 0x0F,                     // bsr SendByte
                 0x8E, endH, endL,               // cpx #end
                 0x26, 0xF7,                     // bne SendLoop
+                // Poison the watchdog to force a reboot
+                0xCC, 0x11, 0x11,               // ldd #$1111
+                0x7B, regBlockH, 0x17,          // stab $xx17   ; COPRST
+                0x7A, regBlockH, 0x17,          // staa $xx17   ; COPRST
                 0x3D,                           // rts
 
-                // SendByte
-                0xF6, 0x08, 0xCC,               // ldab $08CC   ; SC1SR1
-                0x7A, 0x08, 0xCF,               // staa $08CF   ; SC1DRL
-                // TxBusy
+                // SendByte:
+                0xF6, regBlockH, 0xCC,          // ldab $xxCC   ; SC1SR1
+                0x7A, regBlockH, 0xCF,          // staa $xxCF   ; SC1DRL
+                // TxBusy:
                 0x07, 0x06,                     // bsr FeedWatchdog
-                0x1F, 0x08, 0xCC, 0x80, 0xF9,   // brclr $08CC,$80,TxBusy   ; SC1SR1
+                // Loop until TC (Transmit Complete) bit is set
+                0x1F, regBlockH, 0xCC, 0x40, 0xF9,   // brclr $xxCC,$40,TxBusy   ; SC1SR1
                 0x3D,                           // rts
 
-                // FeedWatchdog
+                // FeedWatchdog:
                 0xCC, 0x55, 0xAA,               // ldd #$55AA
-                0x7B, 0x08, 0x17,               // stab $0817   ; COPRST
-                0x7A, 0x08, 0x17,               // staa $0817   ; COPRST
+                0x7B, regBlockH, 0x17,          // stab $xx17   ; COPRST
+                0x7A, regBlockH, 0x17,          // staa $xx17   ; COPRST
                 0x3D,                           // rts
-                // 0xHH, 0xLL // 16-bit sum of previous bytes
             };
-            ushort sum = 0;
-            foreach(var b in program)
+            if (!WriteBeetleBlockAndReadAck(program))
             {
-                _kwpCommon.WriteByte(b);
-                sum += b;
-            }
-            _kwpCommon.WriteByte((byte)(sum / 256));
-            _kwpCommon.WriteByte((byte)(sum % 256));
-
-            Logger.WriteLine("Receiving ACK");
-            ack = new List<byte>();
-            for (int i = 0; i < 4; i++)
-            {
-                var b = _kwpCommon.ReadByte();
-                ack.Add(b);
-                Console.Write(".");
-            }
-            if (!ack.SequenceEqual(expectedAck))
-            {
-                Logger.WriteLine($"Expected ACK but received {Utils.Dump(ack)}");
                 return;
             }
 
             Logger.WriteLine("Receiving memory dump");
+
             var mem = new List<byte>();
             for (int i = 0; i < count; i++)
             {
@@ -429,6 +419,41 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Saved memory dump to {dumpFileName}");
 
             Logger.WriteLine("Done");
+        }
+
+        private bool WriteBeetleBlockAndReadAck(byte[] data)
+        {
+            var count = (ushort)(data.Length + 2); // Count includes 2-byte checksum
+            var countH = (byte)(count / 256);
+            var countL = (byte)(count % 256);
+            _kwpCommon.WriteByte(countH);
+            _kwpCommon.WriteByte(countL);
+
+            var sum = (ushort)(countH + countL);
+            foreach (var b in data)
+            {
+                _kwpCommon.WriteByte(b);
+                sum += b;
+            }
+            _kwpCommon.WriteByte((byte)(sum / 256));
+            _kwpCommon.WriteByte((byte)(sum % 256));
+
+            var expectedAck = new byte[] { 0x03, 0x09, 0x00, 0x0C };
+
+            Logger.WriteLine("Receiving ACK");
+            var ack = new List<byte>();
+            for (int i = 0; i < 4; i++)
+            {
+                var b = _kwpCommon.ReadByte();
+                ack.Add(b);
+            }
+            if (!ack.SequenceEqual(expectedAck))
+            {
+                Logger.WriteLine($"Expected ACK but received {Utils.Dump(ack)}");
+                return false;
+            }
+
+            return true;
         }
 
         private void DumpCcmRom(IKW1281Dialog kwp1281)
