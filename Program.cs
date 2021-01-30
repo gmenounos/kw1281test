@@ -135,7 +135,12 @@ namespace BitFab.KW1281Test
             }
 
             Logger.WriteLine($"Opening serial port {portName}");
+#if BUILT_FOR_WINDOWS32 || BUILT_FOR_WINDOWS64
             using IInterface @interface = new Interface(portName, baudRate);
+#else
+            using IInterface @interface = new FtdiInterface(portName, baudRate);
+#endif
+
             _kwpCommon = new KwpCommon(@interface);
 
             Logger.WriteLine("Sending wakeup message");
