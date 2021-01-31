@@ -7,34 +7,40 @@ namespace BitFab.KW1281Test
 {
     class FtdiInterface : IInterface
     {
+        private FT _ft = null;
+        private FTHandle _handle = FTHandle.Zero;
+        private readonly byte[] _buf = new byte[1];
+
         public FtdiInterface(string serialNumber, int baudRate)
         {
-            var status = FT.OpenBySerialNumber(
+            _ft = new FT();
+
+            var status = _ft.OpenBySerialNumber(
                 serialNumber, FT.OpenExFlags.BySerialNumber, out _handle);
             AssertOk(status);
 
-            status = FT.SetBaudRate(_handle, (uint)baudRate);
+            status = _ft.SetBaudRate(_handle, (uint)baudRate);
             AssertOk(status);
 
-            status = FT.SetDataCharacteristics(
+            status = _ft.SetDataCharacteristics(
                 _handle,
                 FT.Bits.Eight,
                 FT.StopBits.One,
                 FT.Parity.None);
             AssertOk(status);
 
-            status = FT.SetFlowControl(
+            status = _ft.SetFlowControl(
                 _handle,
                 FT.FlowControl.None, 0, 0);
             AssertOk(status);
 
-            status = FT.ClrRts(_handle);
+            status = _ft.ClrRts(_handle);
             AssertOk(status);
 
-            status = FT.SetDtr(_handle);
+            status = _ft.SetDtr(_handle);
             AssertOk(status);
 
-            status = FT.SetTimeouts(
+            status = _ft.SetTimeouts(
                 _handle,
                 (uint)TimeSpan.FromSeconds(5).TotalMilliseconds,
                 (uint)TimeSpan.FromSeconds(5).TotalMilliseconds);
@@ -45,15 +51,21 @@ namespace BitFab.KW1281Test
         {
             if (_handle != FTHandle.Zero)
             {
-                var status = FT.Close(_handle);
+                var status = _ft.Close(_handle);
                 _handle = FTHandle.Zero;
                 AssertOk(status);
+            }
+
+            if (_ft != null)
+            {
+                _ft.Dispose();
+                _ft = null;
             }
         }
 
         public byte ReadByte()
         {
-            var status = FT.Read(_handle, _buf, 1, out uint countOfBytesRead);
+            var status = _ft.Read(_handle, _buf, 1, out uint countOfBytesRead);
             AssertOk(status);
             if (countOfBytesRead != 1)
             {
@@ -67,7 +79,7 @@ namespace BitFab.KW1281Test
         public void WriteByte(byte b)
         {
             _buf[0] = b;
-            var status = FT.Write(_handle, _buf, 1, out uint countOfBytesWritten);
+            var status = _ft.Write(_handle, _buf, 1, out uint countOfBytesWritten);
             AssertOk(status);
             if (countOfBytesWritten != 1)
             {
@@ -97,7 +109,7 @@ namespace BitFab.KW1281Test
             {
                 while (stopWatch.ElapsedTicks < maxTick)
                     ;
-                var status = bit ? FT.SetBreakOff(_handle) : FT.SetBreakOn(_handle);
+                var status = bit ? _ft.SetBreakOff(_handle) : _ft.SetBreakOn(_handle);
                 AssertOk(status);
 
                 maxTick += ticksPerBit;
@@ -128,7 +140,7 @@ namespace BitFab.KW1281Test
             }
 
             // Throw away anything that might be in the receive buffer
-            var status = FT.Purge(_handle, FT.PurgeMask.RX);
+            var status = _ft.Purge(_handle, FT.PurgeMask.RX);
             AssertOk(status);
         }
 
@@ -140,98 +152,258 @@ namespace BitFab.KW1281Test
                     $"D2xx library returned {status} instead of Ok");
             }
         }
-
-        private FTHandle _handle = FTHandle.Zero;
-        private readonly byte[] _buf = new byte[1];
     }
 
-    static class FT
+    class FT : IDisposable
     {
-#if BUILT_FOR_WINDOWS32
-        const string D2XXDll = "ftd2xx.dll";
-#elif BUILT_FOR_WINDOWS64
-        const string D2XXDll = "ftd2xx64.dll";
-#elif BUILT_FOR_MACOS
-        const string D2XXDll = "libftd2xx.dylib";
-#elif BUILT_FOR_LINUX
-        const string D2XXDll = "libftd2xx.so";
-#endif
+        private IntPtr _d2xx = IntPtr.Zero;
+        private readonly OpenBySerialNumberDelegate _openBySerialNumber;
+        private readonly CloseDelegate _close;
+        private readonly SetBaudRateDelegate _setBaudRate;
+        private readonly SetDataCharacteristicsDelegate _setDataCharacteristics;
+        private SetFlowControlDelegate _setFlowControl;
+        private SetDtrDelegate _setDtr;
+        private ClrDtrDelegate _clrDtr;
+        private SetRtsDelegate _setRts;
+        private ClrRtsDelegate _clrRts;
+        private SetTimeoutsDelegate _setTimeouts;
+        private PurgeDelegate _purge;
+        private SetBreakOnDelegate _setBreakOn;
+        private SetBreakOffDelegate _setBreakOff;
+        private ReadDelegate _read;
+        private WriteDelegate _write;
 
-        [DllImport(D2XXDll, EntryPoint = "FT_OpenEx")]
-        public static extern Status OpenBySerialNumber(
-#pragma warning disable CA2101 // Specify marshaling for P/Invoke string arguments
+        public FT()
+        {
+            string libName;
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                libName = "libftd2xx.dylib";
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                libName = "libftd2xx.so";
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                libName = Environment.Is64BitProcess ? "ftd2xx64.dll" : "ftd2xx.dll";
+            }
+            else
+            {
+                throw new InvalidOperationException($"Unknown OS: {RuntimeInformation.OSDescription}");
+            }
+
+            _d2xx = NativeLibrary.Load(
+                libName, typeof(FT).Assembly, DllImportSearchPath.SafeDirectories);
+
+            var export = NativeLibrary.GetExport(_d2xx, "FT_OpenEx");
+            _openBySerialNumber = Marshal.GetDelegateForFunctionPointer<OpenBySerialNumberDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_Close");
+            _close = Marshal.GetDelegateForFunctionPointer<CloseDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_SetBaudRate");
+            _setBaudRate = Marshal.GetDelegateForFunctionPointer<SetBaudRateDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_SetDataCharacteristics");
+            _setDataCharacteristics = Marshal.GetDelegateForFunctionPointer<SetDataCharacteristicsDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_SetFlowControl");
+            _setFlowControl = Marshal.GetDelegateForFunctionPointer<SetFlowControlDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_SetDtr");
+            _setDtr = Marshal.GetDelegateForFunctionPointer<SetDtrDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_ClrDtr");
+            _clrDtr = Marshal.GetDelegateForFunctionPointer<ClrDtrDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_SetRts");
+            _setRts = Marshal.GetDelegateForFunctionPointer<SetRtsDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_ClrRts");
+            _clrRts = Marshal.GetDelegateForFunctionPointer<ClrRtsDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_SetTimeouts");
+            _setTimeouts = Marshal.GetDelegateForFunctionPointer<SetTimeoutsDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_Purge");
+            _purge = Marshal.GetDelegateForFunctionPointer<PurgeDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_SetBreakOn");
+            _setBreakOn = Marshal.GetDelegateForFunctionPointer<SetBreakOnDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_SetBreakOff");
+            _setBreakOff = Marshal.GetDelegateForFunctionPointer<SetBreakOffDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_Read");
+            _read = Marshal.GetDelegateForFunctionPointer<ReadDelegate>(export);
+            export = NativeLibrary.GetExport(_d2xx, "FT_Write");
+            _write = Marshal.GetDelegateForFunctionPointer<WriteDelegate>(export);
+        }
+
+        public void Dispose()
+        {
+            if (_d2xx != IntPtr.Zero)
+            {
+                NativeLibrary.Free(_d2xx);
+                _d2xx = IntPtr.Zero;
+            }
+        }
+
+        public Status OpenBySerialNumber(
+            string serialNumber,
+            OpenExFlags flags,
+            out FTHandle handle)
+        {
+            return _openBySerialNumber(serialNumber, flags, out handle);
+        }
+
+        private delegate Status OpenBySerialNumberDelegate(
             [MarshalAs(UnmanagedType.LPStr)] string serialNumber,
-#pragma warning restore CA2101 // Specify marshaling for P/Invoke string arguments
             OpenExFlags flags,
             out FTHandle handle);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_Close")]
-        public static extern Status Close(
+        public Status Close(
+            FTHandle handle)
+        {
+            return _close(handle);
+        }
+
+        private delegate Status CloseDelegate(
             FTHandle handle);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_SetBaudRate")]
-        public static extern Status SetBaudRate(
+        public Status SetBaudRate(
+            FTHandle handle,
+            uint baudRate)
+        {
+            return _setBaudRate(handle, baudRate);
+        }
+
+        private delegate Status SetBaudRateDelegate(
             FTHandle handle,
             uint baudRate);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_SetDataCharacteristics")]
-        public static extern Status SetDataCharacteristics(
+        public Status SetDataCharacteristics(
+            FTHandle handle,
+            Bits wordLength,
+            StopBits stopBits,
+            Parity parity)
+        {
+            return _setDataCharacteristics(handle, wordLength, stopBits, parity);
+        }
+
+        private delegate Status SetDataCharacteristicsDelegate(
             FTHandle handle,
             Bits wordLength,
             StopBits stopBits,
             Parity parity);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_SetFlowControl")]
-        public static extern Status SetFlowControl(
+        public Status SetFlowControl(
+            FTHandle handle,
+            FlowControl flowControl,
+            byte xonChar,
+            byte xoffChar)
+        {
+            return _setFlowControl(handle, flowControl, xonChar, xoffChar);
+        }
+
+        private delegate Status SetFlowControlDelegate(
             FTHandle handle,
             FlowControl flowControl,
             byte xonChar,
             byte xoffChar);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_SetDtr")]
-        public static extern Status SetDtr(
+        public Status SetDtr(
+            FTHandle handle)
+        {
+            return _setDtr(handle);
+        }
+
+        public delegate Status SetDtrDelegate(
             FTHandle handle);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_ClrDtr")]
-        public static extern Status ClrDtr(
+        public Status ClrDtr(
+            FTHandle handle)
+        {
+            return _clrDtr(handle);
+        }
+
+        private delegate Status ClrDtrDelegate(
             FTHandle handle);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_SetRts")]
-        public static extern Status SetRts(
+        public Status SetRts(
+            FTHandle handle)
+        {
+            return _setRts(handle);
+        }
+
+        private delegate Status SetRtsDelegate(
             FTHandle handle);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_ClrRts")]
-        public static extern Status ClrRts(
+        public Status ClrRts(
+            FTHandle handle)
+        {
+            return _clrRts(handle);
+        }
+
+        private delegate Status ClrRtsDelegate(
             FTHandle handle);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_SetTimeouts")]
-        public static extern Status SetTimeouts(
+        public Status SetTimeouts(
+            FTHandle handle,
+            uint readTimeoutMS,
+            uint writeTimeoutMS)
+        {
+            return _setTimeouts(handle, readTimeoutMS, writeTimeoutMS);
+        }
+
+        private delegate Status SetTimeoutsDelegate(
             FTHandle handle,
             uint readTimeoutMS,
             uint writeTimeoutMS);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_Purge")]
-        public static extern Status Purge(
+        public Status Purge(
+            FTHandle handle,
+            PurgeMask mask)
+        {
+            return _purge(handle, mask);
+        }
+
+        private delegate Status PurgeDelegate(
             FTHandle handle,
             PurgeMask mask);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_SetBreakOn")]
-        public static extern Status SetBreakOn(
+        public Status SetBreakOn(
+            FTHandle handle)
+        {
+            return _setBreakOn(handle);
+        }
+
+        private delegate Status SetBreakOnDelegate(
             FTHandle handle);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_SetBreakOff")]
-        public static extern Status SetBreakOff(
+        public Status SetBreakOff(
+            FTHandle handle)
+        {
+            return _setBreakOff(handle);
+        }
+
+        private delegate Status SetBreakOffDelegate(
             FTHandle handle);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_Read")]
-        public static extern Status Read(
+        public Status Read(
+            FTHandle handle,
+            byte[] buffer,
+            uint countOfBytesToRead,
+            out uint countOfBytesRead)
+        {
+            return _read(handle, buffer, countOfBytesToRead, out countOfBytesRead);
+        }
+
+        private delegate Status ReadDelegate(
             FTHandle handle,
             byte[] buffer,
             uint countOfBytesToRead,
             out uint countOfBytesRead);
 
-        [DllImport(D2XXDll, EntryPoint = "FT_Write")]
-        public static extern Status Write(
+        public Status Write(
+            FTHandle handle,
+            byte[] buffer,
+            uint countOfBytesToWrite,
+            out uint countOfBytesWritten)
+        {
+            return _write(handle, buffer, countOfBytesToWrite, out countOfBytesWritten);
+        }
+
+        private delegate Status WriteDelegate(
             FTHandle handle,
             byte[] buffer,
             uint countOfBytesToWrite,
