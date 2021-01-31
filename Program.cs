@@ -1,4 +1,5 @@
 ﻿using BitFab.KW1281Test.Blocks;
+using BitFab.KW1281Test.Interface;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -6,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace BitFab.KW1281Test
@@ -134,12 +136,7 @@ namespace BitFab.KW1281Test
                 }
             }
 
-            Logger.WriteLine($"Opening serial port {portName}");
-#if BUILT_FOR_WINDOWS32 || BUILT_FOR_WINDOWS64
-            using IInterface @interface = new Interface(portName, baudRate);
-#else
-            using IInterface @interface = new FtdiInterface(portName, baudRate);
-#endif
+            using var @interface = OpenPort(portName, baudRate);
 
             _kwpCommon = new KwpCommon(@interface);
 
@@ -243,6 +240,29 @@ namespace BitFab.KW1281Test
             if (kwpVersion == 1281)
             {
                 kwp1281.EndCommunication();
+            }
+        }
+
+        /// <summary>
+        /// Opens the serial port.
+        /// </summary>
+        /// <param name="portName">
+        /// Either the device name of a serial port (e.g. COM1, /dev/tty23)
+        /// or an FTDI USB->Serial device serial number (2 letters followed by 6 letters/numbers).
+        /// </param>
+        /// <param name="baudRate"></param>
+        /// <returns></returns>
+        private static IInterface OpenPort(string portName, int baudRate)
+        {
+            if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z]{2}[A-Z0-9]{6}\Z"))
+            {
+                Logger.WriteLine($"Opening FTDI serial port {portName}");
+                return new FtdiInterface(portName, baudRate);
+            }
+            else
+            {
+                Logger.WriteLine($"Opening serial port {portName}");
+                return new GenericInterface(portName, baudRate);
             }
         }
 
@@ -657,7 +677,7 @@ namespace BitFab.KW1281Test
             return value;
         }
 
-        private void ReadFaultCodes(IKW1281Dialog kwp1281)
+        private static void ReadFaultCodes(IKW1281Dialog kwp1281)
         {
             var faultCodes = kwp1281.ReadFaultCodes();
             Logger.WriteLine("Fault codes:");

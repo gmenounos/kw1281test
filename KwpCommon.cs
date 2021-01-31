@@ -1,5 +1,5 @@
-﻿using System;
-using System.Net;
+﻿using BitFab.KW1281Test.Interface;
+using System;
 
 namespace BitFab.KW1281Test
 {
@@ -58,7 +58,7 @@ namespace BitFab.KW1281Test
 
         public void WriteByte(byte b)
         {
-            _interface.WriteByte(b);
+            _interface.WriteByteAndDiscardEcho(b);
         }
 
         public byte ReadAndAckByte()
@@ -82,7 +82,7 @@ namespace BitFab.KW1281Test
         private void WriteComplement(byte b)
         {
             var complement = (byte)~b;
-            _interface.WriteByte(complement);
+            _interface.WriteByteAndDiscardEcho(complement);
         }
 
         private readonly IInterface _interface;
