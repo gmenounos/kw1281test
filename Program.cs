@@ -254,7 +254,7 @@ namespace BitFab.KW1281Test
         /// <returns></returns>
         private static IInterface OpenPort(string portName, int baudRate)
         {
-            if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z]{2}[A-Z0-9]{6}\Z"))
+            if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
             {
                 Logger.WriteLine($"Opening FTDI serial port {portName}");
                 return new FtdiInterface(portName, baudRate);
