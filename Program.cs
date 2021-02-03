@@ -66,7 +66,7 @@ namespace BitFab.KW1281Test
                     return;
                 }
 
-                address = ParseUint(args[4]);
+                address = Utils.ParseUint(args[4]);
             }
             else if (string.Compare(command, "DumpBeetleMem", true) == 0 ||
                      string.Compare(command, "DumpEeprom", true) == 0 ||
@@ -79,8 +79,8 @@ namespace BitFab.KW1281Test
                     return;
                 }
 
-                address = ParseUint(args[4]);
-                length = ParseUint(args[5]);
+                address = Utils.ParseUint(args[4]);
+                length = Utils.ParseUint(args[5]);
 
                 if (args.Length > 6)
                 {
@@ -100,8 +100,8 @@ namespace BitFab.KW1281Test
                     return;
                 }
 
-                address = ParseUint(args[4]);
-                value = (byte)ParseUint(args[5]);
+                address = Utils.ParseUint(args[4]);
+                value = (byte)Utils.ParseUint(args[5]);
             }
             else if (string.Compare(command, "LoadEeprom", true) == 0)
             {
@@ -111,7 +111,7 @@ namespace BitFab.KW1281Test
                     return;
                 }
 
-                address = ParseUint(args[4]);
+                address = Utils.ParseUint(args[4]);
                 _filename = args[5];
             }
             else if (string.Compare(command, "SetSoftwareCoding", true) == 0)
@@ -122,13 +122,13 @@ namespace BitFab.KW1281Test
                     return;
                 }
 
-                softwareCoding = (int)ParseUint(args[4]);
+                softwareCoding = (int)Utils.ParseUint(args[4]);
                 if (softwareCoding > 32767)
                 {
                     Logger.WriteLine("SoftwareCoding cannot be greater than 32767.");
                     return;
                 }
-                workshopCode = (int)ParseUint(args[5]);
+                workshopCode = (int)Utils.ParseUint(args[5]);
                 if (workshopCode > 99999)
                 {
                     Logger.WriteLine("WorkshopCode cannot be greater than 99999.");
@@ -1090,22 +1090,6 @@ namespace BitFab.KW1281Test
                 }
             }
             Logger.WriteLine($"Saved memory dump to {dumpFileName}");
-        }
-
-        private static uint ParseUint(string numberString)
-        {
-            uint number;
-
-            if (numberString.StartsWith("$"))
-            {
-                number = uint.Parse(numberString[1..], NumberStyles.HexNumber);
-            }
-            else
-            {
-                number = uint.Parse(numberString);
-            }
-
-            return number;
         }
 
         private static void ShowUsage()

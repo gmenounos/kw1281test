@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -16,34 +17,34 @@ namespace BitFab.KW1281Test.Interface
 
             var status = _ft.Open(
                 serialNumber, FT.OpenExFlags.BySerialNumber, out _handle);
-            AssertOk(status);
+            FT.AssertOk(status);
 
             status = _ft.SetBaudRate(_handle, (uint)baudRate);
-            AssertOk(status);
+            FT.AssertOk(status);
 
             status = _ft.SetDataCharacteristics(
                 _handle,
                 FT.Bits.Eight,
                 FT.StopBits.One,
                 FT.Parity.None);
-            AssertOk(status);
+            FT.AssertOk(status);
 
             status = _ft.SetFlowControl(
                 _handle,
                 FT.FlowControl.None, 0, 0);
-            AssertOk(status);
+            FT.AssertOk(status);
 
             status = _ft.ClrRts(_handle);
-            AssertOk(status);
+            FT.AssertOk(status);
 
             status = _ft.SetDtr(_handle);
-            AssertOk(status);
+            FT.AssertOk(status);
 
             status = _ft.SetTimeouts(
                 _handle,
                 (uint)TimeSpan.FromSeconds(5).TotalMilliseconds,
                 (uint)TimeSpan.FromSeconds(5).TotalMilliseconds);
-            AssertOk(status);
+            FT.AssertOk(status);
         }
 
         public void Dispose()
@@ -52,7 +53,7 @@ namespace BitFab.KW1281Test.Interface
             {
                 var status = _ft.Close(_handle);
                 _handle = IntPtr.Zero;
-                AssertOk(status);
+                FT.AssertOk(status);
             }
 
             if (_ft != null)
@@ -65,7 +66,7 @@ namespace BitFab.KW1281Test.Interface
         public byte ReadByte()
         {
             var status = _ft.Read(_handle, _buf, 1, out uint countOfBytesRead);
-            AssertOk(status);
+            FT.AssertOk(status);
             if (countOfBytesRead != 1)
             {
                 throw new TimeoutException("Read timed out");
@@ -82,7 +83,7 @@ namespace BitFab.KW1281Test.Interface
         {
             _buf[0] = b;
             var status = _ft.Write(_handle, _buf, 1, out uint countOfBytesWritten);
-            AssertOk(status);
+            FT.AssertOk(status);
             if (countOfBytesWritten != 1)
             {
                 throw new InvalidOperationException(
@@ -93,28 +94,19 @@ namespace BitFab.KW1281Test.Interface
         public void SetBreakOn()
         {
             var status = _ft.SetBreakOn(_handle);
-            AssertOk(status);
+            FT.AssertOk(status);
         }
 
         public void SetBreakOff()
         {
             var status = _ft.SetBreakOff(_handle);
-            AssertOk(status);
+            FT.AssertOk(status);
         }
 
         public void ClearReceiveBuffer()
         {
             var status = _ft.Purge(_handle, FT.PurgeMask.RX);
-            AssertOk(status);
-        }
-
-        private static void AssertOk(FT.Status status)
-        {
-            if (status != FT.Status.Ok)
-            {
-                throw new InvalidOperationException(
-                    $"D2xx library returned {status} instead of Ok");
-            }
+            FT.AssertOk(status);
         }
     }
 
@@ -124,6 +116,7 @@ namespace BitFab.KW1281Test.Interface
 
         // Delegates used to call into the FTID D2xx DLL
 #pragma warning disable CS0649
+        private readonly FTDll.SetVidPid _setVidPid;
         private readonly FTDll.OpenBySerialNumber _openBySerialNumber;
         private readonly FTDll.Close _close;
         private readonly FTDll.SetBaudRate _setBaudRate;
@@ -144,14 +137,18 @@ namespace BitFab.KW1281Test.Interface
         public FT()
         {
             string libName;
+            bool isMacOs = false;
+            bool isLinux = false;
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 libName = "libftd2xx.dylib";
+                isMacOs = true;
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 libName = "libftd2xx.so";
+                isLinux = true;
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
@@ -165,7 +162,7 @@ namespace BitFab.KW1281Test.Interface
             _d2xx = NativeLibrary.Load(
                 libName, typeof(FT).Assembly, DllImportSearchPath.SafeDirectories);
 
-            var fieldNames = new[]
+            List<string> fieldNames = new()
             {
                 nameof(_openBySerialNumber),
                 nameof(_close),
@@ -183,6 +180,10 @@ namespace BitFab.KW1281Test.Interface
                 nameof(_read),
                 nameof(_write),
             };
+            if (isMacOs || isLinux)
+            {
+                fieldNames.Add(nameof(_setVidPid));
+            }
 
             foreach (var fieldName in fieldNames)
             {
@@ -193,6 +194,20 @@ namespace BitFab.KW1281Test.Interface
                 var delegateVal = Marshal.GetDelegateForFunctionPointer(export, fieldInfo.FieldType);
                 fieldInfo.SetValue(this, delegateVal);
             }
+
+            if (isMacOs || isLinux)
+            {
+                var vidStr = Environment.GetEnvironmentVariable("FTDI_VID");
+                var pidStr = Environment.GetEnvironmentVariable("FTDI_PID");
+                if (!string.IsNullOrEmpty(vidStr) && !string.IsNullOrEmpty(pidStr))
+                {
+                    var vid = Utils.ParseUint(vidStr);
+                    var pid = Utils.ParseUint(pidStr);
+                    Logger.WriteLine($"Setting FTDI VID=0x{vid:X4}, PID=0x{pid:X4}");
+                    var status = SetVidPid(vid, pid);
+                    AssertOk(status);
+                }
+            }
         }
 
         public void Dispose()
@@ -202,6 +217,22 @@ namespace BitFab.KW1281Test.Interface
                 NativeLibrary.Free(_d2xx);
                 _d2xx = IntPtr.Zero;
             }
+        }
+
+        public static void AssertOk(FT.Status status)
+        {
+            if (status != FT.Status.Ok)
+            {
+                throw new InvalidOperationException(
+                    $"D2xx library returned {status} instead of Ok");
+            }
+        }
+
+        public Status SetVidPid(
+            uint vid,
+            uint pid)
+        {
+            return _setVidPid(vid, pid);
         }
 
         public Status Open(
@@ -394,6 +425,10 @@ namespace BitFab.KW1281Test.Interface
 
     static class FTDll
     {
+        [SymbolName("FT_SetVIDPID")]
+        public delegate FT.Status SetVidPid(
+            uint vid, uint pid);
+
         [SymbolName("FT_OpenEx")]
         public delegate FT.Status OpenBySerialNumber(
             [MarshalAs(UnmanagedType.LPStr)] string serialNumber,
