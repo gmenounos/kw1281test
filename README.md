@@ -29,6 +29,51 @@ Or, load up the project in Visual Studio and Ctrl-Shift-B.
 
 4. You can run the tool by typing `dotnet run`
 
+```
+Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
+    PORT = COM1|COM2|etc.
+    BAUD = 10400|9600|etc.
+    ADDRESS = The controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
+    COMMAND =
+        ActuatorTest
+        ClearFaultCodes
+        DelcoVWPremium5SafeCode
+        DumpBeetleMem START LENGTH [FILENAME]
+            START = Start address in decimal (e.g. 3072) or hex (e.g. $C00)
+            LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
+            FILENAME = Optional filename
+        DumpCcmRom
+        DumpClusterNecRom
+        DumpEeprom START LENGTH [FILENAME]
+            START = Start address in decimal (e.g. 0) or hex (e.g. $0)
+            LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)
+            FILENAME = Optional filename
+        DumpMem START LENGTH [FILENAME]
+            START = Start address in decimal (e.g. 8192) or hex (e.g. $2000)
+            LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)
+            FILENAME = Optional filename
+        DumpRB8Eeprom START LENGTH [FILENAME]
+            START = Start address in decimal (e.g. 66560) or hex (e.g. $10400)
+            LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
+            FILENAME = Optional filename
+        LoadEeprom START FILENAME
+            START = Start address in decimal (e.g. 0) or hex (e.g. $0)
+            FILENAME = Name of file containing binary data to load into EEPROM
+        MapEeprom
+        ReadFaultCodes
+        ReadIdent
+        ReadEeprom ADDRESS
+            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
+        ReadSoftwareVersion
+        Reset
+        SetSoftwareCoding CODING WORKSHOP
+            CODING = Software coding in decimal (e.g. 4361) or hex (e.g. $1109)
+            WORKSHOP = Workshop code in decimal (e.g. 4361) or hex (e.g. $1109)
+        WriteEeprom ADDRESS VALUE
+            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
+            VALUE = Value in decimal (e.g. 138) or hex (e.g. $8A)
+```
+
 ##### Credits
 Protocol Info: https://www.blafusel.de/obd/obd2_kw1281.html  
 VW Radio Reverse Engineering Info: https://github.com/mnaberez/vwradio  
