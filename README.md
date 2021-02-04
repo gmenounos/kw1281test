@@ -6,8 +6,8 @@ If you have a legacy Ross-Tech USB cable, you can probably use that cable by
 installing the Virtual COM Port drivers: https://www.ross-tech.com/vag-com/usb/virtual-com-port.php
 Functionality includes reading/writing the EEPROMs of many VW MKIV instrument clusters and Comfort Control Modules.
 
-The tool is written in .NET 5.0 and runs under Windows 10. It may also run under
-Windows 7, macOS and Linux but I have not tried them.
+The tool is written in .NET 5.0 and runs under Windows 10 (most serial ports) and macOS (with an FTDI serial port and D2xx drivers). It may also run under
+Windows 7 and Linux but I have not tried them.
 
 You can download a precompiled version from the Releases page: https://github.com/gmenounos/kw1281test/releases/
 
