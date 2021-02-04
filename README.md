@@ -17,13 +17,15 @@ Otherwise, here's how to build it yourself:
 
 1. You will need the .NET Core SDK,
 which you can find here: https://dotnet.microsoft.com/download
-(Click on the "Download .NET Core SDK" link and follow the instructions)
+(Click on the "Download .NET Core SDK" link and follow the instructions) or Microsoft Visual Studio
+(free Community Edition here: https://visualstudio.microsoft.com/vs/community/)
 
 2. Download the source code: https://github.com/gmenounos/kw1281test/archive/master.zip
 and unzip it into a folder on your computer.
 
 3. Open up a command prompt on your computer and go into the folder where you unzipped
 the source code. Type `dotnet build` to build the tool.
+Or, load up the project in Visual Studio and Ctrl-Shift-B.
 
 4. You can run the tool by typing `dotnet run`
 
