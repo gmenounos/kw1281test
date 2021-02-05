@@ -147,7 +147,7 @@ namespace BitFab.KW1281Test.Interface
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                libName = "libftd2xx.so";
+                libName = "ftd2xx.so";
                 isLinux = true;
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
