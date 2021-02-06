@@ -22,7 +22,7 @@ namespace BitFab.KW1281Test
             {
                 throw new InvalidOperationException($"Received unexpected identificationOption: {responseMsg.Body[0]:X2}");
             }
-            DumpAscii(responseMsg.Body.Skip(1));
+            Logger.WriteLine(DumpAscii(responseMsg.Body.Skip(1)));
 
             const int maxTries = 16;
             for (var i = 0; i < maxTries; i++)
@@ -164,17 +164,31 @@ namespace BitFab.KW1281Test
 
         private void SendMessage(Service service, byte[] body)
         {
+            int p3 = 55; // Inter-command delay (milliseconds)
+            int p4 = 5; // Inter-byte delay (milliseconds)
+
             var message = new Kwp2000Message(
                 _controllerAddress, _testerAddress, service, body);
 
-            _kwpCommon.WriteByte(message.Header);
-            _kwpCommon.WriteByte(message.DestAddress);
-            _kwpCommon.WriteByte(message.SrcAddress);
-            _kwpCommon.WriteByte((byte)message.Service);
+            Thread.Sleep(p3);
+
+            var headerBytes = new[]
+            {
+                message.Header, message.DestAddress, message.SrcAddress, (byte)message.Service
+            };
+
+            foreach (var b in headerBytes)
+            {
+                _kwpCommon.WriteByte(b);
+                Thread.Sleep(p4);
+            }
+
             foreach (var b in message.Body)
             {
                 _kwpCommon.WriteByte(b);
+                Thread.Sleep(p4);
             }
+
             _kwpCommon.WriteByte(message.Checksum);
 
             Logger.WriteLine($"Sent: {message}");
