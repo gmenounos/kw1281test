@@ -426,7 +426,7 @@ namespace BitFab.KW1281Test
             foreach (var b in blockBytes)
             {
                 WriteByteAndReadAck(b);
-                // Thread.Sleep(1); // TODO: Is this necessary?
+                Thread.Sleep(5);
             }
 
             _kwpCommon.WriteByte(0x03); // Block end, does not get ACK'd
