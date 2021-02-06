@@ -45,6 +45,10 @@ namespace BitFab.KW1281Test.Interface
                 (uint)TimeSpan.FromSeconds(5).TotalMilliseconds,
                 (uint)TimeSpan.FromSeconds(5).TotalMilliseconds);
             FT.AssertOk(status);
+
+            // Should allow faster response times for small packets
+            status = _ft.SetLatencyTimer(_handle, 2);
+            FT.AssertOk(status);
         }
 
         public void Dispose()
@@ -127,6 +131,7 @@ namespace BitFab.KW1281Test.Interface
         private readonly FTDll.SetRts _setRts;
         private readonly FTDll.ClrRts _clrRts;
         private readonly FTDll.SetTimeouts _setTimeouts;
+        private readonly FTDll.SetLatencyTimer _setLatencyTimer;
         private readonly FTDll.Purge _purge;
         private readonly FTDll.SetBreakOn _setBreakOn;
         private readonly FTDll.SetBreakOff _setBreakOff;
@@ -174,6 +179,7 @@ namespace BitFab.KW1281Test.Interface
                 nameof(_setRts),
                 nameof(_clrRts),
                 nameof(_setTimeouts),
+                nameof(_setLatencyTimer),
                 nameof(_purge),
                 nameof(_setBreakOn),
                 nameof(_setBreakOff),
@@ -304,6 +310,13 @@ namespace BitFab.KW1281Test.Interface
             uint writeTimeoutMS)
         {
             return _setTimeouts(handle, readTimeoutMS, writeTimeoutMS);
+        }
+
+        public Status SetLatencyTimer(
+            IntPtr handle,
+            byte timerMS)
+        {
+            return _setLatencyTimer(handle, timerMS);
         }
 
         public Status Purge(
@@ -479,6 +492,11 @@ namespace BitFab.KW1281Test.Interface
             IntPtr handle,
             uint readTimeoutMS,
             uint writeTimeoutMS);
+
+        [SymbolName("FT_SetLatencyTimer")]
+        public delegate FT.Status SetLatencyTimer(
+            IntPtr handle,
+            byte timerMS);
 
         [SymbolName("FT_Purge")]
         public delegate FT.Status Purge(

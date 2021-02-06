@@ -6,6 +6,15 @@ $PublishSourcDir = 'C:\Users\gmeno\src\kw1281test\bin\Release\net5.0\publish'
 $GitHubDir = 'C:\Users\gmeno\src\kw1281test\GitHub'
 
 Compress-Archive -Force -Path "$PublishSourcDir\Win\kw1281test.exe" -DestinationPath "$GitHubDir\kw1281test_Win10.zip"
-Compress-Archive -Force -Path "$PublishSourcDir\Mac\kw1281test" -DestinationPath "$GitHubDir\kw1281test_macOS.zip"
-Compress-Archive -Force -Path "$PublishSourcDir\LinuxArm\kw1281test" -DestinationPath "$GitHubDir\kw1281test_LinuxArm.zip"
+
+Push-Location -Path "$PublishSourcDir\Mac\"
+wsl zip kw1281test_macOS.zip kw1281test
+Move-Item -Force -Path kw1281test_macOS.zip -Destination "$GitHubDir\"
+Pop-Location
+
+Push-Location -Path "$PublishSourcDir\LinuxArm\"
+wsl zip kw1281test_LinuxArm.zip kw1281test
+Move-Item -Force -Path kw1281test_LinuxArm.zip -Destination "$GitHubDir\"
+Pop-Location
+
 Start-Process .\GitHub
