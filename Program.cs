@@ -689,8 +689,10 @@ namespace BitFab.KW1281Test
 
         private static void ReadIdent(IKW1281Dialog kwp1281)
         {
-            var identInfo = kwp1281.ReadIdent();
-            Logger.WriteLine($"Ident: {identInfo}");
+            foreach (var identInfo in kwp1281.ReadIdent())
+            {
+                Logger.WriteLine($"Ident: {identInfo}");
+            }
         }
 
         private static void ReadSoftwareVersion(IKW1281Dialog kwp1281)
@@ -1036,7 +1038,7 @@ namespace BitFab.KW1281Test
 
         private void DumpClusterEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
         {
-            var identInfo = kwp1281.ReadIdent().ToString().Replace(' ', '_').Replace(":", "");
+            var identInfo = kwp1281.ReadIdent().First().ToString().Replace(' ', '_').Replace(":", "");
 
             UnlockControllerForEepromReadWrite(kwp1281);
 

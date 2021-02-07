@@ -19,7 +19,7 @@ namespace BitFab.KW1281Test
 
         void Login(ushort code, ushort workshopCode, byte unknown = 0x00);
 
-        ControllerIdent ReadIdent();
+        List<ControllerIdent> ReadIdent();
 
         List<byte> ReadEeprom(ushort address, byte count);
 
@@ -94,12 +94,26 @@ namespace BitFab.KW1281Test
             _ = ReceiveBlocks();
         }
 
-        public ControllerIdent ReadIdent()
+        public List<ControllerIdent> ReadIdent()
         {
-            Logger.WriteLine("Sending ReadIdent block");
-            SendBlock(new List<byte> { (byte)BlockTitle.ReadIdent });
-            var blocks = ReceiveBlocks();
-            return new ControllerIdent(blocks.Where(b => !b.IsAckNak));
+            var idents = new List<ControllerIdent>();
+            bool moreAvailable;
+            do
+            {
+                Logger.WriteLine("Sending ReadIdent block");
+
+                SendBlock(new List<byte> { (byte)BlockTitle.ReadIdent });
+
+                var blocks = ReceiveBlocks();
+                var ident = new ControllerIdent(blocks.Where(b => !b.IsAckNak));
+                idents.Add(ident);
+
+                moreAvailable = blocks
+                    .OfType<AsciiDataBlock>()
+                    .Any(b => b.MoreDataAvailable);
+            } while (moreAvailable);
+
+            return idents;
         }
 
         /// <summary>
