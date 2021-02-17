@@ -160,7 +160,7 @@ namespace BitFab.KW1281Test
         {
             Logger.WriteLine(
                 $"Sending ReadEeprom block (Address: ${seg:X2}{msb:X2}{lsb:X2}, Count: ${count:X2})");
-            SendBlock(new List<byte>
+            var block = new List<byte>
             {
                 (byte)BlockTitle.ReadEeprom,
                 count,
@@ -168,11 +168,14 @@ namespace BitFab.KW1281Test
                 lsb,
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 (byte)(seg << 4)
-            });
+            };
+            // Logger.WriteLine($"SEND {Utils.Dump(block)}");
+            SendBlock(block);
             var blocks = ReceiveBlocks();
 
             if (blocks.Count == 1 && blocks[0] is NakBlock)
             {
+                // Logger.WriteLine($"RECV {Utils.Dump(blocks.First().Bytes)}");
                 // Permissions issue
                 return null;
             }

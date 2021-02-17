@@ -205,7 +205,7 @@ namespace BitFab.KW1281Test
                     break;
 
                 case "readeeprom":
-                    value = ReadEeprom(kwp1281, address, value);
+                    ReadEeprom(kwp1281, address);
                     break;
 
                 case "readfaultcodes":
@@ -342,7 +342,9 @@ namespace BitFab.KW1281Test
                 entryH = 0x02;
                 regBlockH = 0x08;
             }
-            else if (ecuInfo.Text.Contains("M73 V08"))
+            else if (
+                ecuInfo.Text.Contains("M73 V08") ||
+                ecuInfo.Text.Contains("M73 D14")) // Audi TT 8N2920980A
             {
                 entryH = 0x18;
                 regBlockH = 0x20;
@@ -658,7 +660,7 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private byte ReadEeprom(IKW1281Dialog kwp1281, uint address, byte value)
+        private void ReadEeprom(IKW1281Dialog kwp1281, uint address)
         {
             UnlockControllerForEepromReadWrite(kwp1281);
 
@@ -669,12 +671,10 @@ namespace BitFab.KW1281Test
             }
             else
             {
-                value = blockBytes[0];
+                var value = blockBytes[0];
                 Logger.WriteLine(
                     $"Address {address} (${address:X4}): Value {value} (${value:X2})");
             }
-
-            return value;
         }
 
         private static void ReadFaultCodes(IKW1281Dialog kwp1281)
