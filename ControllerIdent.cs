@@ -19,6 +19,11 @@ namespace BitFab.KW1281Test
                 {
                     sb.Append(asciiBlock);
                 }
+                else if (block is CodingWscBlock codingWscBlock)
+                {
+                    sb.AppendLine();
+                    sb.Append(codingWscBlock);
+                }
                 else
                 {
                     Logger.WriteLine($"ReadIdent returned block of type {block.GetType()}");
