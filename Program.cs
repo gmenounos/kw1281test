@@ -68,7 +68,7 @@ namespace BitFab.KW1281Test
 
                 address = Utils.ParseUint(args[4]);
             }
-            else if (string.Compare(command, "DumpBeetleMem", true) == 0 ||
+            else if (string.Compare(command, "DumpMarelliMem", true) == 0 ||
                      string.Compare(command, "DumpEeprom", true) == 0 ||
                      string.Compare(command, "DumpMem", true) == 0 ||
                      string.Compare(command, "DumpRB8Eeprom", true) == 0)
@@ -172,8 +172,8 @@ namespace BitFab.KW1281Test
                     DelcoVWPremium5SafeCode(kwp1281);
                     break;
 
-                case "dumpbeetlemem":
-                    DumpBeetleMem(kwp1281, ecuInfo, (ushort)address, (ushort)length);
+                case "dumpmarellimem":
+                    DumpMarelliMem(kwp1281, ecuInfo, (ushort)address, (ushort)length);
                     return;
 
                 case "dumpccmrom":
@@ -325,7 +325,7 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
         }
 
-        private void DumpBeetleMem(
+        private void DumpMarelliMem(
             IKW1281Dialog kwp1281, ControllerInfo ecuInfo, ushort address, ushort count)
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
@@ -366,7 +366,7 @@ namespace BitFab.KW1281Test
                 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x50, 0x34,
                 entryH, 0x00, // Entry point $xx00
             };
-            if (!WriteBeetleBlockAndReadAck(data))
+            if (!WriteMarelliBlockAndReadAck(data))
             {
                 return;
             }
@@ -426,7 +426,7 @@ namespace BitFab.KW1281Test
                 0x7A, regBlockH, 0x17,          // staa $xx17   ; COPRST
                 0x3D,                           // rts
             };
-            if (!WriteBeetleBlockAndReadAck(program))
+            if (!WriteMarelliBlockAndReadAck(program))
             {
                 return;
             }
@@ -440,7 +440,7 @@ namespace BitFab.KW1281Test
                 mem.Add(b);
             }
 
-            var dumpFileName = _filename ?? $"beetle_mem_${address:X4}.bin";
+            var dumpFileName = _filename ?? $"marelli_mem_${address:X4}.bin";
 
             File.WriteAllBytes(dumpFileName, mem.ToArray());
             Logger.WriteLine($"Saved memory dump to {dumpFileName}");
@@ -448,7 +448,7 @@ namespace BitFab.KW1281Test
             Logger.WriteLine("Done");
         }
 
-        private bool WriteBeetleBlockAndReadAck(byte[] data)
+        private bool WriteMarelliBlockAndReadAck(byte[] data)
         {
             var count = (ushort)(data.Length + 2); // Count includes 2-byte checksum
             var countH = (byte)(count / 256);
@@ -1104,7 +1104,7 @@ namespace BitFab.KW1281Test
         ActuatorTest
         ClearFaultCodes
         DelcoVWPremium5SafeCode
-        DumpBeetleMem START LENGTH [FILENAME]
+        DumpMarelliMem START LENGTH [FILENAME]
             START = Start address in decimal (e.g. 3072) or hex (e.g. $C00)
             LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
             FILENAME = Optional filename
