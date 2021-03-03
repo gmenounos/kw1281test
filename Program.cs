@@ -172,10 +172,6 @@ namespace BitFab.KW1281Test
                     DelcoVWPremium5SafeCode(kwp1281);
                     break;
 
-                case "dumpmarellimem":
-                    DumpMarelliMem(kwp1281, ecuInfo, (ushort)address, (ushort)length);
-                    return;
-
                 case "dumpccmrom":
                     DumpCcmRom(kwp1281);
                     break;
@@ -187,6 +183,10 @@ namespace BitFab.KW1281Test
                 case "dumpeeprom":
                     DumpEeprom(kwp1281, address, length);
                     break;
+
+                case "dumpmarellimem":
+                    DumpMarelliMem(kwp1281, ecuInfo, (ushort)address, (ushort)length);
+                    return;
 
                 case "dumpmem":
                     DumpMem(kwp1281, address, length);
@@ -325,6 +325,124 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
         }
 
+        private void DumpCcmRom(IKW1281Dialog kwp1281)
+        {
+            if (_controllerAddress != (int)ControllerAddress.CCM &&
+                _controllerAddress != (int)ControllerAddress.CentralLocking)
+            {
+                Logger.WriteLine("Only supported for CCM and Central Locking");
+                return;
+            }
+
+            kwp1281.Login(19283, 222);
+
+            var dumpFileName = _filename ?? "ccm_rom_dump.bin";
+            const byte blockSize = 8;
+
+            Logger.WriteLine($"Saving CCM ROM to {dumpFileName}");
+
+            bool succeeded = true;
+            using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
+            {
+                for (int seg = 0; seg < 16; seg++)
+                {
+                    for (int msb = 0; msb < 16; msb++)
+                    {
+                        for (int lsb = 0; lsb < 256; lsb += blockSize)
+                        {
+                            var blockBytes = kwp1281.ReadCcmRom((byte)seg, (byte)msb, (byte)lsb, blockSize);
+                            if (blockBytes == null)
+                            {
+                                blockBytes = Enumerable.Repeat((byte)0, blockSize).ToList();
+                                succeeded = false;
+                            }
+                            else if (blockBytes.Count < blockSize)
+                            {
+                                blockBytes.AddRange(Enumerable.Repeat((byte)0, blockSize - blockBytes.Count));
+                                succeeded = false;
+                            }
+
+                            fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
+                            fs.Flush();
+                        }
+                    }
+                }
+            }
+
+            if (!succeeded)
+            {
+                Logger.WriteLine();
+                Logger.WriteLine("**********************************************************************");
+                Logger.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
+                Logger.WriteLine("**********************************************************************");
+                Logger.WriteLine();
+            }
+        }
+
+        private void DumpClusterNecRom(IKW1281Dialog kwp1281)
+        {
+            if (_controllerAddress != (int)ControllerAddress.Cluster)
+            {
+                Logger.WriteLine("Only supported for cluster");
+                return;
+            }
+
+            var dumpFileName = _filename ?? "cluster_nec_rom_dump.bin";
+            const byte blockSize = 16;
+
+            Logger.WriteLine($"Saving cluster NEC ROM to {dumpFileName}");
+
+            bool succeeded = true;
+            using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
+            {
+                {
+                    for (int address = 0; address < 65536; address += blockSize)
+                    {
+                        var blockBytes = kwp1281.CustomReadNecRom((ushort)address, blockSize);
+                        if (blockBytes == null)
+                        {
+                            blockBytes = Enumerable.Repeat((byte)0, blockSize).ToList();
+                            succeeded = false;
+                        }
+                        else if (blockBytes.Count < blockSize)
+                        {
+                            blockBytes.AddRange(Enumerable.Repeat((byte)0, blockSize - blockBytes.Count));
+                            succeeded = false;
+                        }
+
+                        fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
+                        fs.Flush();
+                    }
+                }
+            }
+
+            if (!succeeded)
+            {
+                Logger.WriteLine();
+                Logger.WriteLine("**********************************************************************");
+                Logger.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
+                Logger.WriteLine("**********************************************************************");
+                Logger.WriteLine();
+            }
+        }
+
+        private void DumpEeprom(IKW1281Dialog kwp1281, uint address, uint length)
+        {
+            switch (_controllerAddress)
+            {
+                case (int)ControllerAddress.Cluster:
+                    DumpClusterEeprom(kwp1281, (ushort)address, (ushort)length);
+                    break;
+                case (int)ControllerAddress.CCM:
+                case (int)ControllerAddress.CentralLocking:
+                    DumpCcmEeprom(kwp1281, (ushort)address, (ushort)length);
+                    break;
+                default:
+                    Logger.WriteLine("Only supported for cluster, CCM and Central Locking");
+                    break;
+            }
+        }
+
         private void DumpMarelliMem(
             IKW1281Dialog kwp1281, ControllerInfo ecuInfo, ushort address, ushort count)
         {
@@ -446,159 +564,6 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Saved memory dump to {dumpFileName}");
 
             Logger.WriteLine("Done");
-        }
-
-        private bool WriteMarelliBlockAndReadAck(byte[] data)
-        {
-            var count = (ushort)(data.Length + 2); // Count includes 2-byte checksum
-            var countH = (byte)(count / 256);
-            var countL = (byte)(count % 256);
-            _kwpCommon.WriteByte(countH);
-            _kwpCommon.WriteByte(countL);
-
-            var sum = (ushort)(countH + countL);
-            foreach (var b in data)
-            {
-                _kwpCommon.WriteByte(b);
-                sum += b;
-            }
-            _kwpCommon.WriteByte((byte)(sum / 256));
-            _kwpCommon.WriteByte((byte)(sum % 256));
-
-            var expectedAck = new byte[] { 0x03, 0x09, 0x00, 0x0C };
-
-            Logger.WriteLine("Receiving ACK");
-            var ack = new List<byte>();
-            for (int i = 0; i < 4; i++)
-            {
-                var b = _kwpCommon.ReadByte();
-                ack.Add(b);
-            }
-            if (!ack.SequenceEqual(expectedAck))
-            {
-                Logger.WriteLine($"Expected ACK but received {Utils.Dump(ack)}");
-                return false;
-            }
-
-            return true;
-        }
-
-        private void DumpCcmRom(IKW1281Dialog kwp1281)
-        {
-            if (_controllerAddress != (int)ControllerAddress.CCM &&
-                _controllerAddress != (int)ControllerAddress.CentralLocking)
-            {
-                Logger.WriteLine("Only supported for CCM and Central Locking");
-                return;
-            }
-
-            kwp1281.Login(19283, 222);
-
-            var dumpFileName = _filename ?? "ccm_rom_dump.bin";
-            const byte blockSize = 8;
-
-            Logger.WriteLine($"Saving CCM ROM to {dumpFileName}");
-
-            bool succeeded = true;
-            using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
-            {
-                for (int seg = 0; seg < 16; seg++)
-                {
-                    for (int msb = 0; msb < 16; msb++)
-                    {
-                        for (int lsb = 0; lsb < 256; lsb += blockSize)
-                        {
-                            var blockBytes = kwp1281.ReadCcmRom((byte)seg, (byte)msb, (byte)lsb, blockSize);
-                            if (blockBytes == null)
-                            {
-                                blockBytes = Enumerable.Repeat((byte)0, blockSize).ToList();
-                                succeeded = false;
-                            }
-                            else if (blockBytes.Count < blockSize)
-                            {
-                                blockBytes.AddRange(Enumerable.Repeat((byte)0, blockSize - blockBytes.Count));
-                                succeeded = false;
-                            }
-
-                            fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
-                            fs.Flush();
-                        }
-                    }
-                }
-            }
-
-            if (!succeeded)
-            {
-                Logger.WriteLine();
-                Logger.WriteLine("**********************************************************************");
-                Logger.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-                Logger.WriteLine("**********************************************************************");
-                Logger.WriteLine();
-            }
-        }
-
-        private void DumpClusterNecRom(IKW1281Dialog kwp1281)
-        {
-            if (_controllerAddress != (int)ControllerAddress.Cluster)
-            {
-                Logger.WriteLine("Only supported for cluster");
-                return;
-            }
-
-            var dumpFileName = _filename ?? "cluster_nec_rom_dump.bin";
-            const byte blockSize = 16;
-
-            Logger.WriteLine($"Saving cluster NEC ROM to {dumpFileName}");
-
-            bool succeeded = true;
-            using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
-            {
-                {
-                    for (int address = 0; address < 65536; address += blockSize)
-                    {
-                        var blockBytes = kwp1281.CustomReadNecRom((ushort)address, blockSize);
-                        if (blockBytes == null)
-                        {
-                            blockBytes = Enumerable.Repeat((byte)0, blockSize).ToList();
-                            succeeded = false;
-                        }
-                        else if (blockBytes.Count < blockSize)
-                        {
-                            blockBytes.AddRange(Enumerable.Repeat((byte)0, blockSize - blockBytes.Count));
-                            succeeded = false;
-                        }
-
-                        fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
-                        fs.Flush();
-                    }
-                }
-            }
-
-            if (!succeeded)
-            {
-                Logger.WriteLine();
-                Logger.WriteLine("**********************************************************************");
-                Logger.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-                Logger.WriteLine("**********************************************************************");
-                Logger.WriteLine();
-            }
-        }
-
-        private void DumpEeprom(IKW1281Dialog kwp1281, uint address, uint length)
-        {
-            switch (_controllerAddress)
-            {
-                case (int)ControllerAddress.Cluster:
-                    DumpClusterEeprom(kwp1281, (ushort)address, (ushort)length);
-                    break;
-                case (int)ControllerAddress.CCM:
-                case (int)ControllerAddress.CentralLocking:
-                    DumpCcmEeprom(kwp1281, (ushort)address, (ushort)length);
-                    break;
-                default:
-                    Logger.WriteLine("Only supported for cluster, CCM and Central Locking");
-                    break;
-            }
         }
 
         private void DumpMem(IKW1281Dialog kwp1281, uint address, uint length)
@@ -734,6 +699,41 @@ namespace BitFab.KW1281Test
         }
 
         // End top-level commands
+
+        private bool WriteMarelliBlockAndReadAck(byte[] data)
+        {
+            var count = (ushort)(data.Length + 2); // Count includes 2-byte checksum
+            var countH = (byte)(count / 256);
+            var countL = (byte)(count % 256);
+            _kwpCommon.WriteByte(countH);
+            _kwpCommon.WriteByte(countL);
+
+            var sum = (ushort)(countH + countL);
+            foreach (var b in data)
+            {
+                _kwpCommon.WriteByte(b);
+                sum += b;
+            }
+            _kwpCommon.WriteByte((byte)(sum / 256));
+            _kwpCommon.WriteByte((byte)(sum % 256));
+
+            var expectedAck = new byte[] { 0x03, 0x09, 0x00, 0x0C };
+
+            Logger.WriteLine("Receiving ACK");
+            var ack = new List<byte>();
+            for (int i = 0; i < 4; i++)
+            {
+                var b = _kwpCommon.ReadByte();
+                ack.Add(b);
+            }
+            if (!ack.SequenceEqual(expectedAck))
+            {
+                Logger.WriteLine($"Expected ACK but received {Utils.Dump(ack)}");
+                return false;
+            }
+
+            return true;
+        }
 
         private void MapClusterEeprom(IKW1281Dialog kwp1281)
         {

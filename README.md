@@ -38,15 +38,15 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
         ActuatorTest
         ClearFaultCodes
         DelcoVWPremium5SafeCode
-        DumpBeetleMem START LENGTH [FILENAME]
-            START = Start address in decimal (e.g. 3072) or hex (e.g. $C00)
-            LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
-            FILENAME = Optional filename
         DumpCcmRom
         DumpClusterNecRom
         DumpEeprom START LENGTH [FILENAME]
             START = Start address in decimal (e.g. 0) or hex (e.g. $0)
             LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)
+            FILENAME = Optional filename
+        DumpMarelliMem START LENGTH [FILENAME]
+            START = Start address in decimal (e.g. 3072) or hex (e.g. $C00)
+            LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
             FILENAME = Optional filename
         DumpMem START LENGTH [FILENAME]
             START = Start address in decimal (e.g. 8192) or hex (e.g. $2000)
