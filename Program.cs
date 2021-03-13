@@ -462,6 +462,7 @@ namespace BitFab.KW1281Test
             }
             else if (
                 ecuInfo.Text.Contains("M73 V08") ||
+                ecuInfo.Text.Contains("M73 D09") || // Audi TT 8N2920980A
                 ecuInfo.Text.Contains("M73 D14")) // Audi TT 8N2920980A
             {
                 entryH = 0x18;
