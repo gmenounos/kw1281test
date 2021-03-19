@@ -455,15 +455,15 @@ namespace BitFab.KW1281Test
             byte entryH; // High byte of code entry point
             byte regBlockH; // High byte of register block
 
-            if (ecuInfo.Text.Contains("M73 V07"))
+            if (ecuInfo.Text.Contains("M73 V07")) // Beetle 1C0920901C
             {
                 entryH = 0x02;
                 regBlockH = 0x08;
             }
             else if (
-                ecuInfo.Text.Contains("M73 V08") ||
+                ecuInfo.Text.Contains("M73 V08") || // Beetle 1C0920921G
                 ecuInfo.Text.Contains("M73 D09") || // Audi TT 8N2920980A
-                ecuInfo.Text.Contains("M73 D14")) // Audi TT 8N2920980A
+                ecuInfo.Text.Contains("M73 D14"))   // Audi TT 8N2920980A
             {
                 entryH = 0x18;
                 regBlockH = 0x20;
