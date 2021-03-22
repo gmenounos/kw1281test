@@ -6,10 +6,10 @@ namespace BitFab.KW1281Test
 {
     internal static class Utils
     {
-        public static string Dump(IEnumerable<byte> body)
+        public static string Dump(IEnumerable<byte> bytes)
         {
             var sb = new StringBuilder();
-            foreach (var b in body)
+            foreach (var b in bytes)
             {
                 sb.Append($" {b:X2}");
             }

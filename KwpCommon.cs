@@ -4,8 +4,10 @@ using System.Diagnostics;
 
 namespace BitFab.KW1281Test
 {
-    interface IKwpCommon
+    public interface IKwpCommon
     {
+        IInterface Interface { get; }
+
         int WakeUp(byte controllerAddress, bool evenParity = false);
 
         byte ReadByte();
@@ -19,13 +21,28 @@ namespace BitFab.KW1281Test
         byte ReadAndAckByte();
 
         void ReadComplement(byte b);
+
+        int FastInit(byte controllerAddress);
     }
 
     class KwpCommon : IKwpCommon
     {
+        public IInterface Interface => _interface;
+
         public int WakeUp(byte controllerAddress, bool evenParity)
         {
+            // Disable garbage collection int this time-critical method
+            bool noGc = GC.TryStartNoGCRegion(1024 * 1024);
+
             BitBang5Baud(controllerAddress, evenParity);
+
+            if (noGc)
+            {
+                GC.EndNoGCRegion();
+            }
+
+            // Throw away anything that might be in the receive buffer
+            _interface.ClearReceiveBuffer();
 
             Logger.WriteLine("Reading sync byte");
             var syncByte = _interface.ReadByte();
@@ -96,19 +113,15 @@ namespace BitFab.KW1281Test
         /// False for odd parity (KWP1281), true for even parity (KWP2000).</param>
         private void BitBang5Baud(byte b, bool evenParity)
         {
-            // Disable garbage collection int this time-critical method
-            bool noGc = GC.TryStartNoGCRegion(1024 * 1024);
-
             const int bitsPerSec = 5;
             long ticksPerBit = Stopwatch.Frequency / bitsPerSec;
 
-            var stopWatch = new Stopwatch();
-            long maxTick = 0;
+            long maxTick;
 
             // Delay the appropriate amount and then set/clear the TxD line
             void BitBang(bool bit)
             {
-                while (stopWatch.ElapsedTicks < maxTick)
+                while (Stopwatch.GetTimestamp() < maxTick)
                     ;
                 if (bit)
                 {
@@ -124,8 +137,7 @@ namespace BitFab.KW1281Test
 
             bool parity = !evenParity; // XORed with each bit to calculate parity bit
 
-            stopWatch.Start();
-
+            maxTick = Stopwatch.GetTimestamp();
             BitBang(false); // Start bit
 
             for (int i = 0; i < 7; i++)
@@ -141,15 +153,10 @@ namespace BitFab.KW1281Test
 
             BitBang(true); // Stop bit
 
-            if (noGc)
-            {
-                GC.EndNoGCRegion();
-            }
-
-            // Throw away anything that might be in the receive buffer
-            _interface.ClearReceiveBuffer();
+            // Wait for end of stop bit
+            while (Stopwatch.GetTimestamp() < maxTick)
+                ;
         }
-
 
         /// <summary>
         /// Write a byte to the interface and read/discard its echo.
@@ -162,6 +169,41 @@ namespace BitFab.KW1281Test
             {
                 throw new InvalidOperationException($"Wrote 0x{b:X2} to port but echo was 0x{echo:X2}");
             }
+        }
+
+        public int FastInit(byte controllerAddress)
+        {
+            static void Sleep(int ms)
+            {
+                var maxTick = Stopwatch.GetTimestamp() + Stopwatch.Frequency / 1000 * ms;
+                while (Stopwatch.GetTimestamp() < maxTick)
+                    ;
+            }
+
+            // Disable garbage collection int this time-critical method
+            bool noGc = GC.TryStartNoGCRegion(1024 * 1024);
+
+            BitBang5Baud(controllerAddress, evenParity: false);
+
+            Sleep(1190);
+
+            _interface.SetBreakOn();
+
+            Sleep(30);
+
+            _interface.SetBreakOff();
+
+            Sleep(16);
+
+            if (noGc)
+            {
+                GC.EndNoGCRegion();
+            }
+
+            // Throw away anything that might be in the receive buffer
+            _interface.ClearReceiveBuffer();
+
+            return 2000;
         }
 
         private readonly IInterface _interface;

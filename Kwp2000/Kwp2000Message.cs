@@ -8,11 +8,13 @@ namespace BitFab.KW1281Test.Kwp2000
 {
     public class Kwp2000Message
     {
-        public byte Header { get => (byte)(0x80 + 1 + Body.Count); }
+        public byte FormatByte { get; }
 
-        public byte DestAddress { get; }
+        public byte? DestAddress { get; }
 
-        public byte SrcAddress { get; }
+        public byte? SrcAddress { get; }
+
+        public byte? LengthByte { get; }
 
         public DiagnosticService Service { get; }
 
@@ -21,32 +23,73 @@ namespace BitFab.KW1281Test.Kwp2000
         public byte Checksum { get => CalcChecksum(); }
 
         public Kwp2000Message(
-            byte destAddress, byte srcAddress, DiagnosticService service, IEnumerable<byte> body)
+            DiagnosticService service, IList<byte> body)
         {
-            DestAddress = destAddress;
-            SrcAddress = srcAddress;
+            FormatByte = CalcFormatByte(body, excludeAddresses: true);
+            DestAddress = null;
+            SrcAddress = null;
+            LengthByte = CalcLengthByte(body);
             Service = service;
             Body = new List<byte>(body);
         }
 
         public Kwp2000Message(
-            byte header, byte destAddress, byte srcAddress, DiagnosticService service,
-            List<byte> body, byte checksum)
-            : this(destAddress, srcAddress, service, body)
+            byte destAddress, byte srcAddress, DiagnosticService service, IList<byte> body)
         {
-            Debug.Assert(header == Header);
-            var expectedChecksum = CalcChecksum();
-            Debug.Assert(checksum == expectedChecksum);
+            FormatByte = CalcFormatByte(body);
+            DestAddress = destAddress;
+            SrcAddress = srcAddress;
+            LengthByte = CalcLengthByte(body);
+            Service = service;
+            Body = new List<byte>(body);
+        }
+
+        public Kwp2000Message(
+            byte formatByte, byte? destAddress, byte? srcAddress, byte? lengthByte,
+            DiagnosticService service,
+            IList<byte> body, byte checksum)
+        {
+            FormatByte = formatByte;
+            DestAddress = destAddress;
+            SrcAddress = srcAddress;
+            LengthByte = lengthByte;
+            Service = service;
+            Body = new List<byte>(body);
+
+            Debug.Assert(FormatByte == CalcFormatByte(Body, !destAddress.HasValue));
+            Debug.Assert(LengthByte == CalcLengthByte(Body));
+            Debug.Assert(checksum == CalcChecksum());
+        }
+
+        public IEnumerable<byte> HeaderBytes
+        {
+            get
+            {
+                yield return FormatByte;
+                if (DestAddress.HasValue)
+                {
+                    yield return DestAddress.Value;
+                }
+                if (SrcAddress.HasValue)
+                {
+                    yield return SrcAddress.Value;
+                }
+                if (LengthByte.HasValue)
+                {
+                    yield return LengthByte.Value;
+                }
+            }
         }
 
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append($"{Header:X2}");
-            sb.Append($" {DestAddress:X2}");
-            sb.Append($" {SrcAddress:X2}");
-            sb.Append($" {(byte)Service:X2}");
-            sb.Append(DumpHex(Body));
+            foreach(var b in HeaderBytes)
+            {
+                sb.Append($"{b:X2} ");
+            }
+            sb.Append($"{(byte)Service:X2}");
+            sb.Append(Utils.Dump(Body));
             sb.Append($" {CalcChecksum():X2}");
             sb.Append($" ({DescribeService()})");
             return sb.ToString();
@@ -87,20 +130,32 @@ namespace BitFab.KW1281Test.Kwp2000
             }
         }
 
+        private static byte CalcFormatByte(IList<byte> body, bool excludeAddresses = false)
+        {
+            var length = body.Count + 1;
+            byte formatByte = (byte)(length > 63 ? 0 : length);
+            if (!excludeAddresses)
+            {
+                formatByte |= 0x80;
+            }
+            return formatByte;
+        }
+
+        private static byte? CalcLengthByte(IList<byte> body)
+        {
+            var length = body.Count + 1;
+            return length > 63 ? (byte)length : null;
+        }
+
         private byte CalcChecksum()
         {
             return (byte)(
-                (Header + DestAddress + SrcAddress + (byte)Service + Body.Sum(b => b)) & 0xFF);
-        }
-
-        private string DumpHex(IEnumerable<byte> bytes)
-        {
-            var sb = new StringBuilder();
-            foreach (var b in bytes)
-            {
-                sb.Append($" {b:X2}");
-            }
-            return sb.ToString();
+                FormatByte +
+                (DestAddress ?? 0) +
+                (SrcAddress ?? 0) +
+                (LengthByte ?? 0) +
+                (byte)Service +
+                Body.Sum(b => b));
         }
     }
 }

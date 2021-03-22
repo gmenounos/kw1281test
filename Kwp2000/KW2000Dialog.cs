@@ -14,6 +14,16 @@ namespace BitFab.KW1281Test
     {
         private const byte _testerAddress = 0xF1;
 
+        /// <summary>
+        /// Inter-command delay (milliseconds)
+        /// </summary>
+        public int P3 { get; set; } = 55;
+
+        /// <summary>
+        /// Inter-byte delay (milliseconds)
+        /// </summary>
+        public int P4 { get; set; } = 5;
+
         public bool SecurityAccess(byte accessMode)
         {
             const byte identificationOption = 0x94;
@@ -125,22 +135,26 @@ namespace BitFab.KW1281Test
             return responseMessage.Body.ToArray();
         }
 
-        private Kwp2000Message SendReceive(Service service, byte[] body)
+        public Kwp2000Message SendReceive(
+            Service service, byte[] body, bool excludeAddresses = false)
         {
-            SendMessage(service, body);
+            SendMessage(service, body, excludeAddresses);
 
             while (true)
             {
                 var message = ReceiveMessage();
 
-                if (message.SrcAddress != _controllerAddress)
+                if (message.SrcAddress.HasValue)
                 {
-                    throw new InvalidOperationException($"Unexpected SrcAddress: {message.SrcAddress:X2}");
-                }
+                    if (message.SrcAddress != _controllerAddress)
+                    {
+                        throw new InvalidOperationException($"Unexpected SrcAddress: {message.SrcAddress:X2}");
+                    }
 
-                if (message.DestAddress != _testerAddress)
-                {
-                    throw new InvalidOperationException($"Unexpected DestAddress: {message.DestAddress:X2}");
+                    if (message.DestAddress != _testerAddress)
+                    {
+                        throw new InvalidOperationException($"Unexpected DestAddress: {message.DestAddress:X2}");
+                    }
                 }
 
                 if ((byte)message.Service == 0x7F)
@@ -162,31 +176,40 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private void SendMessage(Service service, byte[] body)
+        public void SendMessage(Service service, byte[] body, bool excludeAddresses = false)
         {
-            int p3 = 55; // Inter-command delay (milliseconds)
-            int p4 = 5; // Inter-byte delay (milliseconds)
-
-            var message = new Kwp2000Message(
-                _controllerAddress, _testerAddress, service, body);
-
-            Thread.Sleep(p3);
-
-            var headerBytes = new[]
+            static void Sleep(int ms)
             {
-                message.Header, message.DestAddress, message.SrcAddress, (byte)message.Service
-            };
+                var maxTick = Stopwatch.GetTimestamp() + Stopwatch.Frequency / 1000 * ms;
+                while (Stopwatch.GetTimestamp() < maxTick)
+                    ;
+            }
 
-            foreach (var b in headerBytes)
+            Kwp2000Message message;
+            if (excludeAddresses)
+            {
+                message = new Kwp2000Message(service, body);
+            }
+            else
+            {
+                message = new Kwp2000Message(
+                    _controllerAddress, _testerAddress, service, body);
+            }
+            Sleep(P3);
+
+            foreach (var b in message.HeaderBytes)
             {
                 _kwpCommon.WriteByte(b);
-                Thread.Sleep(p4);
+                Sleep(P4);
             }
+
+            _kwpCommon.WriteByte((byte)message.Service);
+            Sleep(P4);
 
             foreach (var b in message.Body)
             {
                 _kwpCommon.WriteByte(b);
-                Thread.Sleep(p4);
+                Sleep(P4);
             }
 
             _kwpCommon.WriteByte(message.Checksum);
@@ -194,23 +217,32 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Sent: {message}");
         }
 
-        private Kwp2000Message ReceiveMessage()
+        public Kwp2000Message ReceiveMessage()
         {
-            var header = _kwpCommon.ReadByte();
-            var length = header - 0x80 - 1;
-            Debug.Assert(length >= 0);
-            var destAddress = _kwpCommon.ReadByte();
-            var srcAddress = _kwpCommon.ReadByte();
+            var formatByte = _kwpCommon.ReadByte();
+            byte? destAddress = null;
+            byte? srcAddress = null;
+            if ((formatByte & 0x80) == 0x80)
+            {
+                destAddress = _kwpCommon.ReadByte();
+                srcAddress = _kwpCommon.ReadByte();
+            }
+            byte? lengthByte = null;
+            if ((formatByte & 63) == 0)
+            {
+                lengthByte = _kwpCommon.ReadByte();
+            }
+            var bodyLength = (lengthByte ?? (formatByte & 63)) - 1;
             var service = (Service)_kwpCommon.ReadByte();
             var body = new List<byte>();
-            for (var i = 0; i < length; i++)
+            for (var i = 0; i < bodyLength; i++)
             {
                 body.Add(_kwpCommon.ReadByte());
             }
             var checksum = _kwpCommon.ReadByte();
 
             var message = new Kwp2000Message(
-                header, destAddress, srcAddress, service, body, checksum);
+                formatByte, destAddress, srcAddress, lengthByte, service, body, checksum);
             Logger.WriteLine($"Received: {message}");
             return message;
         }

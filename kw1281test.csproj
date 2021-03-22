@@ -5,9 +5,9 @@
     <TargetFramework>net5.0</TargetFramework>
     <RootNamespace>BitFab.KW1281Test</RootNamespace>
     <LangVersion>latest</LangVersion>
-    <AssemblyVersion>0.50.0.0</AssemblyVersion>
-    <FileVersion>0.50.0.0</FileVersion>
-    <Version>0.50-beta</Version>
+    <AssemblyVersion>0.51.0.0</AssemblyVersion>
+    <FileVersion>0.51.0.0</FileVersion>
+    <Version>0.51-beta</Version>
     <Copyright>Copyright © 2021 Greg Menounos</Copyright>
     <DebugType>embedded</DebugType>
     <DebugSymbols>true</DebugSymbols>
@@ -23,7 +23,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.IO.Ports" Version="5.0.0" />
+    <EmbeddedResource Include="EDC15\Loader.bin" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Ports" Version="5.0.1" />
   </ItemGroup>
 
 </Project>

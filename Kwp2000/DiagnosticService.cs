@@ -8,5 +8,12 @@
         stopDiagnosticSession = 0x20,
         readMemoryByAddress = 0x23,
         securityAccess = 0x27,
+        startRoutineByLocalIdentifier = 0x31,
+        requestDownload = 0x34,
+        transferData = 0x36,
+        testerPresent = 0x3E,
+        startCommunication = 0x81,
+        stopCommunicatiom = 0x82,
+        accessTimingParameters = 0x83,
     };
 }

@@ -2,7 +2,7 @@
 
 namespace BitFab.KW1281Test.Interface
 {
-    interface IInterface : IDisposable
+    public interface IInterface : IDisposable
     {
         /// <summary>
         /// Read a byte from the interface.

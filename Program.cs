@@ -1,7 +1,10 @@
 ﻿using BitFab.KW1281Test.Blocks;
+using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
+using BitFab.KW1281Test.Kwp2000;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -47,6 +50,9 @@ namespace BitFab.KW1281Test
                 return;
             }
 
+            // This seems to increase the accuracy of our timing loops
+            Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.RealTime;
+
             string portName = args[0];
             var baudRate = int.Parse(args[1]);
             _controllerAddress = int.Parse(args[2], NumberStyles.HexNumber);
@@ -54,7 +60,6 @@ namespace BitFab.KW1281Test
             uint address = 0;
             uint length = 0;
             byte value = 0;
-            bool evenParityWakeup = false;
             int softwareCoding = 0;
             int workshopCode = 0;
 
@@ -85,11 +90,6 @@ namespace BitFab.KW1281Test
                 if (args.Length > 6)
                 {
                     _filename = args[6];
-                }
-
-                if (string.Compare(command, "DumpRB8Eeprom", true) == 0)
-                {
-                    evenParityWakeup = true;
                 }
             }
             else if (string.Compare(command, "WriteEeprom", true) == 0)
@@ -135,101 +135,117 @@ namespace BitFab.KW1281Test
                     return;
                 }
             }
+            else if (string.Compare(command, "DumpEdc15Eeprom", true) == 0)
+            {
+                if (args.Length < 4)
+                {
+                    ShowUsage();
+                    return;
+                }
+
+                if (args.Length > 4)
+                {
+                    _filename = args[4];
+                }
+            }
 
             using var @interface = OpenPort(portName, baudRate);
 
             _kwpCommon = new KwpCommon(@interface);
 
-            Logger.WriteLine("Sending wakeup message");
-            var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParityWakeup);
-
-            IKW1281Dialog kwp1281 = null;
-            KW2000Dialog kwp2000 = null;
-            ControllerInfo ecuInfo = null;
-            if (kwpVersion == 1281)
-            {
-                kwp1281 = new KW1281Dialog(_kwpCommon);
-
-                ecuInfo = kwp1281.ReadEcuInfo();
-                Logger.WriteLine($"ECU: {ecuInfo}");
-            }
-            else
-            {
-                kwp2000 = new KW2000Dialog(_kwpCommon, (byte)_controllerAddress);
-            }
-
             switch (command.ToLower())
             {
                 case "actuatortest":
-                    ActuatorTest(kwp1281);
+                    Kwp1281Wakeup();
+                    ActuatorTest(_kwp1281);
                     break;
 
                 case "clearfaultcodes":
-                    ClearFaultCodes(kwp1281);
+                    Kwp1281Wakeup();
+                    ClearFaultCodes(_kwp1281);
                     break;
 
                 case "delcovwpremium5safecode":
-                    DelcoVWPremium5SafeCode(kwp1281);
+                    Kwp1281Wakeup();
+                    DelcoVWPremium5SafeCode(_kwp1281);
                     break;
 
                 case "dumpccmrom":
-                    DumpCcmRom(kwp1281);
+                    Kwp1281Wakeup();
+                    DumpCcmRom(_kwp1281);
                     break;
 
                 case "dumpclusternecrom":
-                    DumpClusterNecRom(kwp1281);
+                    Kwp1281Wakeup();
+                    DumpClusterNecRom(_kwp1281);
+                    break;
+
+                case "dumpedc15eeprom":
+                    DumpEdc15Eeprom();
                     break;
 
                 case "dumpeeprom":
-                    DumpEeprom(kwp1281, address, length);
+                    Kwp1281Wakeup();
+                    DumpEeprom(_kwp1281, address, length);
                     break;
 
                 case "dumpmarellimem":
-                    DumpMarelliMem(kwp1281, ecuInfo, (ushort)address, (ushort)length);
+                    var ecuInfo = Kwp1281Wakeup();
+                    DumpMarelliMem(_kwp1281, ecuInfo, (ushort)address, (ushort)length);
                     return;
 
                 case "dumpmem":
-                    DumpMem(kwp1281, address, length);
+                    Kwp1281Wakeup();
+                    DumpMem(_kwp1281, address, length);
                     break;
 
                 case "dumprb8eeprom":
-                    DumpRB8Eeprom(kwp2000, address, length, kwpVersion);
+                    DumpRB8Eeprom(Kwp2000Wakeup(evenParityWakeup: true), address, length);
                     break;
 
                 case "loadeeprom":
-                    LoadEeprom(kwp1281, address);
+                    Kwp1281Wakeup();
+                    LoadEeprom(_kwp1281, address);
                     break;
 
                 case "mapeeprom":
-                    MapEeprom(kwp1281);
+                    Kwp1281Wakeup();
+                    MapEeprom(_kwp1281);
                     break;
 
                 case "readeeprom":
-                    ReadEeprom(kwp1281, address);
+                    Kwp1281Wakeup();
+                    ReadEeprom(_kwp1281, address);
                     break;
 
                 case "readfaultcodes":
-                    ReadFaultCodes(kwp1281);
+                    Kwp1281Wakeup();
+                    ReadFaultCodes(_kwp1281);
                     break;
 
                 case "readident":
-                    ReadIdent(kwp1281);
+                    Kwp1281Wakeup();
+                    ReadIdent(_kwp1281);
                     break;
 
                 case "readsoftwareversion":
-                    ReadSoftwareVersion(kwp1281);
+                    Kwp1281Wakeup();
+                    ReadSoftwareVersion(_kwp1281);
                     break;
 
                 case "reset":
-                    Reset(kwp1281);
+                    Kwp1281Wakeup();
+                    Reset(_kwp1281);
                     break;
 
                 case "setsoftwarecoding":
-                    SetSoftwareCoding(kwp1281, softwareCoding, workshopCode);
+                    Kwp1281Wakeup();
+                    SetSoftwareCoding(_kwp1281, softwareCoding, workshopCode);
                     break;
 
                 case "writeeeprom":
-                    WriteEeprom(kwp1281, address, value);
+                    Kwp1281Wakeup();
+                    WriteEeprom(_kwp1281, address, value);
                     break;
 
                 default:
@@ -237,10 +253,45 @@ namespace BitFab.KW1281Test
                     break;
             }
 
+            if (_kwp1281 != null)
+            {
+                _kwp1281.EndCommunication();
+            }
+        }
+
+        private ControllerInfo Kwp1281Wakeup(bool evenParityWakeup = false)
+        {
+            Logger.WriteLine("Sending wakeup message");
+
+            var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParityWakeup);
+
+            if (kwpVersion != 1281)
+            {
+                throw new InvalidOperationException("Expected KWP1281 protocol.");
+            }
+
+            _kwp1281 = new KW1281Dialog(_kwpCommon);
+
+            var ecuInfo = _kwp1281.ReadEcuInfo();
+            Logger.WriteLine($"ECU: {ecuInfo}");
+
+            return ecuInfo;
+        }
+
+        private KW2000Dialog Kwp2000Wakeup(bool evenParityWakeup = false)
+        {
+            Logger.WriteLine("Sending wakeup message");
+
+            var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParityWakeup);
+
             if (kwpVersion == 1281)
             {
-                kwp1281.EndCommunication();
+                throw new InvalidOperationException("Expected KWP2000 protocol.");
             }
+
+            var kwp2000 = new KW2000Dialog(_kwpCommon, (byte)_controllerAddress);
+
+            return kwp2000;
         }
 
         /// <summary>
@@ -426,6 +477,12 @@ namespace BitFab.KW1281Test
             }
         }
 
+        private void DumpEdc15Eeprom()
+        {
+            var edc15 = new Edc15VM(_kwpCommon, _controllerAddress);
+            edc15.DumpEeprom(_filename);
+        }
+
         private void DumpEeprom(IKW1281Dialog kwp1281, uint address, uint length)
         {
             switch (_controllerAddress)
@@ -578,17 +635,11 @@ namespace BitFab.KW1281Test
             DumpClusterMem(kwp1281, address, length);
         }
 
-        private void DumpRB8Eeprom(KW2000Dialog kwp2000, uint address, uint length, int kwpVersion)
+        private void DumpRB8Eeprom(KW2000Dialog kwp2000, uint address, uint length)
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
                 Logger.WriteLine("Only supported for cluster (address 17)");
-                return;
-            }
-
-            if (kwpVersion < 2000)
-            {
-                Logger.WriteLine($"Cluster protocol is KWP{kwpVersion} but needs to be KWP2xxx");
                 return;
             }
 
@@ -1111,6 +1162,8 @@ namespace BitFab.KW1281Test
             FILENAME = Optional filename
         DumpCcmRom
         DumpClusterNecRom
+        DumpEdc15Eeprom [FILENAME]
+            FILENAME = Optional filename
         DumpEeprom START LENGTH [FILENAME]
             START = Start address in decimal (e.g. 0) or hex (e.g. $0)
             LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)
@@ -1144,5 +1197,6 @@ namespace BitFab.KW1281Test
         private IKwpCommon _kwpCommon;
         private int _controllerAddress;
         private string _filename = null;
+        private KW1281Dialog _kwp1281;
     }
 }

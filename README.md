@@ -40,6 +40,8 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
         DelcoVWPremium5SafeCode
         DumpCcmRom
         DumpClusterNecRom
+        DumpEdc15Eeprom [FILENAME]
+            FILENAME = Optional filename
         DumpEeprom START LENGTH [FILENAME]
             START = Start address in decimal (e.g. 0) or hex (e.g. $0)
             LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)
@@ -78,3 +80,4 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
 Protocol Info: https://www.blafusel.de/obd/obd2_kw1281.html  
 VW Radio Reverse Engineering Info: https://github.com/mnaberez/vwradio  
 6502bench SourceGen: https://6502bench.com/
+EDC15 flashing info and seed/key algorithm: https://github.com/fjvva/ecu-tool
