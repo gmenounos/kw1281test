@@ -594,10 +594,6 @@ E384x:	MOV     R1,[R0+] ; Pop R1
 		RET
 E384	ENDP
 
-		; In order for this loader to be executed by the ECU, the checksum of the bytes in the range E000-RoutineEnd
-		; must be EFCD8631. See https://www.ecuconnections.com/forum/viewtopic.php?f=211&t=49704&sid=5cf324c44d2c74d372984f428ffea5ed
-		; for more information. The following 4 bytes adjust the checksum to the correct value.
-		DB		017H, 01CH, 0E1H, 0E3H ; Checksum correction bytes
 RoutineEnd:
 
 All		ENDS

@@ -56,7 +56,7 @@ namespace BitFab.KW1281Test.EDC15
             }
             resp = kwp2000.SendReceive(DiagnosticService.securityAccess, buf.ToArray());
 
-            var loader = Edc15VM.Loader;
+            var loader = Edc15VM.GetLoader();
             var len = loader.Length;
 
             // Ask the ECU to accept our loader and store it in RAM
@@ -215,17 +215,117 @@ namespace BitFab.KW1281Test.EDC15
         /// <summary>
         /// Loader that can read/write the serial EEPROM.
         /// </summary>
-        private static byte[] Loader
+        private static byte[] GetLoader()
         {
-            get
+            var assembly = Assembly.GetEntryAssembly();
+            var resourceStream = assembly.GetManifestResourceStream(
+                "BitFab.KW1281Test.EDC15.Loader.bin");
+
+            var loaderLength = resourceStream.Length + 4; // Add 4 bytes for checksum correction
+            loaderLength = (loaderLength + 7) / 8 * 8; // Round up to a multiple of 8 bytes
+            var buf = new byte[loaderLength];
+
+            resourceStream.Read(buf, 0, (int)resourceStream.Length);
+
+            // In order for this loader to be executed by the ECU, the checksum of all the bytes
+            // must be EFCD8631.
+
+            // Patch the loader with the location of the end (actually 1 byte past the end)
+            ushort loaderEnd = (ushort)(0xE000 + loaderLength);
+            buf[0x0E] = (byte)(loaderEnd & 0xFF);
+            buf[0x0F] = (byte)(loaderEnd >> 8);
+
+            // Take the checksum of the loader up to but not including the checksum correction
+            ushort r6 = 0xEFCD;
+            ushort r1 = 0x8631;
+            Checksum(ref r6, ref r1, buf.Take(buf.Length - 4).ToArray());
+
+            // Calculate the checksum correction bytes and insert them at the end of the loader
+            var padding = CalcPadding(r6, r1);
+            Array.Copy(padding, 0, buf, buf.Length - 4, 4);
+
+            return buf;
+        }
+
+        /// <summary>
+        /// Calculate the checksum correction padding needed to result in a checksum of EFCD8631
+        /// </summary>
+        /// <param name="r6"></param>
+        /// <param name="r1"></param>
+        /// <returns></returns>
+        private static byte[] CalcPadding(ushort r6, ushort r1)
+        {
+            var paddingH = (ushort)(0xDF9B ^ r6);
+            var paddingL = (ushort)(r1 - 0xAB85);
+
+            return new[]
             {
-                var assembly = Assembly.GetEntryAssembly();
-                var resourceStream = assembly.GetManifestResourceStream(
-                    "BitFab.KW1281Test.EDC15.Loader.bin");
-                var buf = new byte[resourceStream.Length];
-                resourceStream.Read(buf, 0, (int)resourceStream.Length);
-                return buf;
+                (byte)(paddingL & 0xFF),
+                (byte)(paddingL >> 8),
+                (byte)(paddingH & 0xFF),
+                (byte)(paddingH >> 8),
+            };
+        }
+
+        /// <summary>
+        /// EDC15 checksum algorithm (sub_1584).
+        /// Calculates a 32-bit checksum of an array of bytes based on an initial 32-bit seed.
+        /// Based on https://www.ecuconnections.com/forum/viewtopic.php?f=211&t=49704&sid=5cf324c44d2c74d372984f428ffea5ed
+        /// </summary>
+        /// <param name="r6">Input: High word of seed, Output: High word of checksum</param>
+        /// <param name="r1">Input: Low word of seed, Output: Low word of checksum</param>
+        /// <param name="buf">Buffer to calculate checksum for</param>
+        static void Checksum(ref ushort r6, ref ushort r1, byte[] buf)
+        {
+            int r3 = 0; // Buffer index
+            int r0 = buf.Length;
+            while (true)
+            {
+                r1 ^= GetBuf(buf, r3); r3 += 2;
+                r1 = Rol(r1, r6, out ushort c);
+                r6 = (ushort)(r6 - GetBuf(buf, r3) - c); r3 += 2;
+                r6 ^= r1;
+                if (r3 >= r0)
+                {
+                    break;
+                }
+
+                r1 = (ushort)(r1 - GetBuf(buf, r3) - 1); r3 += 2;
+                r1 += 0xDAAD;
+                r6 ^= GetBuf(buf, r3); r3 += 2;
+                r6 = Ror(r6, r1);
+                if (r3 >= r0)
+                {
+                    break;
+                }
             }
+        }
+
+        /// <summary>
+        /// Rotates a 16-bit value right by count bits.
+        /// </summary>
+        private static ushort Ror(ushort value, ushort count)
+        {
+            count &= 0xF;
+            value = (ushort)((value >> count) | (value << (16 - count)));
+            return value;
+        }
+
+        /// <summary>
+        /// Rotates a 16-bit value left by count bits. Carry will be equal to the last bit rotated
+        /// or 0 if the low 4 bits of count are 0;
+        /// </summary>
+        private static ushort Rol(ushort value, ushort count, out ushort carry)
+        {
+            count &= 0xF;
+            value = (ushort)((value << count) | (value >> (16 - count)));
+            carry = ((value & 1) == 0 || (count == 0)) ? (ushort)0 : (ushort)1;
+            return value;
+        }
+
+        private static ushort GetBuf(byte[] buf, int ix)
+        {
+            return (ushort)(buf[ix] + (buf[ix + 1] << 8));
         }
 
         private readonly IKwpCommon _kwpCommon;
