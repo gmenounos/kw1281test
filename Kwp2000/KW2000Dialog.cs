@@ -1,10 +1,8 @@
 ﻿using BitFab.KW1281Test.Kwp2000;
-using System;   
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using Service = BitFab.KW1281Test.Kwp2000.DiagnosticService;
 
@@ -24,59 +22,7 @@ namespace BitFab.KW1281Test
         /// </summary>
         public int P4 { get; set; } = 5;
 
-        public bool SecurityAccess(byte accessMode)
-        {
-            const byte identificationOption = 0x94;
-            var responseMsg = SendReceive(Service.readEcuIdentification, new byte[] { identificationOption });
-            if (responseMsg.Body[0] != identificationOption)
-            {
-                throw new InvalidOperationException($"Received unexpected identificationOption: {responseMsg.Body[0]:X2}");
-            }
-            Logger.WriteLine(DumpAscii(responseMsg.Body.Skip(1)));
-
-            const int maxTries = 16;
-            for (var i = 0; i < maxTries; i++)
-            {
-                responseMsg = SendReceive(Service.securityAccess, new byte[] { accessMode });
-                if (responseMsg.Body[0] != accessMode)
-                {
-                    throw new InvalidOperationException($"Received unexpected accessMode: {responseMsg.Body[0]:X2}");
-                }
-                var seedBytes = responseMsg.Body.Skip(1).ToArray();
-                var seed = (uint)(
-                    (seedBytes[0] << 24) |
-                    (seedBytes[1] << 16) |
-                    (seedBytes[2] << 8) |
-                    seedBytes[3]);
-                var key = CalcRB8Key(seed);
-
-                try
-                {
-                    responseMsg = SendReceive(Service.securityAccess,
-                        new[] {
-                            (byte)(accessMode + 1),
-                            (byte)((key >> 24) & 0xFF),
-                            (byte)((key >> 16) & 0xFF),
-                            (byte)((key >> 8) & 0xFF),
-                            (byte)(key & 0xFF)
-                        });
-
-                    Logger.WriteLine("Success!!!");
-                    return true;
-                }
-                catch(NegativeResponseException)
-                {
-                    if (i < (maxTries - 1))
-                    {
-                        Logger.WriteLine("Trying again.");
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        internal void DumpEeprom(uint address, uint length, string dumpFileName)
+        public void DumpEeprom(uint address, uint length, string dumpFileName)
         {
             StartDiagnosticSession(0x84, 0x14);
 
@@ -245,36 +191,6 @@ namespace BitFab.KW1281Test
                 formatByte, destAddress, srcAddress, lengthByte, service, body, checksum);
             Logger.WriteLine($"Received: {message}");
             return message;
-        }
-
-        private static string DumpAscii(IEnumerable<byte> bytes)
-        {
-            var sb = new StringBuilder();
-            foreach (var b in bytes)
-            {
-                sb.Append((char)b);
-            }
-            return sb.ToString();
-        }
-
-        private static string DumpHex(IEnumerable<byte> bytes)
-        {
-            var sb = new StringBuilder();
-            foreach (var b in bytes)
-            {
-                sb.Append($" {b:X2}");
-            }
-            return sb.ToString();
-        }
-
-        static uint CalcRB8Key(uint seed)
-        {
-            uint key =
-                0xFB4ACBBA
-                + (seed & 0x07DA06B8)
-                + (~seed | 0x07DA06B8)
-                - 2 * (seed & 0x00004000);
-            return key;
         }
 
         private readonly IKwpCommon _kwpCommon;

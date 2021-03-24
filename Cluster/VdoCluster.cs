@@ -5,7 +5,7 @@ using System.Text;
 
 namespace BitFab.KW1281Test.Cluster
 {
-    class Vdo
+    class VdoCluster
     {
         public static bool UnlockCluster(IKW1281Dialog kwp1281)
         {

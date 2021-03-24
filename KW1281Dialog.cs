@@ -68,6 +68,8 @@ namespace BitFab.KW1281Test
         /// <param name="workshopCode"></param>
         /// <returns>True if successful.</returns>
         bool SetSoftwareCoding(int controllerAddress, int softwareCoding, int workshopCode);
+
+        public IKwpCommon KwpCommon { get; }
     }
 
     internal class KW1281Dialog : IKW1281Dialog
@@ -446,7 +448,7 @@ namespace BitFab.KW1281Test
                 Thread.Sleep(5);
             }
 
-            _kwpCommon.WriteByte(0x03); // Block end, does not get ACK'd
+            KwpCommon.WriteByte(0x03); // Block end, does not get ACK'd
         }
 
         private List<Block> ReceiveBlocks()
@@ -469,30 +471,30 @@ namespace BitFab.KW1281Test
 
         private void WriteByteAndReadAck(byte b)
         {
-            _kwpCommon.WriteByte(b);
-            _kwpCommon.ReadComplement(b);
+            KwpCommon.WriteByte(b);
+            KwpCommon.ReadComplement(b);
         }
 
         private Block ReceiveBlock()
         {
             var blockBytes = new List<byte>();
 
-            var blockLength = _kwpCommon.ReadAndAckByte();
+            var blockLength = KwpCommon.ReadAndAckByte();
             blockBytes.Add(blockLength);
 
             var blockCounter = ReadBlockCounter();
             blockBytes.Add(blockCounter);
 
-            var blockTitle = _kwpCommon.ReadAndAckByte();
+            var blockTitle = KwpCommon.ReadAndAckByte();
             blockBytes.Add(blockTitle);
 
             for (int i = 0; i < blockLength - 3; i++)
             {
-                var b = _kwpCommon.ReadAndAckByte();
+                var b = KwpCommon.ReadAndAckByte();
                 blockBytes.Add(b);
             }
 
-            var blockEnd = _kwpCommon.ReadByte();
+            var blockEnd = KwpCommon.ReadByte();
             blockBytes.Add(blockEnd);
             if (blockEnd != 0x03)
             {
@@ -524,7 +526,7 @@ namespace BitFab.KW1281Test
 
         private byte ReadBlockCounter()
         {
-            var blockCounter = _kwpCommon.ReadAndAckByte();
+            var blockCounter = KwpCommon.ReadAndAckByte();
             if (!_blockCounter.HasValue)
             {
                 // First block
@@ -667,15 +669,15 @@ namespace BitFab.KW1281Test
                 controllerInfo.WorkshopCode == workshopCode;
         }
 
+        public IKwpCommon KwpCommon { get; }
+
         private byte? _blockCounter = null;
 
         private bool _additionalCustomCommandsUnlocked;
 
-        private readonly IKwpCommon _kwpCommon;
-
         public KW1281Dialog(IKwpCommon kwpCommon)
         {
-            _kwpCommon = kwpCommon;
+            KwpCommon = kwpCommon;
             _additionalCustomCommandsUnlocked = false;
         }
     }

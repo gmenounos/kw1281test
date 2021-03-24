@@ -16,6 +16,16 @@ namespace BitFab.KW1281Test
             return sb.ToString();
         }
 
+        public static string DumpAscii(IEnumerable<byte> bytes)
+        {
+            var sb = new StringBuilder();
+            foreach (var b in bytes)
+            {
+                sb.Append((char)b);
+            }
+            return sb.ToString();
+        }
+
         public static uint ParseUint(string numberString)
         {
             uint number;

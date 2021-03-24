@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace BitFab.KW1281Test
+namespace BitFab.KW1281Test.Cluster
 {
-    public class KeyFinder
+    public class VdoKeyFinder
     {
         /// <summary>
         /// Takes a 10-byte seed block and generates an 8-byte key block.
