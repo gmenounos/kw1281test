@@ -78,7 +78,7 @@ Cmd23:	CALL    E23E
 
 ; Program flash
 Cmd36:	CALL    E1C4 ; Program flash
-		CALL    SendAck ; Send ACK
+Cmd36x:	CALL    SendAck ; Send ACK
 		JMPR    CC_UC,E04A ; Receive and dispatch message
 
 ; Reboot
@@ -90,7 +90,7 @@ CmdA2:	CALL	SendACK
 
 ; Respond with 0x55
 CmdA3:	MOVB    RL7,#0055H
-		CALL    XmitRL7
+CmdA3x:	CALL    XmitRL7
 		JMPR    CC_UC,E04A ; Receive and dispatch message
 
 ; Set baud rate (buf[2] => S0BG)
@@ -100,40 +100,33 @@ CmdA4:	CALL    SendACK
 		MOVB    RL2,[R1+#0002H]
 		MOV     S0BG,R2
 		MOVB    RL7,#00AAH
-		CALL    XmitRL7
-		JMPR    CC_UC,E04A ; Receive and dispatch message
+		JMPR    CC_UC,CmdA3x ; XmitRL7 + jump to dispatcher
 
 ; Erase flash
 CmdA5:	CALL    SendACK
 		CALL    E2E6 ; Erase flash
-		CALL    SendACK
-		JMPR    CC_UC,E04A ; Receive and dispatch message
+		JMPR    CC_UC,Cmd36x ; SendACK + jump to dispatcher
 
 ; Dump EEPROM
 CmdA6:	CALL	SendACK
 		CALL   	E1C6 ; Dump EEPROM
-		CALL   	SendACK
-		JMPR    CC_UC,E04A ; Receive and dispatch message
+		JMPR    CC_UC,Cmd36x ; SendACK + jump to dispatcher
 
 ; Write 1 byte to EEPROM (Page 0)
 CmdA7:	CALL	SendACK
 		CALL   	E324 ; Write 1 byte to EEPROM (Page 0)
-		CALL   	SendACK
-		JMPR    CC_UC,E04A ; Receive and dispatch message
+		JMPR    CC_UC,Cmd36x ; SendACK + jump to dispatcher
 
 ; Write 1 byte to EEPROM (Page 1)
 CmdA8:	CALL	SendACK
 		CALL    E356
-		CALL    SendACK
-		JMPR    CC_UC,E04A ; Receive and dispatch message
+		JMPR    CC_UC,Cmd36x ; SendACK + jump to dispatcher
 
 ; Handle timeout?
 E0C6:	MOVB    RL7,[R1]
 		ADDB    RL7,#1
-		CALL   	XmitRL7
-		JMPR    CC_UC,E04A ; Receive and dispatch message
+		JMPR    CC_UC,CmdA3x ; XmitRL7 + jump to dispatcher
 
-		RET
 RoutineStart	ENDP
 
 ; Send NAK
@@ -145,7 +138,6 @@ SendNAK	PROC NEAR
 		MOVB    [R1],RL2
 		MOVB    RL2,#007FH ; Code 7F (NAK)
 		JMPR	CC_UC,SendACK2
-		RET
 SendNAK	ENDP
 
 ; Send ACK
@@ -159,9 +151,7 @@ SendACK	PROC NEAR
 SendACK2:		
 		MOVB    [R1+#0001H],RL2
 		CALL	E15E ; Send message
-		MOV     R2,[R0+] ; Pop R2
-		MOV     R1,[R0+] ; Pop R1
-		RET
+		JMPR    CC_UC,E156x ; Pop R2,R1 + RET
 SendACK	ENDP
 
 ; Receive message into buf (E600) - Status returned in R6 (0: Success, 1: Timeout, 2: Checksum error)
@@ -190,8 +180,8 @@ E140:	CALL    E1A2 ; Receive a byte in R7. R6: 0 if success, 1 if timeout
 		JMPR    CC_Z,E156 ; Return if true
 		MOV     R6,#02H ; Checksum error
 E156:	MOV     R3,[R0+] ; Pop R3
-		MOV     R2,[R0+] ; Pop R2
-		MOV     R1,[R0+] ; Pop R1
+E156x:	MOV     R2,[R0+] ; Pop R2
+E156y:	MOV     R1,[R0+] ; Pop R1
 		RET
 E128	ENDP
 
@@ -211,17 +201,13 @@ E16E:	MOVB    RL7,[R1+] ; message byte => RL7
 		JMPR    CC_NZ,E16E ; Loop until all characters sent
 		MOVB    RL7,RL3 ; checksum => RL7
 		CALL    XmitRL7
-		MOV     R3,[R0+] ; Pop R3
-		MOV     R2,[R0+] ; Pop R2
-		MOV     R1,[R0+] ; Pop R1
-		RET
+		JMPR    CC_UC,E156 ; Pop R3,R2,R1 + RET
 E15E	ENDP
 
 		; Transmit byte in R7
 XmitRL7	PROC NEAR
 		MOVB	S0TBUF,RL7	; Transmit RL7
-		CALL  	E192		; Receive echo in R7
-		RET
+		JMPR	CC_UC,E192x	; Receive echo in R7
 XmitRL7	ENDP
 
 		; Receive a byte in R7
@@ -247,8 +233,7 @@ E1AA:	SRVWDT  ; Feed watchdog
 		JMPR    CC_UC,E1C0
 E1BA:	MOV     R7,S0RBUF ; Byte => R7
 		BCLR    S0RIR ; Clear receive flag
-E1C0:	MOV     R1,[R0+] ; Pop R1
-		RET
+E1C0:	JMPR    CC_UC,E156y ; Pop R1 + RET
 E1A2	ENDP
 
 ; Dump EEPROM
@@ -291,8 +276,7 @@ E20C:	CALL    Delay256
 		CALL    Delay7
 		BCLR    P2.8 ; 0 => P2.8
 		CALL    Delay7
-		CALL    E25C ; 0x 01 11
-		RET
+		JMPR	CC_UC,E25C ; 0x 01 11
 E1C6	ENDP
 
 ; 11 01 00
@@ -363,8 +347,7 @@ E2B2:	SHL     R7,#01H
 		CMPD1   R1,#00H ; Count-- == 0?
 		JMPR    CC_NZ,E2B2 ; Repeat
 		BCLR    P2.8 ; 0 => P2.8
-		MOV     R1,[R0+] ; Pop R1
-		RET
+		JMPR	CC_UC,PopR1
 E2AC	ENDP
 
 ; Clock (P2.9) 8 bits of P2.8 into RL7 (MSB first)
@@ -383,15 +366,13 @@ E2CE:	BSET    P2.9 ; 1 => P2.9
 		JMPR    CC_NZ,E2CE ; Repeat
 		BSET    DP2.8 ; P2.8 is an output
 		BCLR    P2.8 ; 0 => P2.8
-		MOV     R1,[R0+] ; Pop R1
-		RET
+		JMPR	CC_UC,PopR1
 E2C6	ENDP
 
 Delay256	PROC NEAR
 		MOV  	[-R0],R3 ; Push R3
 		MOV     R3,#0100H
 		JMPR    CC_UC,DelayLoop
-		RET
 Delay256	ENDP
 
 Delay7	PROC NEAR
@@ -416,7 +397,6 @@ E324x:
 		CMP     R7,#0
 		JMPR    CC_NZ,E324x
 		JMPR	CC_UC,E356y
-		RET
 E324	ENDP
 
 ; Write 1 byte to EEPROM (Page 1)
@@ -435,8 +415,7 @@ E356y:
 		CALL    E192 ; Receive a byte in R7
 		CALL    E2AC ; Clock (P2.9) all bits of RL7 (MSB first) to P2.8
 		CALL    E27A ; Clock (P2.9) one bit of P2.8 into R7.0
-		CALL    E25C ; 0x 01 11
-		RET
+		JMPR	CC_UC,E25C ; 0x 01 11
 E356	ENDP
 	
 ; Program flash
@@ -464,10 +443,10 @@ E1EA:	SRVWDT  ; Feed watchdog
 		ADDC    R2,#0
 		CMPD1   R4,#00H
 		JMPR    CC_NZ,E1EA
-		MOV     R4,[R0+] ; Pop R4
-		MOV     R3,[R0+] ; Pop R3
-		MOV     R2,[R0+] ; Pop R2
-		MOV     R1,[R0+] ; Pop R1
+PopR4:	MOV     R4,[R0+] ; Pop R4
+PopR3:	MOV     R3,[R0+] ; Pop R3
+PopR2:	MOV     R2,[R0+] ; Pop R2
+PopR1:	MOV     R1,[R0+] ; Pop R1
 		RET
 E1C4	ENDP
 
@@ -521,11 +500,7 @@ E270:	CALL    E290 ; Read extended data (returned in RL7)
 		JMPR    CC_NZ,E270
 		CALL    E15E ; Send message in buf (E600)
 		MOV     R5,[R0+] ; Pop R5
-		MOV     R4,[R0+] ; Pop R4
-		MOV     R3,[R0+] ; Pop R3
-		MOV     R2,[R0+] ; Pop R2
-		MOV     R1,[R0+] ; Pop R1
-		RET
+		JMPR	CC_UC,PopR4
 E23E	ENDP
 
 ; Read extended data (returned in RL7)
@@ -535,8 +510,7 @@ E290	PROC NEAR
 		CALL    E2A4 ; Set Data Page Pointer 0 based on R2
 		AND     R1,#3FFFH
 		MOVB    RL7,[R1]
-		MOV     R1,[R0+] ; Pop R1
-		RET
+		JMPR	CC_UC,PopR1
 E290	ENDP
 
 ; Set Data Page Pointer 0 based on R1, R2
@@ -549,9 +523,7 @@ E2A4	PROC NEAR
 		AND     R1,#3
 		OR      R2,R1
 		MOV     DPP0,R2 ; R2 => Data Page Pointer 0
-		MOV     R2,[R0+] ; Pop R2
-		MOV     R1,[R0+] ; Pop R1
-		RET
+		JMPR	CC_UC,PopR2
 E2A4	ENDP
 
 ; Erase flash
@@ -584,10 +556,7 @@ E2E6	PROC NEAR
 		MOVB    RL7,#0080H
 		CALL    E354 ; Wait until erase operation is complete
 		MOV     R7,[R0+] ; Pop R7
-		MOV     R3,[R0+] ; Pop R3
-		MOV     R2,[R0+] ; Pop R2
-		MOV     R1,[R0+] ; Pop R1
-		RET
+		JMPR	CC_UC,PopR3
 E2E6	ENDP
 	
 ; Wait until operation is complete
@@ -612,8 +581,7 @@ E374	PROC NEAR
 		CALL    E2A4 ; Set Data Page Pointer 0 based on R2
 		AND     R1,#3FFFH
 		MOVB    [R1],RL7
-		MOV     R1,[R0+] ; Pop R1
-		RET
+		JMPR	CC_UC,E384x ; Pop R1 + RET
 E374	ENDP
 	
 ; Write extended data word (source is R7)
@@ -622,15 +590,14 @@ E384	PROC NEAR
 		CALL    E2A4 ; Set Data Page Pointer 0 based on R2
 		AND     R1,#3FFFH
 		MOV     [R1],R7
-		MOV     R1,[R0+] ; Pop R1
+E384x:	MOV     R1,[R0+] ; Pop R1
 		RET
 E384	ENDP
 
-		DB		0, 0	; Pad the length to a multiple of 8 for ease of calculating the checksum correction bytes
 		; In order for this loader to be executed by the ECU, the checksum of the bytes in the range E000-RoutineEnd
 		; must be EFCD8631. See https://www.ecuconnections.com/forum/viewtopic.php?f=211&t=49704&sid=5cf324c44d2c74d372984f428ffea5ed
 		; for more information. The following 4 bytes adjust the checksum to the correct value.
-		DB		0AAH, 095H, 09DH, 0E2H ; Checksum correction bytes
+		DB		017H, 01CH, 0E1H, 0E3H ; Checksum correction bytes
 RoutineEnd:
 
 All		ENDS
