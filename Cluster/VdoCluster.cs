@@ -83,6 +83,10 @@ namespace BitFab.KW1281Test.Cluster
             {
                 return new[] { new byte[] { 0x01, 0x04, 0x3D, 0x35 } };
             }
+            else if (Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VMMJ08MH", 0x00, 0x09))) // 1J5920826L V75
+            {
+                return new[] { new byte[] { 0x3E, 0x47, 0x3D, 0x48 } };
+            }
             else
             {
                 return _clusterUnlockCodes;
@@ -135,6 +139,7 @@ namespace BitFab.KW1281Test.Cluster
             new byte[] { 0x39, 0x34, 0x34, 0x40 },
             new byte[] { 0x01, 0x04, 0x3D, 0x35 },
             new byte[] { 0x3E, 0x35, 0x3D, 0x3A },
+            new byte[] { 0x3E, 0x47, 0x3D, 0x48 },
             new byte[] { 0x39, 0x43, 0x43, 0x43 },
             new byte[] { 0x3A, 0x31, 0x31, 0x36 },
             new byte[] { 0x3A, 0x34, 0x47, 0x38 },
