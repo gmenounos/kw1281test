@@ -183,17 +183,26 @@ namespace BitFab.KW1281Test
             // Disable garbage collection int this time-critical method
             bool noGc = GC.TryStartNoGCRegion(1024 * 1024);
 
+            var breakStart = Stopwatch.GetTimestamp();
+            _interface.SetBreakOn();
+            var breakStop = Stopwatch.GetTimestamp();
+            _interface.SetBreakOff();
+
+            Sleep(1190);
+
+            var breakOverhead = (int)((breakStop - breakStart) / (Stopwatch.Frequency / 1000));
+
             BitBang5Baud(controllerAddress, evenParity: false);
 
             Sleep(1190);
 
             _interface.SetBreakOn();
 
-            Sleep(30);
+            Sleep(30 - breakOverhead);
 
             _interface.SetBreakOff();
 
-            Sleep(16);
+            Sleep(25 - breakOverhead);
 
             if (noGc)
             {
