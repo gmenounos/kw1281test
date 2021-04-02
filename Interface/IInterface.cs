@@ -20,5 +20,7 @@ namespace BitFab.KW1281Test.Interface
         void SetBreakOff();
 
         void ClearReceiveBuffer();
+
+        void SetBaudRate(int baudRate);
     }
 }

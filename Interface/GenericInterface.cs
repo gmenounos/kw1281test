@@ -55,6 +55,11 @@ namespace BitFab.KW1281Test.Interface
             _port.DiscardInBuffer();
         }
 
+        public void SetBaudRate(int baudRate)
+        {
+            _port.BaudRate = baudRate;
+        }
+
         private readonly SerialPort _port;
 
         private readonly byte[] _buf = new byte[1];

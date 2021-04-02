@@ -12,28 +12,9 @@ namespace BitFab.KW1281Test.EDC15
     {
         public void DumpEeprom(string filename)
         {
-            Logger.WriteLine("Sending wakeup message");
-            var kwpVersion = _kwpCommon.FastInit((byte)_controllerAddress);
-
             var kwp2000 = new KW2000Dialog(_kwpCommon, (byte)_controllerAddress);
 
-            Kwp2000Message resp;
-
-            // Need to decrease these timing parameters to get the ECU to wake up.
-            kwp2000.P3 = 0;
-            kwp2000.P4 = 0;
-            kwp2000.SendMessage(DiagnosticService.startCommunication, Array.Empty<byte>());
-            kwp2000.P3 = 6;
-            try
-            {
-                resp = kwp2000.SendReceive(DiagnosticService.testerPresent, Array.Empty<byte>());
-            }
-            catch (InvalidOperationException)
-            {
-                // Ignore "Unexpected DestAddress: 00"
-            }
-
-            kwp2000.P3 = 55;
+            var resp = kwp2000.SendReceive(DiagnosticService.startDiagnosticSession, new byte[] { 0x89 });
 
             resp = kwp2000.SendReceive(DiagnosticService.startDiagnosticSession, new byte[] { 0x85 });
 

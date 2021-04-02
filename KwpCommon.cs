@@ -1,6 +1,7 @@
 ﻿using BitFab.KW1281Test.Interface;
 using System;
 using System.Diagnostics;
+using System.Threading;
 
 namespace BitFab.KW1281Test
 {
@@ -21,13 +22,11 @@ namespace BitFab.KW1281Test
         byte ReadAndAckByte();
 
         void ReadComplement(byte b);
-
-        int FastInit(byte controllerAddress);
     }
 
     class KwpCommon : IKwpCommon
     {
-        public IInterface Interface => _interface;
+        public IInterface Interface { get; }
 
         public int WakeUp(byte controllerAddress, bool evenParity)
         {
@@ -42,21 +41,24 @@ namespace BitFab.KW1281Test
             }
 
             // Throw away anything that might be in the receive buffer
-            _interface.ClearReceiveBuffer();
+            Interface.ClearReceiveBuffer();
 
             Logger.WriteLine("Reading sync byte");
-            var syncByte = _interface.ReadByte();
+            var syncByte = Interface.ReadByte();
             if (syncByte != 0x55)
             {
                 throw new InvalidOperationException(
                     $"Unexpected sync byte: Expected $55, Actual ${syncByte:X2}");
             }
 
-            var keywordLsb = _interface.ReadByte();
+            var keywordLsb = Interface.ReadByte();
             Logger.WriteLine($"Keyword Lsb ${keywordLsb:X2}");
 
-            var keywordMsb = ReadAndAckByte();
+            var keywordMsb = ReadByte();
             Logger.WriteLine($"Keyword Msb ${keywordMsb:X2}");
+
+            Thread.Sleep(25);
+            WriteComplement(keywordMsb);
 
             var protocolVersion = ((keywordMsb & 0x7F) << 7) + (keywordLsb & 0x7F);
             Logger.WriteLine($"Protocol is KW {protocolVersion} (8N1)");
@@ -71,7 +73,7 @@ namespace BitFab.KW1281Test
 
         public byte ReadByte()
         {
-            return _interface.ReadByte();
+            return Interface.ReadByte();
         }
 
         public void WriteByte(byte b)
@@ -81,7 +83,7 @@ namespace BitFab.KW1281Test
 
         public byte ReadAndAckByte()
         {
-            var b = _interface.ReadByte();
+            var b = Interface.ReadByte();
             WriteComplement(b);
             return b;
         }
@@ -89,7 +91,7 @@ namespace BitFab.KW1281Test
         public void ReadComplement(byte b)
         {
             var expectedComplement = (byte)~b;
-            var actualComplement = _interface.ReadByte();
+            var actualComplement = Interface.ReadByte();
             if (actualComplement != expectedComplement)
             {
                 throw new InvalidOperationException(
@@ -125,11 +127,11 @@ namespace BitFab.KW1281Test
                     ;
                 if (bit)
                 {
-                    _interface.SetBreakOff();
+                    Interface.SetBreakOff();
                 }
                 else
                 {
-                    _interface.SetBreakOn();
+                    Interface.SetBreakOn();
                 }
 
                 maxTick += ticksPerBit;
@@ -163,63 +165,17 @@ namespace BitFab.KW1281Test
         /// </summary>
         private void WriteByteAndDiscardEcho(byte b)
         {
-            _interface.WriteByteRaw(b);
-            var echo = _interface.ReadByte();
+            Interface.WriteByteRaw(b);
+            var echo = Interface.ReadByte();
             if (echo != b)
             {
                 throw new InvalidOperationException($"Wrote 0x{b:X2} to port but echo was 0x{echo:X2}");
             }
         }
 
-        public int FastInit(byte controllerAddress)
-        {
-            static void Sleep(int ms)
-            {
-                var maxTick = Stopwatch.GetTimestamp() + Stopwatch.Frequency / 1000 * ms;
-                while (Stopwatch.GetTimestamp() < maxTick)
-                    ;
-            }
-
-            // Disable garbage collection int this time-critical method
-            bool noGc = GC.TryStartNoGCRegion(1024 * 1024);
-
-            var breakStart = Stopwatch.GetTimestamp();
-            _interface.SetBreakOn();
-            var breakStop = Stopwatch.GetTimestamp();
-            _interface.SetBreakOff();
-
-            Sleep(1190);
-
-            var breakOverhead = (int)((breakStop - breakStart) / (Stopwatch.Frequency / 1000));
-
-            BitBang5Baud(controllerAddress, evenParity: false);
-
-            Sleep(1190);
-
-            _interface.SetBreakOn();
-
-            Sleep(30 - breakOverhead);
-
-            _interface.SetBreakOff();
-
-            Sleep(25 - breakOverhead);
-
-            if (noGc)
-            {
-                GC.EndNoGCRegion();
-            }
-
-            // Throw away anything that might be in the receive buffer
-            _interface.ClearReceiveBuffer();
-
-            return 2000;
-        }
-
-        private readonly IInterface _interface;
-
         public KwpCommon(IInterface @interface)
         {
-            _interface = @interface;
+            Interface = @interface;
         }
     }
 }

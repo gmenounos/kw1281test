@@ -112,6 +112,12 @@ namespace BitFab.KW1281Test.Interface
             var status = _ft.Purge(_handle, FT.PurgeMask.RX);
             FT.AssertOk(status);
         }
+
+        public void SetBaudRate(int baudRate)
+        {
+            var status = _ft.SetBaudRate(_handle, (uint)baudRate);
+            FT.AssertOk(status);
+        }
     }
 
     class FT : IDisposable

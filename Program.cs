@@ -488,8 +488,25 @@ namespace BitFab.KW1281Test
 
         private void DumpEdc15Eeprom()
         {
+            Kwp1281Wakeup();
+            _kwp1281.EndCommunication();
+
+            Thread.Sleep(1000);
+
+            // Now wake it up again, hopefully in KW2000 mode
+            _kwpCommon.Interface.SetBaudRate(10400);
+            var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParity: false);
+            if (kwpVersion < 2000)
+            {
+                throw new InvalidOperationException(
+                    $"Unable to wake up ECU in KW2000 mode. KW version: {kwpVersion}");
+            }
+            Console.WriteLine($"KW Version: {kwpVersion}");
+
             var edc15 = new Edc15VM(_kwpCommon, _controllerAddress);
             edc15.DumpEeprom(_filename);
+
+            _kwp1281 = null;
         }
 
         private void DumpEeprom(IKW1281Dialog kwp1281, uint address, uint length)
