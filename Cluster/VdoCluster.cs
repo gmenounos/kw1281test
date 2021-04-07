@@ -52,7 +52,8 @@ namespace BitFab.KW1281Test.Cluster
         /// </summary>
         private static byte[][] GetClusterUnlockCodes(List<byte> softwareVersion)
         {
-            if (Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK501MH", 0x10, 0x01)))
+            if (
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK501MH", 0x10, 0x01)))
             {
                 return new[] { new byte[] { 0x39, 0x34, 0x34, 0x40 } };
             }
@@ -68,11 +69,14 @@ namespace BitFab.KW1281Test.Cluster
             {
                 return new[] { new byte[] { 0x3E, 0x35, 0x3D, 0x3A } };
             }
-            else if (Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VBKX00MH", 0x00, 0x01)))
+            else if (
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VBKX00MH", 0x00, 0x01)))
             {
                 return new[] { new byte[] { 0x3A, 0x39, 0x31, 0x43 } };
             }
-            else if (Enumerable.SequenceEqual(softwareVersion, ClusterVersion("V599LLA ", 0x00, 0x01))) // 1J0920800L V59
+            else if (
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("V599HLA ", 0x91, 0x00)) || // 7D0920841A V18
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("V599LLA ", 0x00, 0x01)))   // 1J0920800L V59
             {
                 return new[] { new byte[] { 0x38, 0x3F, 0x40, 0x35 } };
             }
@@ -83,7 +87,8 @@ namespace BitFab.KW1281Test.Cluster
             {
                 return new[] { new byte[] { 0x01, 0x04, 0x3D, 0x35 } };
             }
-            else if (Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VMMJ08MH", 0x00, 0x09))) // 1J5920826L V75
+            else if (
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VMMJ08MH", 0x00, 0x09)))   // 1J5920826L V75
             {
                 return new[] { new byte[] { 0x3E, 0x47, 0x3D, 0x48 } };
             }
