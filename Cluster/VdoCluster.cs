@@ -93,6 +93,11 @@ namespace BitFab.KW1281Test.Cluster
             {
                 return new[] { new byte[] { 0x3E, 0x47, 0x3D, 0x48 } };
             }
+            else if (
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("V798MLA ", 0x00, 0x01)))   // 7D0920800F V01
+            {
+                return new[] { new byte[] { 0x02, 0x03, 0x05, 0x09 } };
+            }
             else
             {
                 return _clusterUnlockCodes;
