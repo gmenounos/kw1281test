@@ -39,7 +39,6 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
         ClearFaultCodes
         DelcoVWPremium5SafeCode
         DumpCcmRom
-        DumpClusterNecRom
         DumpEdc15Eeprom [FILENAME]
             FILENAME = Optional filename
         DumpEeprom START LENGTH [FILENAME]

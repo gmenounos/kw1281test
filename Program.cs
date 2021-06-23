@@ -2,7 +2,6 @@
 using BitFab.KW1281Test.Cluster;
 using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
-using BitFab.KW1281Test.Kwp2000;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -10,7 +9,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -827,7 +825,9 @@ namespace BitFab.KW1281Test
 
         private void DumpClusterEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
         {
-            var identInfo = kwp1281.ReadIdent().First().ToString().Replace(' ', '_').Replace(":", "");
+            var identInfo = kwp1281.ReadIdent().First().ToString()
+                .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
+                .Replace(' ', '_').Replace(":", "");
 
             UnlockControllerForEepromReadWrite(kwp1281);
 
@@ -898,7 +898,6 @@ namespace BitFab.KW1281Test
             LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
             FILENAME = Optional filename
         DumpCcmRom
-        DumpClusterNecRom
         DumpEdc15Eeprom [FILENAME]
             FILENAME = Optional filename
         DumpEeprom START LENGTH [FILENAME]

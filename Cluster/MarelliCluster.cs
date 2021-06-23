@@ -30,11 +30,15 @@ namespace BitFab.KW1281Test.Cluster
             }
             else if (address == 3072 && count == 1024)
             {
+                Logger.WriteLine("Untested cluster version! You may need to disconnect your battery if this fails.");
+
                 entryH = 0x02;
                 regBlockH = 0x08;
             }
             else if (address == 14336 && count == 2048)
             {
+                Logger.WriteLine("Untested cluster version! You may need to disconnect your battery if this fails.");
+
                 entryH = 0x18;
                 regBlockH = 0x20;
             }
