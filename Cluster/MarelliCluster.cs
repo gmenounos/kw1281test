@@ -23,8 +23,17 @@ namespace BitFab.KW1281Test.Cluster
             }
             else if (
                 ecuInfo.Text.Contains("M73 V08") || // Beetle 1C0920921G
-                ecuInfo.Text.Contains("M73 D09") || // Audi TT 8N2920980A
                 ecuInfo.Text.Contains("M73 D14"))   // Audi TT 8N2920980A
+            {
+                entryH = 0x18;
+                regBlockH = 0x20;
+            }
+            else if (address == 3072 && count == 1024)
+            {
+                entryH = 0x02;
+                regBlockH = 0x08;
+            }
+            else if (address == 14336 && count == 2048)
             {
                 entryH = 0x18;
                 regBlockH = 0x20;
