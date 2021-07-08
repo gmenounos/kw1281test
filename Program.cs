@@ -210,6 +210,10 @@ namespace BitFab.KW1281Test
                     DumpRB8Eeprom(Kwp2000Wakeup(evenParityWakeup: true), address, length);
                     break;
 
+                case "getskc":
+                    GetSkc();
+                    break;
+
                 case "loadeeprom":
                     Kwp1281Wakeup();
                     LoadEeprom(_kwp1281, address);
@@ -549,6 +553,53 @@ namespace BitFab.KW1281Test
             kwp2000.DumpEeprom(address, length, dumpFileName);
         }
 
+        private void GetSkc()
+        {
+            if (_controllerAddress == (int)ControllerAddress.Cluster)
+            {
+                var ecuInfo = Kwp1281Wakeup();
+                var partNumberMatch = Regex.Match(
+                    ecuInfo.Text,
+                    "\\b\\d[a-zA-Z]\\d9\\d{5}[a-zA-Z][a-zA-Z]?\\b");
+                if (partNumberMatch.Success)
+                {
+                    switch(partNumberMatch.Value[8])
+                    {
+                        case '5':
+                            // Immo2
+                            Logger.WriteLine($"Cluster is Immo2");
+                            break;
+                        case '6':
+                        case '7':
+                        case '8':
+                        case '9':
+                            // Immo3
+                            var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2); // VWK501 only
+                            var buf = File.ReadAllBytes(dumpFileName);
+                            var skc = Utils.GetShort(buf, 0).ToString("D5");
+                            Logger.WriteLine($"SKC: {skc}");
+                            break;
+                        default:
+                            Logger.WriteLine($"Cluster is non-Immo so there is no SKC.");
+                            break;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"ECU Info: {ecuInfo.Text}");
+                }
+            }
+            else if (_controllerAddress == (int)ControllerAddress.Ecu)
+            {
+                // 038906012GN
+                Logger.WriteLine("Not supported for ECUs yet.");
+            }
+            else
+            {
+                Logger.WriteLine("Only supported for clusters (address 17) and ECUs (address 1)");
+            }
+        }
+
         private void LoadEeprom(IKW1281Dialog kwp1281, uint address)
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
@@ -823,7 +874,7 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private void DumpClusterEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
+        private string DumpClusterEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
         {
             var identInfo = kwp1281.ReadIdent().First().ToString()
                 .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
@@ -836,6 +887,8 @@ namespace BitFab.KW1281Test
             Logger.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             DumpEeprom(kwp1281, startAddress, length, maxReadLength: 16, dumpFileName);
             Logger.WriteLine($"Saved EEPROM dump to {dumpFileName}");
+
+            return dumpFileName;
         }
 
         private void LoadClusterEeprom(IKW1281Dialog kwp1281, ushort address, string filename)
@@ -912,6 +965,7 @@ namespace BitFab.KW1281Test
             START = Start address in decimal (e.g. 66560) or hex (e.g. $10400)
             LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
             FILENAME = Optional filename
+        GetSKC
         LoadEeprom START FILENAME
             START = Start address in decimal (e.g. 0) or hex (e.g. $0)
             FILENAME = Name of file containing binary data to load into EEPROM

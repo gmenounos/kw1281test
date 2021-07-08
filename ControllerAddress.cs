@@ -5,6 +5,7 @@
     /// </summary>
     enum ControllerAddress
     {
+        Ecu = 0x01,
         Cluster = 0x17,
         CanGateway = 0x19,
         CentralLocking = 0x35,
