@@ -555,6 +555,9 @@ namespace BitFab.KW1281Test
 
         private void GetSkc()
         {
+            // TODO: Bosch RB8
+            // TODO: Marelli
+
             if (_controllerAddress == (int)ControllerAddress.Cluster)
             {
                 var ecuInfo = Kwp1281Wakeup();
@@ -567,16 +570,20 @@ namespace BitFab.KW1281Test
                     {
                         case '5':
                             // Immo2
-                            Logger.WriteLine($"Cluster is Immo2");
+                            var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0BA, 2);
+                            var buf = File.ReadAllBytes(dumpFileName);
+                            var skc = Utils.GetShort(buf, 0).ToString("X5");
+                            Logger.WriteLine($"SKC: {skc}");
                             break;
                         case '6':
                         case '7':
                         case '8':
                         case '9':
                             // Immo3
-                            var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2); // VWK501 only
-                            var buf = File.ReadAllBytes(dumpFileName);
-                            var skc = Utils.GetShort(buf, 0).ToString("D5");
+                            dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2); // VWK501 only, VWK503=0x10A
+                            // var dumpFileName = DumpClusterEeprom(_kwp1281, 0x10A, 2); // VWK503 only
+                            buf = File.ReadAllBytes(dumpFileName);
+                            skc = Utils.GetShort(buf, 0).ToString("D5");
                             Logger.WriteLine($"SKC: {skc}");
                             break;
                         default:
