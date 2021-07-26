@@ -49,8 +49,17 @@ namespace BitFab.KW1281Test
                 return;
             }
 
-            // This seems to increase the accuracy of our timing loops
-            Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.RealTime;
+            try
+            {
+                // This seems to increase the accuracy of our timing loops
+                Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.RealTime;
+            }
+            catch(TypeLoadException)
+            {
+                // But it also throws a TypeLoadException on certain systems
+                Logger.WriteLine(
+                    "Ignored TypeLoadException thrown when trying to increase process priority.");
+            }
 
             string portName = args[0];
             var baudRate = int.Parse(args[1]);
@@ -539,61 +548,89 @@ namespace BitFab.KW1281Test
             DumpClusterMem(kwp1281, address, length);
         }
 
-        private void DumpRB8Eeprom(KW2000Dialog kwp2000, uint address, uint length)
+        /// <summary>
+        /// Dumps the EEPROM of a Bosch RB8 cluster to a file.
+        /// </summary>
+        /// <returns>The dump file name or null if the EEPROM was not dumped.</returns>
+        private string DumpRB8Eeprom(KW2000Dialog kwp2000, uint address, uint length)
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
                 Logger.WriteLine("Only supported for cluster (address 17)");
-                return;
+                return null;
             }
 
             var dumpFileName = _filename ?? $"RB8_${address:X6}_eeprom.bin";
 
             BoschCluster.SecurityAccess(kwp2000, 0xFB);
             kwp2000.DumpEeprom(address, length, dumpFileName);
+
+            return dumpFileName;
         }
 
         private void GetSkc()
         {
-            // TODO: Bosch RB8
-            // TODO: Marelli
-
             if (_controllerAddress == (int)ControllerAddress.Cluster)
             {
                 var ecuInfo = Kwp1281Wakeup();
-                var partNumberMatch = Regex.Match(
-                    ecuInfo.Text,
-                    "\\b\\d[a-zA-Z]\\d9\\d{5}[a-zA-Z][a-zA-Z]?\\b");
-                if (partNumberMatch.Success)
+                if (ecuInfo.Text.Contains("VDO"))
                 {
-                    switch(partNumberMatch.Value[8])
+                    var partNumberMatch = Regex.Match(
+                        ecuInfo.Text,
+                        "\\b\\d[a-zA-Z]\\d9\\d{5}[a-zA-Z][a-zA-Z]?\\b");
+                    if (partNumberMatch.Success)
                     {
-                        case '5':
-                            // Immo2
-                            var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0BA, 2);
-                            var buf = File.ReadAllBytes(dumpFileName);
-                            var skc = Utils.GetShort(buf, 0).ToString("X5");
-                            Logger.WriteLine($"SKC: {skc}");
-                            break;
-                        case '6':
-                        case '7':
-                        case '8':
-                        case '9':
-                            // Immo3
-                            dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2); // VWK501 only, VWK503=0x10A
-                            // var dumpFileName = DumpClusterEeprom(_kwp1281, 0x10A, 2); // VWK503 only
-                            buf = File.ReadAllBytes(dumpFileName);
-                            skc = Utils.GetShort(buf, 0).ToString("D5");
-                            Logger.WriteLine($"SKC: {skc}");
-                            break;
-                        default:
-                            Logger.WriteLine($"Cluster is non-Immo so there is no SKC.");
-                            break;
+                        switch (partNumberMatch.Value[8])
+                        {
+                            case '5':
+                                // Immo2
+                                var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0BA, 2);
+                                var buf = File.ReadAllBytes(dumpFileName);
+                                var skc = Utils.GetShort(buf, 0).ToString("X5");
+                                Logger.WriteLine($"SKC: {skc}");
+                                break;
+                            case '6':
+                            case '7':
+                            case '8':
+                            case '9':
+                                // Immo3
+                                dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2); // VWK501 only, VWK503=0x10A
+                                // var dumpFileName = DumpClusterEeprom(_kwp1281, 0x10A, 2); // VWK503 only
+                                buf = File.ReadAllBytes(dumpFileName);
+                                skc = Utils.GetShort(buf, 0).ToString("D5");
+                                Logger.WriteLine($"SKC: {skc}");
+                                break;
+                            default:
+                                Logger.WriteLine($"Cluster is non-Immo so there is no SKC.");
+                                break;
+                        }
                     }
+                    else
+                    {
+                        Console.WriteLine($"ECU Info: {ecuInfo.Text}");
+                    }
+                }
+                else if (ecuInfo.Text.Contains("RB8"))
+                {
+                    // Need to quit KWP1281 before switching to KWP2000
+                    _kwp1281.EndCommunication();
+                    _kwp1281 = null;
+                    Thread.Sleep(TimeSpan.FromSeconds(2));
+
+                    var dumpFileName = DumpRB8Eeprom(
+                        Kwp2000Wakeup(evenParityWakeup: true), 0x1040E, 2);
+                    var buf = File.ReadAllBytes(dumpFileName);
+                    var skc = Utils.GetShort(buf, 0).ToString("D5");
+                    Logger.WriteLine($"SKC: {skc}");
+                }
+                else if (ecuInfo.Text.Contains("M73"))
+                {
+                    // TODO: Marelli
+                    Console.WriteLine($"Unsupported cluster: {ecuInfo.Text}");
                 }
                 else
                 {
-                    Console.WriteLine($"ECU Info: {ecuInfo.Text}");
+                    Console.WriteLine($"Unsupported cluster: {ecuInfo.Text}");
                 }
             }
             else if (_controllerAddress == (int)ControllerAddress.Ecu)
