@@ -59,6 +59,7 @@ namespace BitFab.KW1281Test
                 // But it also throws a TypeLoadException on certain systems
                 Logger.WriteLine(
                     "Ignored TypeLoadException thrown when trying to increase process priority.");
+                Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
             }
 
             string portName = args[0];
