@@ -57,6 +57,7 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
             START = Start address in decimal (e.g. 66560) or hex (e.g. $10400)
             LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
             FILENAME = Optional filename
+        GetSKC
         LoadEeprom START FILENAME
             START = Start address in decimal (e.g. 0) or hex (e.g. $0)
             FILENAME = Name of file containing binary data to load into EEPROM
