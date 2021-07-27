@@ -14,6 +14,8 @@
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <Authors>Greg Menounos</Authors>
     <Company>BitFab</Company>
+    <PackageProjectUrl>https://github.com/gmenounos/kw1281test</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/gmenounos/kw1281test</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
