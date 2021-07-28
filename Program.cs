@@ -43,6 +43,9 @@ namespace BitFab.KW1281Test
                 .InformationalVersion;
             Logger.WriteLine($"KW1281Test {version} (https://github.com/gmenounos/kw1281test/releases)");
             Logger.WriteLine($"Args: {string.Join(' ', args)}");
+            Logger.WriteLine($"OSVersion: {Environment.OSVersion}");
+            Logger.WriteLine($".NET Version: {Environment.Version}");
+            Logger.WriteLine($"Culture: {CultureInfo.InstalledUICulture}");
 
             if (args.Length < 4)
             {
