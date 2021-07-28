@@ -5,8 +5,10 @@ using System.Text;
 
 namespace BitFab.KW1281Test.Cluster
 {
-    class VdoCluster
+    static class VdoCluster
     {
+        public static string SoftwareVersion { get; private set; }
+
         public static bool UnlockCluster(IKW1281Dialog kwp1281)
         {
             var versionBlocks = kwp1281.CustomReadSoftwareVersion();
@@ -14,6 +16,7 @@ namespace BitFab.KW1281Test.Cluster
             // Now we need to send an unlock code that is unique to each ROM version
             Logger.WriteLine("Sending Custom \"Unlock partial EEPROM read\" block");
             var softwareVersion = versionBlocks[0].Body;
+            SoftwareVersion = KW1281Dialog.DumpMixedContent(softwareVersion);
             var unlockCodes = GetClusterUnlockCodes(softwareVersion);
             var unlocked = false;
             foreach (var unlockCode in unlockCodes)
@@ -28,8 +31,7 @@ namespace BitFab.KW1281Test.Cluster
                 }
                 if (unlockResponse[0].IsAck)
                 {
-                    Logger.WriteLine(
-                        $"Unlock code for software version {KW1281Dialog.DumpMixedContent(softwareVersion)} is {Utils.Dump(unlockCode)}");
+                    Logger.WriteLine($"Unlock code for software version {SoftwareVersion} is {Utils.Dump(unlockCode)}");
                     if (unlockCodes.Length > 1)
                     {
                         Logger.WriteLine("Please report this to the program maintainer.");

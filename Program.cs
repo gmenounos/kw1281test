@@ -570,6 +570,7 @@ namespace BitFab.KW1281Test
                 var ecuInfo = Kwp1281Wakeup();
                 if (ecuInfo.Text.Contains("VDO"))
                 {
+                    Logger.WriteLine($"SoftwareVersion: {VdoCluster.SoftwareVersion}");
                     var partNumberMatch = Regex.Match(
                         ecuInfo.Text,
                         "\\b\\d[a-zA-Z]\\d9\\d{5}[a-zA-Z][a-zA-Z]?\\b");
