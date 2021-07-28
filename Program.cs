@@ -27,6 +27,7 @@ namespace BitFab.KW1281Test
             }
             catch (Exception ex)
             {
+                Logger.WriteLine($"Caught: {ex.GetType()} {ex.Message}");
                 Logger.WriteLine($"Unhandled exception: {ex}");
             }
             finally
@@ -49,18 +50,8 @@ namespace BitFab.KW1281Test
                 return;
             }
 
-            try
-            {
-                // This seems to increase the accuracy of our timing loops
-                Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.RealTime;
-            }
-            catch(TypeLoadException)
-            {
-                // But it also throws a TypeLoadException on certain systems
-                Logger.WriteLine(
-                    "Ignored TypeLoadException thrown when trying to increase process priority.");
-                Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
-            }
+            // This seems to increase the accuracy of our timing loops
+            Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.RealTime;
 
             string portName = args[0];
             var baudRate = int.Parse(args[1]);

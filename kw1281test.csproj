@@ -16,6 +16,9 @@
     <Company>BitFab</Company>
     <PackageProjectUrl>https://github.com/gmenounos/kw1281test</PackageProjectUrl>
     <RepositoryUrl>https://github.com/gmenounos/kw1281test</RepositoryUrl>
+    <TrimMode>link</TrimMode>
+    <PublishTrimmed>true</PublishTrimmed>
+    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
   </PropertyGroup>
 
   <ItemGroup>
