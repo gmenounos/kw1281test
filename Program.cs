@@ -570,65 +570,39 @@ namespace BitFab.KW1281Test
                 var ecuInfo = Kwp1281Wakeup();
                 if (ecuInfo.Text.Contains("VDO"))
                 {
+                    UnlockControllerForEepromReadWrite(_kwp1281);
                     Logger.WriteLine($"SoftwareVersion: {VdoCluster.SoftwareVersion}");
-                    var partNumberMatch = Regex.Match(
-                        ecuInfo.Text,
-                        "\\b\\d[a-zA-Z]\\d9\\d{5}[a-zA-Z][a-zA-Z]?\\b");
-                    if (partNumberMatch.Success)
-                    {
-                        var modelNumber = partNumberMatch.Value[..2].ToUpper();
 
-                        // Skoda
-                        if (modelNumber == "3U" || modelNumber == "1U")
+                    var trimmedSoftwareVersion = VdoCluster.SoftwareVersion.Split(' ')[0];
+                    if (!string.IsNullOrWhiteSpace(trimmedSoftwareVersion))
+                    {
+                        switch (trimmedSoftwareVersion)
                         {
-                            switch (partNumberMatch.Value[8])
-                            {
-                              case '0':
+                            //case string v when trimmedSoftwareVersion.Contains("VWK501L"):
+                            //    // Immo3 - VWK501 low line
+                            //    var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2); // VWK501 only, VWK503=0x10A
+                            //    var buf = File.ReadAllBytes(dumpFileName);
+                            //    var skc = Utils.GetShort(buf, 0).ToString("X5");
+                            //    Logger.WriteLine($"SKC: {skc}");
+                            //    break;
+                            case string v when trimmedSoftwareVersion.Contains("VWK501"):
                                 // Immo3 - VWK501
                                 var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2); // VWK501 only, VWK503=0x10A
                                 var buf = File.ReadAllBytes(dumpFileName);
                                 var skc = Utils.GetShort(buf, 0).ToString("X5");
+                                var skcDec = Convert.ToInt32(skc, 16).ToString("D5");
                                 Logger.WriteLine($"SKC: {skc}");
                                 break;
-                              case '1':
-                              case '2':
+                            case string v when trimmedSoftwareVersion.Contains("VWK503"):
                                 // Immo3 - VWK503
                                 dumpFileName = DumpClusterEeprom(_kwp1281, 0x10A, 2); // VWK503 only
                                 buf = File.ReadAllBytes(dumpFileName);
                                 skc = Utils.GetShort(buf, 0).ToString("D5");
                                 Logger.WriteLine($"SKC: {skc}");
                                 break;
-                              default:
+                            default:
                                 Logger.WriteLine($"Cluster is non-Immo so there is no SKC.");
                                 break;
-                            }
-                        }
-                        else
-                        {
-                          switch (partNumberMatch.Value[8])
-                          {
-                            case '5':
-                              // Immo2
-                              var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0BA, 2);
-                              var buf = File.ReadAllBytes(dumpFileName);
-                              var skc = Utils.GetShort(buf, 0).ToString("X5");
-                              Logger.WriteLine($"SKC: {skc}");
-                              break;
-                            case '6':
-                            case '7':
-                            case '8':
-                            case '9':
-                              // Immo3
-                              dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2); // VWK501 only, VWK503=0x10A
-                              // var dumpFileName = DumpClusterEeprom(_kwp1281, 0x10A, 2); // VWK503 only
-                              buf = File.ReadAllBytes(dumpFileName);
-                              skc = Utils.GetShort(buf, 0).ToString("D5");
-                              Logger.WriteLine($"SKC: {skc}");
-                              break;
-                            default:
-                              Logger.WriteLine($"Cluster is non-Immo so there is no SKC.");
-                              break;
-                          }
                         }
                     }
                     else
@@ -719,7 +693,7 @@ namespace BitFab.KW1281Test
         {
             var faultCodes = kwp1281.ReadFaultCodes();
             Logger.WriteLine("Fault codes:");
-            foreach(var faultCode in faultCodes)
+            foreach (var faultCode in faultCodes)
             {
                 Logger.WriteLine($"    {faultCode}");
             }
