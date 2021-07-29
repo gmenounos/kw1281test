@@ -572,11 +572,26 @@ namespace BitFab.KW1281Test
                 {
                     var partNumberMatch = Regex.Match(
                         ecuInfo.Text,
-                        "\\b\\d[a-zA-Z]\\d9\\d{5}[a-zA-Z][a-zA-Z]?\\b");
+                        "\\b(\\d[a-zA-Z])\\d9(\\d{2})\\d{3}[a-zA-Z][a-zA-Z]?\\b");
                     if (partNumberMatch.Success)
                     {
+                        var family = partNumberMatch.Groups[1].Value;
+
+                        switch(partNumberMatch.Groups[2].Value)
+                        {
+                            case "19": // Non-CAN
+                                Logger.WriteLine($"Cluster is non-Immo so there is no SKC.");
+                                return;
+                            case "20": // CAN
+                                break;
+                            default:
+                                Logger.WriteLine($"Unknown cluster: {ecuInfo.Text}");
+                                return;
+                        }
+
                         switch (partNumberMatch.Value[8])
                         {
+                            case '0':
                             case '5':
                                 // Immo2
                                 var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0BA, 2);
