@@ -570,32 +570,41 @@ namespace BitFab.KW1281Test
                 var ecuInfo = Kwp1281Wakeup();
                 if (ecuInfo.Text.Contains("VDO"))
                 {
+                    var partNumberMatch = Regex.Match(
+                      ecuInfo.Text,
+                      "\\b(\\d[a-zA-Z])\\d9(\\d{2})\\d{3}[a-zA-Z][a-zA-Z]?\\b");
+                    if (partNumberMatch.Success)
+                    {
+                        switch (partNumberMatch.Groups[2].Value)
+                        {
+                          case "19": // Non-CAN
+                            Logger.WriteLine($"Cluster is non-Immo so there is no SKC.");
+                            return;
+                          case "20": // CAN
+                            break;
+                          default:
+                            Logger.WriteLine($"Unknown cluster: {ecuInfo.Text}");
+                            return;
+                        }
+                    }
+
                     UnlockControllerForEepromReadWrite(_kwp1281);
                     Logger.WriteLine($"SoftwareVersion: {VdoCluster.SoftwareVersion}");
-
                     var trimmedSoftwareVersion = VdoCluster.SoftwareVersion.Split(' ')[0];
                     if (!string.IsNullOrWhiteSpace(trimmedSoftwareVersion))
                     {
                         switch (trimmedSoftwareVersion)
                         {
-                            //case string v when trimmedSoftwareVersion.Contains("VWK501L"):
-                            //    // Immo3 - VWK501 low line
-                            //    var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2); // VWK501 only, VWK503=0x10A
-                            //    var buf = File.ReadAllBytes(dumpFileName);
-                            //    var skc = Utils.GetShort(buf, 0).ToString("X5");
-                            //    Logger.WriteLine($"SKC: {skc}");
-                            //    break;
                             case string v when trimmedSoftwareVersion.Contains("VWK501"):
                                 // Immo3 - VWK501
-                                var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2); // VWK501 only, VWK503=0x10A
+                                var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2, unlockedAlready: true); // VWK501 only, VWK503=0x10A
                                 var buf = File.ReadAllBytes(dumpFileName);
-                                var skc = Utils.GetShort(buf, 0).ToString("X5");
-                                var skcDec = Convert.ToInt32(skc, 16).ToString("D5");
+                                var skc = Utils.GetShort(buf, 0).ToString("D5");
                                 Logger.WriteLine($"SKC: {skc}");
                                 break;
                             case string v when trimmedSoftwareVersion.Contains("VWK503"):
                                 // Immo3 - VWK503
-                                dumpFileName = DumpClusterEeprom(_kwp1281, 0x10A, 2); // VWK503 only
+                                dumpFileName = DumpClusterEeprom(_kwp1281, 0x10A, 2, unlockedAlready: true); // VWK503 only
                                 buf = File.ReadAllBytes(dumpFileName);
                                 skc = Utils.GetShort(buf, 0).ToString("D5");
                                 Logger.WriteLine($"SKC: {skc}");
@@ -918,13 +927,16 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private string DumpClusterEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
+        private string DumpClusterEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length, bool unlockedAlready = false)
         {
             var identInfo = kwp1281.ReadIdent().First().ToString()
                 .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
                 .Replace(' ', '_').Replace(":", "");
 
-            UnlockControllerForEepromReadWrite(kwp1281);
+            if (!unlockedAlready)
+            {
+              UnlockControllerForEepromReadWrite(kwp1281);
+            }
 
             var dumpFileName = _filename ?? $"{identInfo}_${startAddress:X4}_eeprom.bin";
 
