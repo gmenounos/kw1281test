@@ -107,6 +107,12 @@ namespace BitFab.KW1281Test.Cluster
             {
                 return new[] { new byte[] { 0x02, 0x03, 0x05, 0x09 } };
             }
+            else if (
+               Enumerable.SequenceEqual(softwareVersion, ClusterVersion("SS5501LM", 0x00, 0x01)))   // 1M0920802D V05
+            {
+                //3C 34 47 35
+                return new[] { new byte[] { 0x3C, 0x34, 0x47, 0x35 } };
+            }
             else
             {
                 return _clusterUnlockCodes;

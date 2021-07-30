@@ -595,14 +595,14 @@ namespace BitFab.KW1281Test
                     {
                         switch (trimmedSoftwareVersion)
                         {
-                            case string v when trimmedSoftwareVersion.Contains("VWK501"):
+                            case string v when trimmedSoftwareVersion.Contains("501"):
                                 // Immo3 - VWK501
                                 var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2, unlockedAlready: true); // VWK501 only, VWK503=0x10A
                                 var buf = File.ReadAllBytes(dumpFileName);
                                 var skc = Utils.GetSwappedShort(buf, 0).ToString("D5");
                                 Logger.WriteLine($"SKC: {skc}");
                                 break;
-                            case string v when trimmedSoftwareVersion.Contains("VWK503"):
+                            case string v when trimmedSoftwareVersion.Contains("503"):
                                 // Immo3 - VWK503
                                 dumpFileName = DumpClusterEeprom(_kwp1281, 0x10A, 2, unlockedAlready: true); // VWK503 only
                                 buf = File.ReadAllBytes(dumpFileName);
