@@ -49,13 +49,12 @@ namespace BitFab.KW1281Test
 
         public static int GetShort(byte[] dump, int offset)
         {
-            var test = BitConverter.ToInt32(dump).ToString("D5");
-            Logger.WriteLine($"Bitconverter: {test}");
-            var revertedDump = new byte[] {dump[1], dump[0]};
-            var test2 = BitConverter.ToInt32(revertedDump).ToString("D5");
-            Logger.WriteLine($"Bitconverter reverted: {test2}");
-
             return dump[offset] + dump[offset + 1] * 256;
+        }
+
+        public static int GetSwappedShort(byte[] dump, int offset)
+        {
+            return dump[offset + 1] * 256 + dump[offset];
         }
     }
 }
