@@ -589,30 +589,17 @@ namespace BitFab.KW1281Test
                                 return;
                         }
 
-                        switch (partNumberMatch.Value[8])
+                        const int startAddress = 0x90;
+                        var dumpFileName = DumpClusterEeprom(_kwp1281, startAddress, length: 0x7C);
+                        var buf = File.ReadAllBytes(dumpFileName);
+                        var skc = VdoCluster.GetSkc(buf, startAddress);
+                        if (!string.IsNullOrEmpty(skc))
                         {
-                            case '0':
-                            case '5':
-                                // Immo2
-                                var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0BA, 2);
-                                var buf = File.ReadAllBytes(dumpFileName);
-                                var skc = Utils.GetShort(buf, 0).ToString("X5");
-                                Logger.WriteLine($"SKC: {skc}");
-                                break;
-                            case '6':
-                            case '7':
-                            case '8':
-                            case '9':
-                                // Immo3
-                                dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2); // VWK501 only, VWK503=0x10A
-                                // var dumpFileName = DumpClusterEeprom(_kwp1281, 0x10A, 2); // VWK503 only
-                                buf = File.ReadAllBytes(dumpFileName);
-                                skc = Utils.GetShort(buf, 0).ToString("D5");
-                                Logger.WriteLine($"SKC: {skc}");
-                                break;
-                            default:
-                                Logger.WriteLine($"Cluster is non-Immo so there is no SKC.");
-                                break;
+                            Logger.WriteLine($"SKC: {skc}");
+                        }
+                        else
+                        {
+                            Logger.WriteLine($"Unable to determine SKC.");
                         }
                     }
                     else
