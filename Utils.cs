@@ -50,5 +50,10 @@ namespace BitFab.KW1281Test
         {
             return dump[offset] + dump[offset + 1] * 256;
         }
+
+        public static int GetSwappedShort(byte[] dump, int offset)
+        {
+            return dump[offset + 1] * 256 + dump[offset];
+        }
     }
 }
