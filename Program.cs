@@ -571,47 +571,35 @@ namespace BitFab.KW1281Test
                 if (ecuInfo.Text.Contains("VDO"))
                 {
                     var partNumberMatch = Regex.Match(
-                      ecuInfo.Text,
-                      "\\b(\\d[a-zA-Z])\\d9(\\d{2})\\d{3}[a-zA-Z][a-zA-Z]?\\b");
+                        ecuInfo.Text,
+                        "\\b(\\d[a-zA-Z])\\d9(\\d{2})\\d{3}[a-zA-Z][a-zA-Z]?\\b");
                     if (partNumberMatch.Success)
                     {
-                        switch (partNumberMatch.Groups[2].Value)
-                        {
-                          case "19": // Non-CAN
-                            Logger.WriteLine($"Cluster is non-Immo so there is no SKC.");
-                            return;
-                          case "20": // CAN
-                            break;
-                          default:
-                            Logger.WriteLine($"Unknown cluster: {ecuInfo.Text}");
-                            return;
-                        }
-                    }
+                        var family = partNumberMatch.Groups[1].Value;
 
-                    UnlockControllerForEepromReadWrite(_kwp1281);
-                    Logger.WriteLine($"SoftwareVersion: {VdoCluster.SoftwareVersion}");
-                    var trimmedSoftwareVersion = VdoCluster.SoftwareVersion.Split(' ')[0];
-                    if (!string.IsNullOrWhiteSpace(trimmedSoftwareVersion))
-                    {
-                        switch (trimmedSoftwareVersion)
+                        switch(partNumberMatch.Groups[2].Value)
                         {
-                            case string v when trimmedSoftwareVersion.Contains("VWK501"):
-                                // Immo3 - VWK501
-                                var dumpFileName = DumpClusterEeprom(_kwp1281, 0x0CC, 2, unlockedAlready: true); // VWK501 only, VWK503=0x10A
-                                var buf = File.ReadAllBytes(dumpFileName);
-                                var skc = Utils.GetShort(buf, 0).ToString("D5");
-                                Logger.WriteLine($"SKC: {skc}");
-                                break;
-                            case string v when trimmedSoftwareVersion.Contains("VWK503"):
-                                // Immo3 - VWK503
-                                dumpFileName = DumpClusterEeprom(_kwp1281, 0x10A, 2, unlockedAlready: true); // VWK503 only
-                                buf = File.ReadAllBytes(dumpFileName);
-                                skc = Utils.GetShort(buf, 0).ToString("D5");
-                                Logger.WriteLine($"SKC: {skc}");
+                            case "19": // Non-CAN
+                                Logger.WriteLine($"Cluster is non-Immo so there is no SKC.");
+                                return;
+                            case "20": // CAN
                                 break;
                             default:
-                                Logger.WriteLine($"Cluster is non-Immo so there is no SKC.");
-                                break;
+                                Logger.WriteLine($"Unknown cluster: {ecuInfo.Text}");
+                                return;
+                        }
+
+                        const int startAddress = 0x90;
+                        var dumpFileName = DumpClusterEeprom(_kwp1281, startAddress, length: 0x7C);
+                        var buf = File.ReadAllBytes(dumpFileName);
+                        var skc = VdoCluster.GetSkc(buf, startAddress);
+                        if (!string.IsNullOrEmpty(skc))
+                        {
+                            Logger.WriteLine($"SKC: {skc}");
+                        }
+                        else
+                        {
+                            Logger.WriteLine($"Unable to determine SKC.");
                         }
                     }
                     else
@@ -702,7 +690,7 @@ namespace BitFab.KW1281Test
         {
             var faultCodes = kwp1281.ReadFaultCodes();
             Logger.WriteLine("Fault codes:");
-            foreach (var faultCode in faultCodes)
+            foreach(var faultCode in faultCodes)
             {
                 Logger.WriteLine($"    {faultCode}");
             }
@@ -927,16 +915,13 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private string DumpClusterEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length, bool unlockedAlready = false)
+        private string DumpClusterEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
         {
             var identInfo = kwp1281.ReadIdent().First().ToString()
                 .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
                 .Replace(' ', '_').Replace(":", "");
 
-            if (!unlockedAlready)
-            {
-              UnlockControllerForEepromReadWrite(kwp1281);
-            }
+            UnlockControllerForEepromReadWrite(kwp1281);
 
             var dumpFileName = _filename ?? $"{identInfo}_${startAddress:X4}_eeprom.bin";
 

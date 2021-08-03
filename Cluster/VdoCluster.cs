@@ -2,13 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace BitFab.KW1281Test.Cluster
 {
-    static class VdoCluster
+    class VdoCluster
     {
-        public static string SoftwareVersion { get; private set; }
-
         public static bool UnlockCluster(IKW1281Dialog kwp1281)
         {
             var versionBlocks = kwp1281.CustomReadSoftwareVersion();
@@ -16,7 +15,6 @@ namespace BitFab.KW1281Test.Cluster
             // Now we need to send an unlock code that is unique to each ROM version
             Logger.WriteLine("Sending Custom \"Unlock partial EEPROM read\" block");
             var softwareVersion = versionBlocks[0].Body;
-            SoftwareVersion = KW1281Dialog.DumpMixedContent(softwareVersion);
             var unlockCodes = GetClusterUnlockCodes(softwareVersion);
             var unlocked = false;
             foreach (var unlockCode in unlockCodes)
@@ -31,7 +29,8 @@ namespace BitFab.KW1281Test.Cluster
                 }
                 if (unlockResponse[0].IsAck)
                 {
-                    Logger.WriteLine($"Unlock code for software version {SoftwareVersion} is {Utils.Dump(unlockCode)}");
+                    Logger.WriteLine(
+                        $"Unlock code for software version {KW1281Dialog.DumpMixedContent(softwareVersion)} is {Utils.Dump(unlockCode)}");
                     if (unlockCodes.Length > 1)
                     {
                         Logger.WriteLine("Please report this to the program maintainer.");
@@ -46,6 +45,53 @@ namespace BitFab.KW1281Test.Cluster
                 }
             }
             return unlocked;
+        }
+
+        /// <summary>
+        /// Given a VDO cluster EEPROM dump, attempt to determine the SKC and return it if found.
+        /// </summary>
+        /// <param name="bytes">A portion of a VDO cluster EEPROM dump.</param>
+        /// <param name="startAddress">The start address of bytes within the EEPROM.</param>
+        /// <returns>The SKC or an empty string if the SKC could not be determined.</returns>
+        public static string GetSkc(byte[] bytes, int startAddress)
+        {
+            string text = Encoding.ASCII.GetString(bytes);
+
+            // There are several EEPROM formats. We can determine the format by locating the
+            // 14-character immobilizer ID and noting its offset in the dump.
+
+            var immoMatch = Regex.Match(
+                text,
+                @"[A-Z]{2}Z\dZ0[A-Z]\d{7}");
+            if (!immoMatch.Success)
+            {
+                Logger.WriteLine("GetSkc: Unable to find Immobilizer ID in cluster dump.");
+                return "";
+            }
+
+            int skc;
+            var index = immoMatch.Index + startAddress;
+
+            switch (index)
+            {
+                case 0x090:
+                case 0x0AC:
+                    // Immo2
+                    skc = Utils.GetShort(bytes, 0x0BA - startAddress);
+                    return $"{skc:X5}";
+                case 0x0A2:
+                    // VWK501
+                    skc = Utils.GetShort(bytes, 0x0CC - startAddress);
+                    return $"{skc:D5}";
+                case 0x0E0:
+                    // VWK503
+                    skc = Utils.GetShort(bytes, 0x10A - startAddress);
+                    return $"{skc:D5}";
+                default:
+                    Logger.WriteLine(
+                        $"GetSkc: Unknown EEPROM (Immobilizer offset: 0x{immoMatch.Index:X3})");
+                    return "";
+            }
         }
 
         /// <summary>
