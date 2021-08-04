@@ -112,7 +112,8 @@ namespace BitFab.KW1281Test.Cluster
             }
             else if (
                 Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK501MH", 0x00, 0x01)) ||
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK501LL", 0x00, 0x01)))
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK501LL", 0x00, 0x01)) ||
+                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK501LL", 0x88, 0x00))) // 1J0920906L V58
             {
                 return new[] { new byte[] { 0x36, 0x3D, 0x3E, 0x47 } };
             }
