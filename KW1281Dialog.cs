@@ -358,36 +358,7 @@ namespace BitFab.KW1281Test
                 return "NAK";
             }
 
-            return DumpMixedContent(block.Body);
-        }
-
-        /// <summary>
-        /// Todo: Move to utility class
-        /// </summary>
-        public static string DumpMixedContent(IEnumerable<byte> content)
-        {
-            char mode = '?';
-            var sb = new StringBuilder();
-            foreach (var b in content)
-            {
-                if (b >= 32 && b <= 126)
-                {
-                    mode = 'A';
-
-                    sb.Append((char)b);
-                }
-                else
-                {
-                    if (mode == 'A')
-                    {
-                        sb.Append(' ');
-                    }
-                    mode = 'X';
-
-                    sb.Append($"${b:X2} ");
-                }
-            }
-            return sb.ToString();
+            return Utils.DumpMixedContent(block.Body);
         }
 
         private static string DumpBinaryContent(Block block)

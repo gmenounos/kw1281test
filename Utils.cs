@@ -26,6 +26,32 @@ namespace BitFab.KW1281Test
             return sb.ToString();
         }
 
+        public static string DumpMixedContent(IEnumerable<byte> content)
+        {
+            char mode = '?';
+            var sb = new StringBuilder();
+            foreach (var b in content)
+            {
+                if (b >= 32 && b <= 126)
+                {
+                    mode = 'A';
+
+                    sb.Append((char)b);
+                }
+                else
+                {
+                    if (mode == 'A')
+                    {
+                        sb.Append(' ');
+                    }
+                    mode = 'X';
+
+                    sb.Append($"${b:X2} ");
+                }
+            }
+            return sb.ToString();
+        }
+
         public static uint ParseUint(string numberString)
         {
             uint number;

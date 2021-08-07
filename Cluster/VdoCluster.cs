@@ -14,7 +14,7 @@ namespace BitFab.KW1281Test.Cluster
 
             // Now we need to send an unlock code that is unique to each ROM version
             Logger.WriteLine("Sending Custom \"Unlock partial EEPROM read\" block");
-            var softwareVersion = versionBlocks[0].Body;
+            var softwareVersion = SoftwareVersionToString(versionBlocks[0].Body);
             var unlockCodes = GetClusterUnlockCodes(softwareVersion);
             var unlocked = false;
             foreach (var unlockCode in unlockCodes)
@@ -30,7 +30,7 @@ namespace BitFab.KW1281Test.Cluster
                 if (unlockResponse[0].IsAck)
                 {
                     Logger.WriteLine(
-                        $"Unlock code for software version {KW1281Dialog.DumpMixedContent(softwareVersion)} is {Utils.Dump(unlockCode)}");
+                        $"Unlock code for software version {softwareVersion} is {Utils.Dump(unlockCode)}");
                     if (unlockCodes.Length > 1)
                     {
                         Logger.WriteLine("Please report this to the program maintainer.");
@@ -98,71 +98,57 @@ namespace BitFab.KW1281Test.Cluster
         /// Different cluster models have different unlock codes. Return the appropriate one based
         /// on the cluster's software version.
         /// </summary>
-        private static byte[][] GetClusterUnlockCodes(List<byte> softwareVersion)
+        private static byte[][] GetClusterUnlockCodes(string softwareVersion)
         {
-            if (
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("MPV501MH", 0x00, 0x01))) // 7M3920820H V57
+            return softwareVersion switch
             {
-                return new[] { new byte[] { 0x38, 0x47, 0x34, 0x3A } };
-            }
-            else if (
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK501MH", 0x10, 0x01)))
+                "MPV501MH 01.00" => ToArray(0x38, 0x47, 0x34, 0x3A), // 7M3920820H V57
+
+                "VWK501MH 01.10" => ToArray(0x39, 0x34, 0x34, 0x40),
+
+                "VWK501MH 01.00" or
+                "VWK501LL 01.00" or
+                "VWK501LL 00.88" => ToArray(0x36, 0x3D, 0x3E, 0x47), // 1J0920906L V58
+
+                "VWK503LL 09.00" or
+                "VWK503MH 09.00" => ToArray(0x3E, 0x35, 0x3D, 0x3A), // 1J0920927 V02
+
+                "VBKX00MH 01.00" => ToArray(0x3A, 0x39, 0x31, 0x43),
+
+                "V599HLA  00.91" or // 7D0920841A V18
+                "V599LLA  01.00" or // 1J0920800L V59
+                "V599LLA  03.00" or // 1J0920900J V60
+                "V599LLA  00.91" or // 7D0920801B V18
+                "V599MLA  01.00" => ToArray(0x38, 0x3F, 0x40, 0x35), // 7D0920821D V22
+
+                "VAT500LL 01.20" or // 1J0920905L V01
+                "VAT500MH 01.10" or // 1J0920925D V06
+                "VAT500MH 01.20" => ToArray(0x01, 0x04, 0x3D, 0x35), // 1J5920925C V09
+
+                "VMMJ08MH 09.00" => ToArray(0x3E, 0x47, 0x3D, 0x48), // 1J5920826L V75
+
+                "V798MLA  01.00" => ToArray(0x02, 0x03, 0x05, 0x09), // 7D0920800F V01
+
+                "SS5501LM 01.00" => ToArray(0x3C, 0x34, 0x47, 0x35), // 1M0920802D V05
+
+                _ => _clusterUnlockCodes,
+            };
+        }
+
+        private static string SoftwareVersionToString(List<byte> versionBytes)
+        {
+            if (versionBytes.Count != 10)
             {
-                return new[] { new byte[] { 0x39, 0x34, 0x34, 0x40 } };
+                return Utils.DumpMixedContent(versionBytes);
             }
-            else if (
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK501MH", 0x00, 0x01)) ||
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK501LL", 0x00, 0x01)) ||
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK501LL", 0x88, 0x00))) // 1J0920906L V58
-            {
-                return new[] { new byte[] { 0x36, 0x3D, 0x3E, 0x47 } };
-            }
-            else if (
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK503LL", 0x00, 0x09)) ||
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VWK503MH", 0x00, 0x09))) // 1J0920927 V02
-            {
-                return new[] { new byte[] { 0x3E, 0x35, 0x3D, 0x3A } };
-            }
-            else if (
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VBKX00MH", 0x00, 0x01)))
-            {
-                return new[] { new byte[] { 0x3A, 0x39, 0x31, 0x43 } };
-            }
-            else if (
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("V599HLA ", 0x91, 0x00)) || // 7D0920841A V18
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("V599LLA ", 0x00, 0x01)) || // 1J0920800L V59
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("V599LLA ", 0x00, 0x03)) || // 1J0920900J V60
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("V599LLA ", 0x91, 0x00)) || // 7D0920801B V18
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("V599MLA ", 0x00, 0x01)))   // 7D0920821D V22
-            {
-                return new[] { new byte[] { 0x38, 0x3F, 0x40, 0x35 } };
-            }
-            else if (
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500LL", 0x20, 0x01)) || // 1J0920905L V01
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500MH", 0x10, 0x01)) || // 1J0920925D V06
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VAT500MH", 0x20, 0x01)))   // 1J5920925C V09
-            {
-                return new[] { new byte[] { 0x01, 0x04, 0x3D, 0x35 } };
-            }
-            else if (
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("VMMJ08MH", 0x00, 0x09)))   // 1J5920826L V75
-            {
-                return new[] { new byte[] { 0x3E, 0x47, 0x3D, 0x48 } };
-            }
-            else if (
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("V798MLA ", 0x00, 0x01)))   // 7D0920800F V01
-            {
-                return new[] { new byte[] { 0x02, 0x03, 0x05, 0x09 } };
-            }
-            else if (
-                Enumerable.SequenceEqual(softwareVersion, ClusterVersion("SS5501LM", 0x00, 0x01)))   // 1M0920802D V05
-            {
-                return new[] { new byte[] { 0x3C, 0x34, 0x47, 0x35 } };
-            }
-            else
-            {
-                return _clusterUnlockCodes;
-            }
+
+            var asciiPart = Encoding.ASCII.GetString(versionBytes.Take(8).ToArray());
+            return $"{asciiPart} {versionBytes[9]:X2}.{versionBytes[8]:X2}";
+        }
+
+        private static byte[][] ToArray(byte v1, byte v2, byte v3, byte v4)
+        {
+            return new[] { new byte[] { v1, v2, v3, v4 } };
         }
 
         private static IEnumerable<byte> ClusterVersion(
