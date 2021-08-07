@@ -36,6 +36,7 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
     ADDRESS = The controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
     COMMAND =
         ActuatorTest
+        ClarionVWPremium4SafeCode
         ClearFaultCodes
         DelcoVWPremium5SafeCode
         DumpCcmRom

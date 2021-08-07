@@ -163,6 +163,11 @@ namespace BitFab.KW1281Test
                     ActuatorTest(_kwp1281);
                     break;
 
+                case "clarionvwpremium4safecode":
+                    Kwp1281Wakeup();
+                    ClarionVWPremium4SafeCode(_kwp1281);
+                    break;
+
                 case "clearfaultcodes":
                     Kwp1281Wakeup();
                     ClearFaultCodes(_kwp1281);
@@ -357,6 +362,37 @@ namespace BitFab.KW1281Test
                 } while (keyInfo.Key != ConsoleKey.N && keyInfo.Key != ConsoleKey.Q);
                 Console.WriteLine();
             } while (keyInfo.Key != ConsoleKey.Q);
+        }
+
+        private void ClarionVWPremium4SafeCode(IKW1281Dialog kwp1281)
+        {
+            if (_controllerAddress != (int)ControllerAddress.Radio)
+            {
+                Logger.WriteLine("Only supported for radio address 56");
+                return;
+            }
+
+            // Thanks to Mike Naberezny for this (https://github.com/mnaberez)
+            const byte readWriteSafeCode = 0xF0;
+            const byte read = 0x00;
+            kwp1281.SendBlock(new List<byte> { readWriteSafeCode, read });
+
+            var block = kwp1281.ReceiveBlocks().FirstOrDefault(b => !b.IsAckNak);
+
+            if (block == null)
+            {
+                Logger.WriteLine("No response received from radio.");
+            }
+            else if (block.Title != readWriteSafeCode)
+            {
+                Logger.WriteLine(
+                    $"Unexpected response received from radio. Block title: ${block.Title:X2}");
+            }
+            else
+            {
+                var safeCode = block.Body[0] * 256 + block.Body[1];
+                Logger.WriteLine($"Safe code: {safeCode:D4}");
+            }
         }
 
         private void ClearFaultCodes(IKW1281Dialog kwp1281)
@@ -985,18 +1021,19 @@ namespace BitFab.KW1281Test
     ADDRESS = The controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
     COMMAND =
         ActuatorTest
+        ClarionVWPremium4SafeCode
         ClearFaultCodes
         DelcoVWPremium5SafeCode
-        DumpMarelliMem START LENGTH [FILENAME]
-            START = Start address in decimal (e.g. 3072) or hex (e.g. $C00)
-            LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
-            FILENAME = Optional filename
         DumpCcmRom
         DumpEdc15Eeprom [FILENAME]
             FILENAME = Optional filename
         DumpEeprom START LENGTH [FILENAME]
             START = Start address in decimal (e.g. 0) or hex (e.g. $0)
             LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)
+            FILENAME = Optional filename
+        DumpMarelliMem START LENGTH [FILENAME]
+            START = Start address in decimal (e.g. 3072) or hex (e.g. $C00)
+            LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
             FILENAME = Optional filename
         DumpMem START LENGTH [FILENAME]
             START = Start address in decimal (e.g. 8192) or hex (e.g. $2000)

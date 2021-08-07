@@ -38,6 +38,8 @@ namespace BitFab.KW1281Test
 
         void SendBlock(List<byte> blockBytes);
 
+        List<Block> ReceiveBlocks();
+
         List<Block> SendCustom(List<byte> blockCustomBytes);
 
         List<byte> ReadCcmRom(byte seg, byte msb, byte lsb, byte count);
@@ -451,7 +453,7 @@ namespace BitFab.KW1281Test
             KwpCommon.WriteByte(0x03); // Block end, does not get ACK'd
         }
 
-        private List<Block> ReceiveBlocks()
+        public List<Block> ReceiveBlocks()
         {
             var blocks = new List<Block>();
 
