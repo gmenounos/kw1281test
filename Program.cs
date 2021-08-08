@@ -391,7 +391,7 @@ namespace BitFab.KW1281Test
             else
             {
                 var safeCode = block.Body[0] * 256 + block.Body[1];
-                Logger.WriteLine($"Safe code: {safeCode:D4}");
+                Logger.WriteLine($"Safe code: {safeCode:X4}");
             }
         }
 

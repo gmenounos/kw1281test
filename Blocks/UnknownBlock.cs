@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace BitFab.KW1281Test.Blocks
 {
@@ -12,7 +11,7 @@ namespace BitFab.KW1281Test.Blocks
 
         private void Dump()
         {
-            Logger.Write("Received unknown block:");
+            Logger.Write($"Received ${Title:X2} block:");
             foreach (var b in Bytes)
             {
                 Logger.Write($" 0x{b:X2}");
