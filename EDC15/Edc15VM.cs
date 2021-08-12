@@ -92,9 +92,8 @@ namespace BitFab.KW1281Test.EDC15
                 eeprom.Add(b);
             }
 
-            var dumpFileName = filename ?? $"EDC15_EEPROM.bin";
-            File.WriteAllBytes(dumpFileName, eeprom.ToArray());
-            Logger.WriteLine($"Saved EEPROM to {dumpFileName}");
+            File.WriteAllBytes(filename, eeprom.ToArray());
+            Logger.WriteLine($"Saved EEPROM to {filename}");
 
             resp = kwp2000.ReceiveMessage();
 

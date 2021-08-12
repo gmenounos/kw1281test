@@ -38,10 +38,18 @@ namespace BitFab.KW1281Test
 
         void Run(string[] args)
         {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write("KW1281Test: Yesterday's diagnostics...");
+            Thread.Sleep(2000);
+            Console.WriteLine("Today.");
+            Thread.Sleep(2000);
+            Console.ResetColor();
+            Console.WriteLine();
+
             var version = GetType().GetTypeInfo().Assembly
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
                 .InformationalVersion;
-            Logger.WriteLine($"KW1281Test {version} (https://github.com/gmenounos/kw1281test/releases)");
+            Logger.WriteLine($"Version {version} (https://github.com/gmenounos/kw1281test/releases)");
             Logger.WriteLine($"Args: {string.Join(' ', args)}");
             Logger.WriteLine($"OSVersion: {Environment.OSVersion}");
             Logger.WriteLine($".NET Version: {Environment.Version}");
@@ -528,7 +536,7 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private void DumpEdc15Eeprom()
+        private string DumpEdc15Eeprom()
         {
             Kwp1281Wakeup();
             _kwp1281.EndCommunication();
@@ -546,9 +554,14 @@ namespace BitFab.KW1281Test
             Console.WriteLine($"KW Version: {kwpVersion}");
 
             var edc15 = new Edc15VM(_kwpCommon, _controllerAddress);
-            edc15.DumpEeprom(_filename);
+
+            var dumpFileName = _filename ?? $"EDC15_EEPROM.bin";
+
+            edc15.DumpEeprom(dumpFileName);
 
             _kwp1281 = null;
+
+            return dumpFileName;
         }
 
         private void DumpEeprom(IKW1281Dialog kwp1281, uint address, uint length)
@@ -668,8 +681,14 @@ namespace BitFab.KW1281Test
             }
             else if (_controllerAddress == (int)ControllerAddress.Ecu)
             {
-                // 038906012GN
-                Logger.WriteLine("Not supported for ECUs yet.");
+                var dumpFileName = DumpEdc15Eeprom();
+                var buf = File.ReadAllBytes(dumpFileName);
+                var skc = Utils.GetShort(buf, 0x012E).ToString("D5");
+                var immo1 = buf[0x1B0];
+                var immo2 = buf[0x1DE];
+                var immoStatus = immo1 == 0x60 && immo2 == 0x60 ? "Off" : "On";
+                Logger.WriteLine($"SKC: {skc}");
+                Logger.WriteLine($"Immo is {immoStatus} (${immo1:X2}, ${immo2:X2})");
             }
             else
             {
