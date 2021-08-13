@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -7,30 +8,37 @@ namespace BitFab.KW1281Test.Cluster
 {
     class MarelliCluster
     {
-        public static void DumpMem(
+        /// <summary>
+        /// Dumps memory from a Marelli cluster to a file.
+        /// </summary>
+        public static byte[] DumpMem(
             IKW1281Dialog kwp1281,
-            ControllerInfo ecuInfo,
-            string filename,
-            ushort address, ushort count)
+            string ecuInfo,
+            string? filename = null,
+            ushort? address = null, ushort? count = null)
         {
             byte entryH; // High byte of code entry point
             byte regBlockH; // High byte of register block
 
             if (
-                ecuInfo.Text.Contains("M73 V07")    // Beetle 1C0920901C
+                ecuInfo.Contains("M73 V07")    // Beetle 1C0920901C
                 )
             {
                 entryH = 0x02;
                 regBlockH = 0x08;
+                address ??= 3072;
+                count ??= 1024;
             }
             else if (
-                ecuInfo.Text.Contains("M73 V08") || // Beetle 1C0920921G
-                ecuInfo.Text.Contains("M73 D14") || // Audi TT 8N2920980A
-                ecuInfo.Text.Contains("M73 D55")    // Audi TT 8N2920930C
+                ecuInfo.Contains("M73 V08") || // Beetle 1C0920921G
+                ecuInfo.Contains("M73 D14") || // Audi TT 8N2920980A
+                ecuInfo.Contains("M73 D55")    // Audi TT 8N2920930C
                 )
             {
                 entryH = 0x18;
                 regBlockH = 0x20;
+                address ??= 14336;
+                count ??= 2048;
             }
             else if (address == 3072 && count == 1024)
             {
@@ -49,8 +57,10 @@ namespace BitFab.KW1281Test.Cluster
             else
             {
                 Logger.WriteLine("Unsupported cluster software version");
-                return;
+                return Array.Empty<byte>();
             }
+
+            filename ??= $"marelli_mem_${address:X4}.bin";
 
             Logger.WriteLine("Sending block 0x6C");
             kwp1281.SendBlock(new List<byte> { 0x6C });
@@ -65,7 +75,7 @@ namespace BitFab.KW1281Test.Cluster
             };
             if (!WriteMarelliBlockAndReadAck(kwp1281.KwpCommon, data))
             {
-                return;
+                return Array.Empty<byte>();
             }
 
             // Now we write a small memory dump program to the 68HC12 processor
@@ -125,7 +135,7 @@ namespace BitFab.KW1281Test.Cluster
             };
             if (!WriteMarelliBlockAndReadAck(kwp1281.KwpCommon, program))
             {
-                return;
+                return Array.Empty<byte>();
             }
 
             Logger.WriteLine("Receiving memory dump");
@@ -137,12 +147,12 @@ namespace BitFab.KW1281Test.Cluster
                 mem.Add(b);
             }
 
-            var dumpFileName = filename ?? $"marelli_mem_${address:X4}.bin";
-
-            File.WriteAllBytes(dumpFileName, mem.ToArray());
-            Logger.WriteLine($"Saved memory dump to {dumpFileName}");
+            File.WriteAllBytes(filename, mem.ToArray());
+            Logger.WriteLine($"Saved memory dump to {filename}");
 
             Logger.WriteLine("Done");
+
+            return mem.ToArray();
         }
 
         private static bool WriteMarelliBlockAndReadAck(IKwpCommon kwpCommon, byte[] data)

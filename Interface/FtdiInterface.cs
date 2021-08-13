@@ -7,7 +7,7 @@ namespace BitFab.KW1281Test.Interface
 {
     class FtdiInterface : IInterface
     {
-        private FT _ft = null;
+        private FT? _ft = null;
         private IntPtr _handle = IntPtr.Zero;
         private readonly byte[] _buf = new byte[1];
 
@@ -126,23 +126,23 @@ namespace BitFab.KW1281Test.Interface
 
         // Delegates used to call into the FTID D2xx DLL
 #pragma warning disable CS0649
-        private readonly FTDll.SetVidPid _setVidPid;
-        private readonly FTDll.OpenBySerialNumber _openBySerialNumber;
-        private readonly FTDll.Close _close;
-        private readonly FTDll.SetBaudRate _setBaudRate;
-        private readonly FTDll.SetDataCharacteristics _setDataCharacteristics;
-        private readonly FTDll.SetFlowControl _setFlowControl;
-        private readonly FTDll.SetDtr _setDtr;
-        private readonly FTDll.ClrDtr _clrDtr;
-        private readonly FTDll.SetRts _setRts;
-        private readonly FTDll.ClrRts _clrRts;
-        private readonly FTDll.SetTimeouts _setTimeouts;
-        private readonly FTDll.SetLatencyTimer _setLatencyTimer;
-        private readonly FTDll.Purge _purge;
-        private readonly FTDll.SetBreakOn _setBreakOn;
-        private readonly FTDll.SetBreakOff _setBreakOff;
-        private readonly FTDll.Read _read;
-        private readonly FTDll.Write _write;
+        private readonly FTDll.SetVidPid? _setVidPid;
+        private readonly FTDll.OpenBySerialNumber? _openBySerialNumber;
+        private readonly FTDll.Close? _close;
+        private readonly FTDll.SetBaudRate? _setBaudRate;
+        private readonly FTDll.SetDataCharacteristics? _setDataCharacteristics;
+        private readonly FTDll.SetFlowControl? _setFlowControl;
+        private readonly FTDll.SetDtr? _setDtr;
+        private readonly FTDll.ClrDtr? _clrDtr;
+        private readonly FTDll.SetRts? _setRts;
+        private readonly FTDll.ClrRts? _clrRts;
+        private readonly FTDll.SetTimeouts? _setTimeouts;
+        private readonly FTDll.SetLatencyTimer? _setLatencyTimer;
+        private readonly FTDll.Purge? _purge;
+        private readonly FTDll.SetBreakOn? _setBreakOn;
+        private readonly FTDll.SetBreakOff? _setBreakOff;
+        private readonly FTDll.Read? _read;
+        private readonly FTDll.Write? _write;
 #pragma warning restore CS0649
 
         public FT()

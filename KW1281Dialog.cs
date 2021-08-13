@@ -21,7 +21,7 @@ namespace BitFab.KW1281Test
 
         List<ControllerIdent> ReadIdent();
 
-        List<byte> ReadEeprom(ushort address, byte count);
+        List<byte>? ReadEeprom(ushort address, byte count);
 
         bool WriteEeprom(ushort address, List<byte> values);
 
@@ -42,7 +42,7 @@ namespace BitFab.KW1281Test
 
         List<Block> SendCustom(List<byte> blockCustomBytes);
 
-        List<byte> ReadCcmRom(byte seg, byte msb, byte lsb, byte count);
+        List<byte>? ReadCcmRom(byte seg, byte msb, byte lsb, byte count);
 
         List<byte> CustomReadNecRom(ushort address, byte count);
 
@@ -51,9 +51,9 @@ namespace BitFab.KW1281Test
         /// </summary>
         void KeepAlive();
 
-        ActuatorTestResponseBlock ActuatorTest(byte value);
+        ActuatorTestResponseBlock? ActuatorTest(byte value);
 
-        List<FaultCode> ReadFaultCodes();
+        List<FaultCode>? ReadFaultCodes();
 
         /// <summary>
         /// Clear all of the controllers fault codes.
@@ -126,7 +126,7 @@ namespace BitFab.KW1281Test
         /// <param name="address"></param>
         /// <param name="count"></param>
         /// <returns>The bytes or null if the bytes could not be read</returns>
-        public List<byte> ReadEeprom(ushort address, byte count)
+        public List<byte>? ReadEeprom(ushort address, byte count)
         {
             Logger.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
             SendBlock(new List<byte>
@@ -160,7 +160,7 @@ namespace BitFab.KW1281Test
         /// <param name="lsb">0-255</param>
         /// <param name="count">8(-12?)</param>
         /// <returns>The bytes or null if the bytes could not be read</returns>
-        public List<byte> ReadCcmRom(byte seg, byte msb, byte lsb, byte count)
+        public List<byte>? ReadCcmRom(byte seg, byte msb, byte lsb, byte count)
         {
             Logger.WriteLine(
                 $"Sending ReadEeprom block (Address: ${seg:X2}{msb:X2}{lsb:X2}, Count: ${count:X2})");
@@ -525,7 +525,7 @@ namespace BitFab.KW1281Test
             }
         }
 
-        public ActuatorTestResponseBlock ActuatorTest(byte value)
+        public ActuatorTestResponseBlock? ActuatorTest(byte value)
         {
             Logger.WriteLine($"Sending actuator test 0x{value:X2} block");
             SendBlock(new List<byte>
@@ -552,7 +552,7 @@ namespace BitFab.KW1281Test
             return (ActuatorTestResponseBlock)block;
         }
 
-        public List<FaultCode> ReadFaultCodes()
+        public List<FaultCode>? ReadFaultCodes()
         {
             Logger.WriteLine($"Sending ReadFaultCodes block");
             SendBlock(new List<byte>
@@ -663,7 +663,7 @@ namespace BitFab.KW1281Test
     {
         private readonly IKW1281Dialog _kw1281Dialog;
         private volatile bool _cancel = false;
-        private Task _keepAliveTask = null;
+        private Task? _keepAliveTask = null;
 
         public KW1281KeepAlive(IKW1281Dialog kw1281Dialog)
         {

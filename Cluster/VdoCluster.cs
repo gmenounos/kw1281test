@@ -52,8 +52,8 @@ namespace BitFab.KW1281Test.Cluster
         /// </summary>
         /// <param name="bytes">A portion of a VDO cluster EEPROM dump.</param>
         /// <param name="startAddress">The start address of bytes within the EEPROM.</param>
-        /// <returns>The SKC or an empty string if the SKC could not be determined.</returns>
-        public static string GetSkc(byte[] bytes, int startAddress)
+        /// <returns>The SKC or null if the SKC could not be determined.</returns>
+        public static short? GetSkc(byte[] bytes, int startAddress)
         {
             string text = Encoding.ASCII.GetString(bytes);
 
@@ -66,10 +66,10 @@ namespace BitFab.KW1281Test.Cluster
             if (!immoMatch.Success)
             {
                 Logger.WriteLine("GetSkc: Unable to find Immobilizer ID in cluster dump.");
-                return "";
+                return null;
             }
 
-            int skc;
+            short skc;
             var index = immoMatch.Index + startAddress;
 
             switch (index)
@@ -78,19 +78,19 @@ namespace BitFab.KW1281Test.Cluster
                 case 0x0AC:
                     // Immo2
                     skc = Utils.GetShort(bytes, 0x0BA - startAddress);
-                    return $"{skc:X5}";
+                    return skc;
                 case 0x0A2:
                     // VWK501
                     skc = Utils.GetShort(bytes, 0x0CC - startAddress);
-                    return $"{skc:D5}";
+                    return skc;
                 case 0x0E0:
                     // VWK503
                     skc = Utils.GetShort(bytes, 0x10A - startAddress);
-                    return $"{skc:D5}";
+                    return skc;
                 default:
                     Logger.WriteLine(
                         $"GetSkc: Unknown EEPROM (Immobilizer offset: 0x{immoMatch.Index:X3})");
-                    return "";
+                    return null;
             }
         }
 

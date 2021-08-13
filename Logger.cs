@@ -33,6 +33,6 @@ namespace BitFab.KW1281Test
             _writer.Write(message);
         }
 
-        private static StreamWriter _writer;
+        private static StreamWriter? _writer;
     }
 }

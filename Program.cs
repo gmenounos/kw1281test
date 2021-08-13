@@ -207,15 +207,7 @@ namespace BitFab.KW1281Test
 
                 case "dumpmarellimem":
                     var ecuInfo = Kwp1281Wakeup();
-                    if (_controllerAddress != (int)ControllerAddress.Cluster)
-                    {
-                        Logger.WriteLine("Only supported for clusters");
-                    }
-                    else
-                    {
-                        MarelliCluster.DumpMem(
-                            _kwp1281, ecuInfo, _filename, (ushort)address, (ushort)length);
-                    }
+                    DumpMarelliMem(address, length, ecuInfo);
                     return;
 
                 case "dumpmem":
@@ -581,6 +573,20 @@ namespace BitFab.KW1281Test
             }
         }
 
+        private void DumpMarelliMem(uint address, uint length, ControllerInfo ecuInfo)
+        {
+            if (_controllerAddress != (int)ControllerAddress.Cluster)
+            {
+                Logger.WriteLine("Only supported for clusters");
+            }
+            else
+            {
+                MarelliCluster.DumpMem(
+                    _kwp1281, ecuInfo.Text, _filename, (ushort)address, (ushort)length);
+                _kwp1281 = null; // Don't try to send EndCommunication block
+            }
+        }
+
         private void DumpMem(IKW1281Dialog kwp1281, uint address, uint length)
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
@@ -642,9 +648,9 @@ namespace BitFab.KW1281Test
                         var dumpFileName = DumpClusterEeprom(_kwp1281, startAddress, length: 0x7C);
                         var buf = File.ReadAllBytes(dumpFileName);
                         var skc = VdoCluster.GetSkc(buf, startAddress);
-                        if (!string.IsNullOrEmpty(skc))
+                        if (skc.HasValue)
                         {
-                            Logger.WriteLine($"SKC: {skc}");
+                            Logger.WriteLine($"SKC: {skc:D5}");
                         }
                         else
                         {
@@ -666,13 +672,27 @@ namespace BitFab.KW1281Test
                     var dumpFileName = DumpRB8Eeprom(
                         Kwp2000Wakeup(evenParityWakeup: true), 0x1040E, 2);
                     var buf = File.ReadAllBytes(dumpFileName);
-                    var skc = Utils.GetShort(buf, 0).ToString("D5");
-                    Logger.WriteLine($"SKC: {skc}");
+                    var skc = Utils.GetShort(buf, 0);
+                    Logger.WriteLine($"SKC: {skc:D5}");
                 }
                 else if (ecuInfo.Text.Contains("M73"))
                 {
-                    // TODO: Marelli
-                    Console.WriteLine($"Unsupported cluster: {ecuInfo.Text}");
+                    var buf = MarelliCluster.DumpMem(_kwp1281, ecuInfo.Text);
+                    _kwp1281 = null; // Don't try to send EndCommunication block
+                    if (buf.Length == 0x400)
+                    {
+                        var skc = Utils.GetShortBE(buf, 0x313);
+                        Logger.WriteLine($"SKC: {skc:D5}");
+                    }
+                    else if (buf.Length == 0x800)
+                    {
+                        var skc = Utils.GetShortBE(buf, 0x348);
+                        Logger.WriteLine($"SKC: {skc:D5}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Unsupported cluster: {ecuInfo.Text}");
+                    }
                 }
                 else
                 {
@@ -683,11 +703,11 @@ namespace BitFab.KW1281Test
             {
                 var dumpFileName = DumpEdc15Eeprom();
                 var buf = File.ReadAllBytes(dumpFileName);
-                var skc = Utils.GetShort(buf, 0x012E).ToString("D5");
+                var skc = Utils.GetShort(buf, 0x012E);
                 var immo1 = buf[0x1B0];
                 var immo2 = buf[0x1DE];
                 var immoStatus = immo1 == 0x60 && immo2 == 0x60 ? "Off" : "On";
-                Logger.WriteLine($"SKC: {skc}");
+                Logger.WriteLine($"SKC: {skc:D5}");
                 Logger.WriteLine($"Immo is {immoStatus} (${immo1:X2}, ${immo2:X2})");
             }
             else
@@ -1081,9 +1101,9 @@ namespace BitFab.KW1281Test
             VALUE = Value in decimal (e.g. 138) or hex (e.g. $8A)");
         }
 
-        private IKwpCommon _kwpCommon;
+        private IKwpCommon? _kwpCommon;
         private int _controllerAddress;
-        private string _filename = null;
-        private KW1281Dialog _kwp1281;
+        private string? _filename = null;
+        private KW1281Dialog? _kwp1281;
     }
 }

@@ -69,7 +69,7 @@ namespace BitFab.KW1281Test
 
         private byte[] ReadMemoryByAddress(uint address, byte count)
         {
-            var addressBytes = BitConverter.GetBytes(address);
+            var addressBytes = Utils.GetBytes(address);
 
             var responseMessage = SendReceive(Service.readMemoryByAddress,
                 new byte[]

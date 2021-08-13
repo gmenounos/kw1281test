@@ -72,9 +72,38 @@ namespace BitFab.KW1281Test
             return number;
         }
 
-        public static int GetShort(byte[] dump, int offset)
+        /// <summary>
+        /// Little-Endian
+        /// </summary>
+        public static short GetShort(byte[] buf, int offset)
         {
-            return dump[offset] + dump[offset + 1] * 256;
+            return (short)(buf[offset] + buf[offset + 1] * 256);
+        }
+
+        /// <summary>
+        /// Big-Endian version of GetShort
+        /// </summary>
+        public static short GetShortBE(byte[] buf, int offset)
+        {
+            return (short)(buf[offset] * 256 + buf[offset + 1]);
+        }
+
+        /// <summary>
+        /// Little-Endian
+        /// </summary>
+        public static byte[] GetBytes(uint value)
+        {
+            var bytes = new byte[4];
+
+            bytes[0] = (byte)(value & 0xFF);
+            value >>= 8;
+            bytes[1] = (byte)(value & 0xFF);
+            value >>= 8;
+            bytes[2] = (byte)(value & 0xFF);
+            value >>= 8;
+            bytes[3] = (byte)(value);
+
+            return bytes;
         }
     }
 }
