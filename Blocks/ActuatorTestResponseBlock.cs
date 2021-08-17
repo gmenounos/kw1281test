@@ -14,9 +14,9 @@ namespace BitFab.KW1281Test.Blocks
             get
             {
                 var id = Utils.Dump(Body).Trim();
-                if (_idToName.TryGetValue(id, out string name))
+                if (_idToName.TryGetValue(id, out string? name))
                 {
-                    return name;
+                    return name!;
                 }
                 return id;
             }

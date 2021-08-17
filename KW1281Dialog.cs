@@ -17,7 +17,7 @@ namespace BitFab.KW1281Test
 
         void EndCommunication();
 
-        void Login(ushort code, ushort workshopCode, byte unknown = 0x00);
+        void Login(ushort code, int workshopCode);
 
         List<ControllerIdent> ReadIdent();
 
@@ -26,6 +26,12 @@ namespace BitFab.KW1281Test
         bool WriteEeprom(ushort address, List<byte> values);
 
         List<byte> ReadRomEeprom(ushort address, byte count);
+
+        bool AdaptationRead(byte channelNumber);
+
+        bool AdaptationTest(byte channelNumber, ushort channelValue);
+
+        bool AdaptationSave(byte channelNumber, ushort channelValue);
 
         /// <summary>
         /// http://www.maltchev.com/kiti/VAG_guide.txt
@@ -82,7 +88,7 @@ namespace BitFab.KW1281Test
             return new ControllerInfo(blocks.Where(b => !b.IsAckNak));
         }
 
-        public void Login(ushort code, ushort workshopCode, byte unknown)
+        public void Login(ushort code, int workshopCode)
         {
             Logger.WriteLine("Sending Login block");
             SendBlock(new List<byte>
@@ -90,8 +96,8 @@ namespace BitFab.KW1281Test
                 (byte)BlockTitle.Login,
                 (byte)(code >> 8),
                 (byte)(code & 0xFF),
-                unknown,
-                (byte)(workshopCode >> 8),
+                (byte)(workshopCode >> 16),
+                (byte)((workshopCode >> 8) & 0xFF),
                 (byte)(workshopCode & 0xFF)
             });
 
@@ -487,6 +493,7 @@ namespace BitFab.KW1281Test
                 (byte)BlockTitle.FaultCodesResponse => new FaultCodesBlock(blockBytes),
                 (byte)BlockTitle.ReadRomEepromResponse => new ReadRomEepromResponse(blockBytes),
                 (byte)BlockTitle.WriteEepromResponse => new WriteEepromResponseBlock(blockBytes),
+                (byte)BlockTitle.AdaptationResponse => new AdaptationResponseBlock(blockBytes),
                 _ => new UnknownBlock(blockBytes),
             };
         }
@@ -640,6 +647,79 @@ namespace BitFab.KW1281Test
             return
                 controllerInfo.SoftwareCoding == softwareCoding &&
                 controllerInfo.WorkshopCode == workshopCode;
+        }
+
+        public bool AdaptationRead(byte channelNumber)
+        {
+            var bytes = new List<byte>
+            {
+                (byte)BlockTitle.AdaptationRead,
+                channelNumber
+            };
+
+            Logger.WriteLine($"Sending AdaptationRead block");
+            SendBlock(bytes);
+
+            return ReceiveAdaptationBlock();
+        }
+
+        public bool AdaptationTest(byte channelNumber, ushort channelValue)
+        {
+            var bytes = new List<byte>
+            {
+                (byte)BlockTitle.AdaptationTest,
+                channelNumber,
+                (byte)(channelValue / 256),
+                (byte)(channelValue % 256)
+            };
+
+            Logger.WriteLine($"Sending AdaptationTest block");
+            SendBlock(bytes);
+
+            return ReceiveAdaptationBlock();
+        }
+
+        public bool AdaptationSave(byte channelNumber, ushort channelValue)
+        {
+            var bytes = new List<byte>
+            {
+                (byte)BlockTitle.AdaptationSave,
+                channelNumber,
+                (byte)(channelValue / 256),
+                (byte)(channelValue % 256)
+            };
+
+            Logger.WriteLine($"Sending AdaptationSave block");
+            SendBlock(bytes);
+
+            return ReceiveAdaptationBlock();
+        }
+
+        private bool ReceiveAdaptationBlock()
+        {
+            var blocks = ReceiveBlocks();
+            if (blocks.Count == 1 && blocks[0] is NakBlock)
+            {
+                Logger.WriteLine($"Received a NAK.");
+                return false;
+            }
+
+            var responseBlock = blocks.Where(b => !b.IsAckNak).FirstOrDefault();
+            if (responseBlock == null)
+            {
+                Logger.WriteLine($"Didn't receive an Adaptation response block.");
+                return false;
+            }
+
+            if (responseBlock is not AdaptationResponseBlock adaptationResponse)
+            {
+                Logger.WriteLine($"Expected an Adaptation response block but received a ${responseBlock.Title:X2} block.");
+                return false;
+            }
+
+            Logger.WriteLine($"Adaptation value: {adaptationResponse.ChannelValue}");
+
+            return true;
         }
 
         public IKwpCommon KwpCommon { get; }

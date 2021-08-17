@@ -13,6 +13,9 @@ namespace BitFab.KW1281Test.Blocks
             Bytes = bytes;
         }
 
+        /// <summary>
+        /// Returns the entire raw block bytes.
+        /// </summary>
         public List<byte> Bytes { get; }
 
         public byte Title => Bytes[2];
