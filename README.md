@@ -36,10 +36,20 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
     ADDRESS = The controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
     COMMAND =
         ActuatorTest
+        AdaptationRead CHANNEL [LOGIN]
+            CHANNEL = Channel number (0-99)
+            LOGIN = Optional login (0-65535)
+        AdaptationSave CHANNEL VALUE [LOGIN]
+            CHANNEL = Channel number (0-99)
+            VALUE = Channel value (0-65535)
+            LOGIN = Optional login (0-65535)
+        AdaptationTest CHANNEL VALUE [LOGIN]
+            CHANNEL = Channel number (0-99)
+            VALUE = Channel value (0-65535)
+            LOGIN = Optional login (0-65535)
         ClarionVWPremium4SafeCode
         ClearFaultCodes
         DelcoVWPremium5SafeCode
-        DumpCcmRom
         DumpEdc15Eeprom [FILENAME]
             FILENAME = Optional filename
         DumpEeprom START LENGTH [FILENAME]

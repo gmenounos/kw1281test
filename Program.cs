@@ -1165,7 +1165,6 @@ namespace BitFab.KW1281Test
         ClarionVWPremium4SafeCode
         ClearFaultCodes
         DelcoVWPremium5SafeCode
-        DumpCcmRom
         DumpEdc15Eeprom [FILENAME]
             FILENAME = Optional filename
         DumpEeprom START LENGTH [FILENAME]
