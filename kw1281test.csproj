@@ -5,9 +5,9 @@
     <TargetFramework>net5.0</TargetFramework>
     <RootNamespace>BitFab.KW1281Test</RootNamespace>
     <LangVersion>latest</LangVersion>
-    <AssemblyVersion>0.62.0.0</AssemblyVersion>
-    <FileVersion>0.62.0.0</FileVersion>
-    <Version>0.62-beta</Version>
+    <AssemblyVersion>0.63.0.0</AssemblyVersion>
+    <FileVersion>0.63.0.0</FileVersion>
+    <Version>0.63-beta</Version>
     <Copyright>Copyright © 2021 Greg Menounos</Copyright>
     <DebugType>embedded</DebugType>
     <DebugSymbols>true</DebugSymbols>
