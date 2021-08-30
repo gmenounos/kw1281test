@@ -16,7 +16,7 @@ namespace BitFab.KW1281Test.Cluster
             }
             if (seed[8] != 0x01 || seed[9] != 0x00)
             {
-                throw new InvalidOperationException(
+                Logger.WriteLine(
                     $"Unexpected seed suffix: ${seed[8]:X2} ${seed[9]:X2}, (Expected $01 $00)");
             }
 
