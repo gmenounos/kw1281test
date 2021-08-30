@@ -33,18 +33,39 @@ namespace BitFab.KW1281Test
             // Disable garbage collection int this time-critical method
             bool noGc = GC.TryStartNoGCRegion(1024 * 1024);
 
-            BitBang5Baud(controllerAddress, evenParity);
+            byte syncByte = 0;
+            const int maxTries = 3;
+            for (int i = 1; i <= maxTries; i++)
+            {
+                BitBang5Baud(controllerAddress, evenParity);
+
+                // Throw away anything that might be in the receive buffer
+                Interface.ClearReceiveBuffer();
+
+                Logger.WriteLine("Reading sync byte");
+                try
+                {
+                    syncByte = Interface.ReadByte();
+                    break;
+                }
+                catch (TimeoutException)
+                {
+                    if (i < maxTries)
+                    {
+                        Logger.WriteLine("Retrying wakeup message...");
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Controller did not wake up.");
+                    }
+                }
+            }
 
             if (noGc)
             {
                 GC.EndNoGCRegion();
             }
 
-            // Throw away anything that might be in the receive buffer
-            Interface.ClearReceiveBuffer();
-
-            Logger.WriteLine("Reading sync byte");
-            var syncByte = Interface.ReadByte();
             if (syncByte != 0x55)
             {
                 throw new InvalidOperationException(

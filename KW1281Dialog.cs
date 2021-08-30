@@ -33,24 +33,11 @@ namespace BitFab.KW1281Test
 
         bool AdaptationSave(byte channelNumber, ushort channelValue);
 
-        /// <summary>
-        /// http://www.maltchev.com/kiti/VAG_guide.txt
-        /// </summary>
-        Dictionary<int, Block> CustomReadSoftwareVersion();
-
-        List<byte> CustomReadMemory(uint address, byte count);
-
-        void CustomReset();
-
         void SendBlock(List<byte> blockBytes);
 
         List<Block> ReceiveBlocks();
 
-        List<Block> SendCustom(List<byte> blockCustomBytes);
-
         List<byte>? ReadCcmRom(byte seg, byte msb, byte lsb, byte count);
-
-        List<byte> CustomReadNecRom(ushort address, byte count);
 
         /// <summary>
         /// Keep the dialog alive by sending an ACK and receiving a response.
@@ -200,7 +187,7 @@ namespace BitFab.KW1281Test
 
         public bool WriteEeprom(ushort address, List<byte> values)
         {
-            Logger.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Values: {DumpBytes(values)}");
+            Logger.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Values: {Utils.DumpBytes(values)}");
 
             byte count = (byte)values.Count;
             var sendBody = new List<byte>
@@ -268,142 +255,6 @@ namespace BitFab.KW1281Test
                 throw new InvalidOperationException($"ReadRomEeprom returned {blocks.Count} blocks instead of 1");
             }
             return blocks[0].Body.ToList();
-        }
-
-        public List<byte> CustomReadMemory(uint address, byte count)
-        {
-            Logger.WriteLine($"Sending Custom \"Read Memory\" block (Address: ${address:X6}, Count: ${count:X2})");
-            var blocks = SendCustom(new List<byte>
-            {
-                0x86,
-                count,
-                (byte)(address & 0xFF),
-                (byte)((address >> 8) & 0xFF),
-                (byte)((address >> 16) & 0xFF),
-            });
-            blocks = blocks.Where(b => !b.IsAckNak).ToList();
-            if (blocks.Count != 1)
-            {
-                throw new InvalidOperationException($"Custom \"Read Memory\" returned {blocks.Count} blocks instead of 1");
-            }
-            return blocks[0].Body.ToList();
-        }
-
-        /// <summary>
-        /// Read the low 64KB of the cluster's NEC controller ROM.
-        /// For MFA clusters, that should cover the entire ROM.
-        /// For FIS clusters, the ROM is 128KB and more work is needed to retrieve the high 64KB.
-        /// </summary>
-        /// <param name="address"></param>
-        /// <param name="count"></param>
-        /// <returns></returns>
-        public List<byte> CustomReadNecRom(ushort address, byte count)
-        {
-            Logger.WriteLine($"Sending Custom \"Read NEC ROM\" block (Address: ${address:X4}, Count: ${count:X2})");
-            var blocks = SendCustom(new List<byte>
-            {
-                0xA6,
-                count,
-                (byte)(address & 0xFF),
-                (byte)((address >> 8) & 0xFF),
-            });
-            blocks = blocks.Where(b => !b.IsAckNak).ToList();
-            if (blocks.Count != 1)
-            {
-                throw new InvalidOperationException($"Custom \"Read NEC ROM\" returned {blocks.Count} blocks instead of 1");
-            }
-            return blocks[0].Body.ToList();
-        }
-
-        /// <summary>
-        /// http://www.maltchev.com/kiti/VAG_guide.txt
-        /// This unlocks additional custom commands $81-$AF
-        /// </summary>
-        private void CustomUnlockAdditionalCommands()
-        {
-            Logger.WriteLine("Sending Custom \"Unlock Additional Commands\" block");
-            SendCustom(new List<byte> { 0x80, 0x01, 0x02, 0x03, 0x04 });
-        }
-
-        public Dictionary<int, Block> CustomReadSoftwareVersion()
-        {
-            var versionBlocks = new Dictionary<int, Block>();
-
-            Logger.WriteLine("Sending Custom \"Read Software Version\" blocks");
-
-            // The cluster can return 4 variations of software version, specified by the 2nd byte
-            // of the block:
-            // 0x00 - Cluster software version
-            // 0x01 - Unknown
-            // 0x02 - Unknown
-            // 0x03 - Unknown
-            for (byte variation = 0x00; variation < 0x04; variation++)
-            {
-                var blocks = SendCustom(new List<byte> { 0x84, variation });
-                foreach (var block in blocks.Where(b => !b.IsAckNak))
-                {
-                    if (variation == 0x00 || variation == 0x03)
-                    {
-                        Logger.WriteLine($"{variation:X2}: {DumpMixedContent(block)}");
-                    }
-                    else
-                    {
-                        Logger.WriteLine($"{variation:X2}: {DumpBinaryContent(block)}");
-                    }
-                    versionBlocks[variation] = block;
-                }
-            }
-
-            return versionBlocks;
-        }
-
-        private static string DumpMixedContent(Block block)
-        {
-            if (block.IsNak)
-            {
-                return "NAK";
-            }
-
-            return Utils.DumpMixedContent(block.Body);
-        }
-
-        private static string DumpBinaryContent(Block block)
-        {
-            if (block.IsNak)
-            {
-                return "NAK";
-            }
-
-            return DumpBytes(block.Body);
-        }
-
-        private static string DumpBytes(IEnumerable<byte> bytes)
-        {
-            var sb = new StringBuilder();
-            foreach (var b in bytes)
-            {
-                sb.Append($"${b:X2} ");
-            }
-            return sb.ToString();
-        }
-
-        public void CustomReset()
-        {
-            Logger.WriteLine("Sending Custom Reset block");
-            SendCustom(new List<byte> { 0x82 });
-        }
-
-        public List<Block> SendCustom(List<byte> blockCustomBytes)
-        {
-            if (blockCustomBytes[0] > 0x80 && !_additionalCustomCommandsUnlocked)
-            {
-                CustomUnlockAdditionalCommands();
-                _additionalCustomCommandsUnlocked = true;
-            }
-
-            blockCustomBytes.Insert(0, (byte)BlockTitle.Custom);
-            SendBlock(blockCustomBytes);
-            return ReceiveBlocks();
         }
 
         public void EndCommunication()

@@ -1,5 +1,4 @@
-﻿using BitFab.KW1281Test.Blocks;
-using BitFab.KW1281Test.Cluster;
+﻿using BitFab.KW1281Test.Cluster;
 using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
 using System;
@@ -585,24 +584,24 @@ namespace BitFab.KW1281Test
             bool succeeded = true;
             using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
             {
-                {
-                    for (int address = 0; address < 65536; address += blockSize)
-                    {
-                        var blockBytes = kwp1281.CustomReadNecRom((ushort)address, blockSize);
-                        if (blockBytes == null)
-                        {
-                            blockBytes = Enumerable.Repeat((byte)0, blockSize).ToList();
-                            succeeded = false;
-                        }
-                        else if (blockBytes.Count < blockSize)
-                        {
-                            blockBytes.AddRange(Enumerable.Repeat((byte)0, blockSize - blockBytes.Count));
-                            succeeded = false;
-                        }
+                var cluster = new VdoCluster(kwp1281);
 
-                        fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
-                        fs.Flush();
+                for (int address = 0; address < 65536; address += blockSize)
+                {
+                    var blockBytes = cluster.CustomReadNecRom((ushort)address, blockSize);
+                    if (blockBytes == null)
+                    {
+                        blockBytes = Enumerable.Repeat((byte)0, blockSize).ToList();
+                        succeeded = false;
                     }
+                    else if (blockBytes.Count < blockSize)
+                    {
+                        blockBytes.AddRange(Enumerable.Repeat((byte)0, blockSize - blockBytes.Count));
+                        succeeded = false;
+                    }
+
+                    fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
+                    fs.Flush();
                 }
             }
 
@@ -870,16 +869,25 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private static void ReadSoftwareVersion(IKW1281Dialog kwp1281)
+        private void ReadSoftwareVersion(IKW1281Dialog kwp1281)
         {
-            kwp1281.CustomReadSoftwareVersion();
+            if (_controllerAddress == (int)ControllerAddress.Cluster)
+            {
+                var cluster = new VdoCluster(kwp1281);
+                cluster.CustomReadSoftwareVersion();
+            }
+            else
+            {
+                Logger.WriteLine("Only supported for cluster");
+            }
         }
 
         private void Reset(IKW1281Dialog kwp1281)
         {
             if (_controllerAddress == (int)ControllerAddress.Cluster)
             {
-                kwp1281.CustomReset();
+                var cluster = new VdoCluster(kwp1281);
+                cluster.CustomReset();
             }
             else
             {
@@ -910,26 +918,6 @@ namespace BitFab.KW1281Test
 
         // End top-level commands
 
-        private void MapClusterEeprom(IKW1281Dialog kwp1281)
-        {
-            // Unlock partial EEPROM read
-            _ = kwp1281.SendCustom(new List<byte> { 0x9D, 0x39, 0x34, 0x34, 0x40 });
-
-            var bytes = new List<byte>();
-            const byte blockSize = 1;
-            for (ushort addr = 0; addr < 2048; addr += blockSize)
-            {
-                var blockBytes = kwp1281.ReadEeprom(addr, blockSize);
-                blockBytes = Enumerable.Repeat(
-                    blockBytes == null ? (byte)0 : (byte)0xFF,
-                    blockSize).ToList();
-                bytes.AddRange(blockBytes);
-            }
-            var dumpFileName = _filename ?? "eeprom_map.bin";
-            Logger.WriteLine($"Saving EEPROM map to {dumpFileName}");
-            File.WriteAllBytes(dumpFileName, bytes.ToArray());
-        }
-
         private void MapCcmEeprom(IKW1281Dialog kwp1281)
         {
             kwp1281.Login(19283, 222);
@@ -947,6 +935,17 @@ namespace BitFab.KW1281Test
             var dumpFileName = _filename ?? "ccm_eeprom_map.bin";
             Logger.WriteLine($"Saving EEPROM map to {dumpFileName}");
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
+        }
+
+        private void MapClusterEeprom(IKW1281Dialog kwp1281)
+        {
+            var cluster = new VdoCluster(kwp1281);
+
+            var map = cluster.MapEeprom();
+
+            var mapFileName = _filename ?? "eeprom_map.bin";
+            Logger.WriteLine($"Saving EEPROM map to {mapFileName}");
+            File.WriteAllBytes(mapFileName, map.ToArray());
         }
 
         private void DumpCcmEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
@@ -971,61 +970,22 @@ namespace BitFab.KW1281Test
 
                 case ControllerAddress.Cluster:
                     // TODO:UnlockCluster() is only needed for EEPROM read, not memory read
-                    if (!VdoCluster.UnlockCluster(kwp1281))
+                    var cluster = new VdoCluster(kwp1281);
+                    if (!cluster.Unlock())
                     {
                         Logger.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
                     }
 
-                    if (!ClusterRequiresSeedKey(kwp1281))
+                    if (!cluster.RequiresSeedKey())
                     {
                         Logger.WriteLine(
                             "Cluster is unlocked for EEPROM access. Skipping Seed/Key login.");
                         return;
                     }
 
-                    ClusterSeedKeyAuthenticate(kwp1281);
+                    cluster.SeedKeyAuthenticate();
                     break;
             }
-        }
-
-        private static void ClusterSeedKeyAuthenticate(IKW1281Dialog kwp1281)
-        {
-            // Perform Seed/Key authentication
-            Logger.WriteLine("Sending Custom \"Seed request\" block");
-            var response = kwp1281.SendCustom(new List<byte> { 0x96, 0x01 });
-
-            var responseBlocks = response.Where(b => !b.IsAckNak).ToList();
-            if (responseBlocks.Count == 1 && responseBlocks[0] is CustomBlock customBlock)
-            {
-                Logger.WriteLine($"Block: {Utils.Dump(customBlock.Body)}");
-
-                var keyBytes = VdoKeyFinder.FindKey(customBlock.Body.ToArray());
-
-                Logger.WriteLine("Sending Custom \"Key response\" block");
-
-                var keyResponse = new List<byte> { 0x96, 0x02 };
-                keyResponse.AddRange(keyBytes);
-
-                response = kwp1281.SendCustom(keyResponse);
-            }
-        }
-
-        private static bool ClusterRequiresSeedKey(IKW1281Dialog kwp1281)
-        {
-            Logger.WriteLine("Sending Custom \"Need Seed/Key?\" block");
-            var response = kwp1281.SendCustom(new List<byte> { 0x96, 0x04 });
-            var responseBlocks = response.Where(b => !b.IsAckNak).ToList();
-            if (responseBlocks.Count == 1 && responseBlocks[0] is CustomBlock)
-            {
-                // Custom 0x04 means need to do Seed/Key
-                // Custom 0x07 means unlocked
-                if (responseBlocks[0].Body.First() == 0x07)
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
         private static void DumpEeprom(
@@ -1119,27 +1079,22 @@ namespace BitFab.KW1281Test
 
         private void DumpClusterMem(IKW1281Dialog kwp1281, uint startAddress, uint length)
         {
-            UnlockControllerForEepromReadWrite(kwp1281);
-
-            const byte blockSize = 15;
+            var cluster = new VdoCluster(kwp1281);
+            if (!cluster.RequiresSeedKey())
+            {
+                Logger.WriteLine(
+                    "Cluster is unlocked for memory access. Skipping Seed/Key login.");
+            }
+            else
+            {
+                cluster.SeedKeyAuthenticate();
+            }
 
             var dumpFileName = _filename ?? $"cluster_mem_${startAddress:X6}.bin";
             Logger.WriteLine($"Saving memory dump to {dumpFileName}");
-            using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
-            {
-                for (uint addr = startAddress; addr < startAddress + length; addr += blockSize)
-                {
-                    var readLength = (byte)Math.Min(startAddress + length - addr, blockSize);
-                    var blockBytes = kwp1281.CustomReadMemory(addr, readLength);
-                    if (blockBytes.Count != readLength)
-                    {
-                        throw new InvalidOperationException(
-                            $"Expected {readLength} bytes from CustomReadMemory() but received {blockBytes.Count} bytes");
-                    }
-                    fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
-                    fs.Flush();
-                }
-            }
+
+            cluster.DumpMem(dumpFileName, startAddress, length);
+
             Logger.WriteLine($"Saved memory dump to {dumpFileName}");
         }
 

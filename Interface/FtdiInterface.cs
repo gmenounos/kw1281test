@@ -42,8 +42,8 @@ namespace BitFab.KW1281Test.Interface
 
             status = _ft.SetTimeouts(
                 _handle,
-                (uint)TimeSpan.FromSeconds(5).TotalMilliseconds,
-                (uint)TimeSpan.FromSeconds(5).TotalMilliseconds);
+                (uint)TimeSpan.FromSeconds(2).TotalMilliseconds,
+                (uint)TimeSpan.FromSeconds(2).TotalMilliseconds);
             FT.AssertOk(status);
 
             // Should allow faster response times for small packets

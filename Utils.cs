@@ -16,6 +16,17 @@ namespace BitFab.KW1281Test
             return sb.ToString();
         }
 
+        // TODO: Merge with Dump()
+        public static string DumpBytes(IEnumerable<byte> bytes)
+        {
+            var sb = new StringBuilder();
+            foreach (var b in bytes)
+            {
+                sb.Append($"${b:X2} ");
+            }
+            return sb.ToString();
+        }
+
         public static string DumpAscii(IEnumerable<byte> bytes)
         {
             var sb = new StringBuilder();

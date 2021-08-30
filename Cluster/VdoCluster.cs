@@ -1,5 +1,7 @@
-﻿using System;
+﻿using BitFab.KW1281Test.Blocks;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -8,9 +10,148 @@ namespace BitFab.KW1281Test.Cluster
 {
     class VdoCluster
     {
-        public static bool UnlockCluster(IKW1281Dialog kwp1281)
+        /// <summary>
+        /// http://www.maltchev.com/kiti/VAG_guide.txt
+        /// </summary>
+        public Dictionary<int, Block> CustomReadSoftwareVersion()
         {
-            var versionBlocks = kwp1281.CustomReadSoftwareVersion();
+            var versionBlocks = new Dictionary<int, Block>();
+
+            Logger.WriteLine("Sending Custom \"Read Software Version\" blocks");
+
+            // The cluster can return 4 variations of software version, specified by the 2nd byte
+            // of the block:
+            // 0x00 - Cluster software version
+            // 0x01 - Unknown
+            // 0x02 - Unknown
+            // 0x03 - Unknown
+            for (byte variation = 0x00; variation < 0x04; variation++)
+            {
+                var blocks = SendCustom(new List<byte> { 0x84, variation });
+                foreach (var block in blocks.Where(b => !b.IsAckNak))
+                {
+                    if (variation == 0x00 || variation == 0x03)
+                    {
+                        Logger.WriteLine($"{variation:X2}: {DumpMixedContent(block)}");
+                    }
+                    else
+                    {
+                        Logger.WriteLine($"{variation:X2}: {DumpBinaryContent(block)}");
+                    }
+                    versionBlocks[variation] = block;
+                }
+            }
+
+            return versionBlocks;
+        }
+
+        public void CustomReset()
+        {
+            Logger.WriteLine("Sending Custom Reset block");
+            SendCustom(new List<byte> { 0x82 });
+        }
+
+        public List<byte> CustomReadMemory(uint address, byte count)
+        {
+            Logger.WriteLine($"Sending Custom \"Read Memory\" block (Address: ${address:X6}, Count: ${count:X2})");
+            var blocks = SendCustom(new List<byte>
+            {
+                0x86,
+                count,
+                (byte)(address & 0xFF),
+                (byte)((address >> 8) & 0xFF),
+                (byte)((address >> 16) & 0xFF),
+            });
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
+            if (blocks.Count != 1)
+            {
+                throw new InvalidOperationException($"Custom \"Read Memory\" returned {blocks.Count} blocks instead of 1");
+            }
+            return blocks[0].Body.ToList();
+        }
+
+        /// <summary>
+        /// Read the low 64KB of the cluster's NEC controller ROM.
+        /// For MFA clusters, that should cover the entire ROM.
+        /// For FIS clusters, the ROM is 128KB and more work is needed to retrieve the high 64KB.
+        /// </summary>
+        /// <param name="address"></param>
+        /// <param name="count"></param>
+        /// <returns></returns>
+        public List<byte> CustomReadNecRom(ushort address, byte count)
+        {
+            Logger.WriteLine($"Sending Custom \"Read NEC ROM\" block (Address: ${address:X4}, Count: ${count:X2})");
+            var blocks = SendCustom(new List<byte>
+            {
+                0xA6,
+                count,
+                (byte)(address & 0xFF),
+                (byte)((address >> 8) & 0xFF),
+            });
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
+            if (blocks.Count != 1)
+            {
+                throw new InvalidOperationException($"Custom \"Read NEC ROM\" returned {blocks.Count} blocks instead of 1");
+            }
+            return blocks[0].Body.ToList();
+        }
+
+        public List<byte> MapEeprom()
+        {
+            // Unlock partial EEPROM read
+            Unlock();
+
+            var map = new List<byte>();
+            const byte blockSize = 1;
+            for (ushort addr = 0; addr < 2048; addr += blockSize)
+            {
+                var blockBytes = _kwp1281.ReadEeprom(addr, blockSize);
+                blockBytes = Enumerable.Repeat(
+                    blockBytes == null ? (byte)0 : (byte)0xFF,
+                    blockSize).ToList();
+                map.AddRange(blockBytes);
+            }
+
+            return map;
+        }
+
+        public void DumpMem(string dumpFileName, uint startAddress, uint length)
+        {
+            const byte blockSize = 15;
+
+            using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
+            {
+                for (uint addr = startAddress; addr < startAddress + length; addr += blockSize)
+                {
+                    var readLength = (byte)Math.Min(startAddress + length - addr, blockSize);
+                    var blockBytes = CustomReadMemory(addr, readLength);
+                    if (blockBytes.Count != readLength)
+                    {
+                        throw new InvalidOperationException(
+                            $"Expected {readLength} bytes from CustomReadMemory() but received {blockBytes.Count} bytes");
+                    }
+                    fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
+                    fs.Flush();
+                }
+            }
+        }
+
+        public List<Block> SendCustom(List<byte> blockCustomBytes)
+        {
+            if (blockCustomBytes[0] > 0x80 && !_additionalCustomCommandsUnlocked)
+            {
+                CustomUnlockAdditionalCommands();
+                _additionalCustomCommandsUnlocked = true;
+            }
+
+            blockCustomBytes.Insert(0, (byte)BlockTitle.Custom);
+            _kwp1281.SendBlock(blockCustomBytes);
+            return _kwp1281.ReceiveBlocks();
+        }
+
+        public bool Unlock()
+        {
+            var versionBlocks = CustomReadSoftwareVersion();
 
             // Now we need to send an unlock code that is unique to each ROM version
             Logger.WriteLine("Sending Custom \"Unlock partial EEPROM read\" block");
@@ -21,7 +162,7 @@ namespace BitFab.KW1281Test.Cluster
             {
                 var unlockCommand = new List<byte> { 0x9D };
                 unlockCommand.AddRange(unlockCode);
-                var unlockResponse = kwp1281.SendCustom(unlockCommand);
+                var unlockResponse = SendCustom(unlockCommand);
                 if (unlockResponse.Count != 1)
                 {
                     throw new InvalidOperationException(
@@ -45,6 +186,46 @@ namespace BitFab.KW1281Test.Cluster
                 }
             }
             return unlocked;
+        }
+
+        public void SeedKeyAuthenticate()
+        {
+            // Perform Seed/Key authentication
+            Logger.WriteLine("Sending Custom \"Seed request\" block");
+            var response = SendCustom(new List<byte> { 0x96, 0x01 });
+
+            var responseBlocks = response.Where(b => !b.IsAckNak).ToList();
+            if (responseBlocks.Count == 1 && responseBlocks[0] is CustomBlock customBlock)
+            {
+                Logger.WriteLine($"Block: {Utils.Dump(customBlock.Body)}");
+
+                var keyBytes = VdoKeyFinder.FindKey(customBlock.Body.ToArray());
+
+                Logger.WriteLine("Sending Custom \"Key response\" block");
+
+                var keyResponse = new List<byte> { 0x96, 0x02 };
+                keyResponse.AddRange(keyBytes);
+
+                response = SendCustom(keyResponse);
+            }
+        }
+
+        public bool RequiresSeedKey()
+        {
+            Logger.WriteLine("Sending Custom \"Need Seed/Key?\" block");
+            var response = SendCustom(new List<byte> { 0x96, 0x04 });
+            var responseBlocks = response.Where(b => !b.IsAckNak).ToList();
+            if (responseBlocks.Count == 1 && responseBlocks[0] is CustomBlock)
+            {
+                // Custom 0x04 means need to do Seed/Key
+                // Custom 0x07 means unlocked
+                if (responseBlocks[0].Body.First() == 0x07)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -92,6 +273,16 @@ namespace BitFab.KW1281Test.Cluster
                         $"GetSkc: Unknown EEPROM (Immobilizer offset: 0x{immoMatch.Index:X3})");
                     return null;
             }
+        }
+
+        /// <summary>
+        /// http://www.maltchev.com/kiti/VAG_guide.txt
+        /// This unlocks additional custom commands $81-$AF
+        /// </summary>
+        private void CustomUnlockAdditionalCommands()
+        {
+            Logger.WriteLine("Sending Custom \"Unlock Additional Commands\" block");
+            SendCustom(new List<byte> { 0x80, 0x01, 0x02, 0x03, 0x04 });
         }
 
         /// <summary>
@@ -424,5 +615,34 @@ namespace BitFab.KW1281Test.Cluster
             new byte[] { 0x00, 0x00, 0x03, 0x02 },
             new byte[] { 0x00, 0x00, 0x00, 0x00 },
         };
+
+        private static string DumpMixedContent(Block block)
+        {
+            if (block.IsNak)
+            {
+                return "NAK";
+            }
+
+            return Utils.DumpMixedContent(block.Body);
+        }
+
+        private static string DumpBinaryContent(Block block)
+        {
+            if (block.IsNak)
+            {
+                return "NAK";
+            }
+
+            return Utils.DumpBytes(block.Body);
+        }
+
+        private readonly IKW1281Dialog _kwp1281;
+        private bool _additionalCustomCommandsUnlocked;
+
+        public VdoCluster(IKW1281Dialog kwp1281)
+        {
+            _kwp1281 = kwp1281;
+            _additionalCustomCommandsUnlocked = false;
+        }
     }
 }
