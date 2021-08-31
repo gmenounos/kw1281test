@@ -577,12 +577,9 @@ namespace BitFab.KW1281Test
 
         private byte? _blockCounter = null;
 
-        private bool _additionalCustomCommandsUnlocked;
-
         public KW1281Dialog(IKwpCommon kwpCommon)
         {
             KwpCommon = kwpCommon;
-            _additionalCustomCommandsUnlocked = false;
         }
     }
 

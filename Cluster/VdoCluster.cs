@@ -65,7 +65,8 @@ namespace BitFab.KW1281Test.Cluster
             blocks = blocks.Where(b => !b.IsAckNak).ToList();
             if (blocks.Count != 1)
             {
-                throw new InvalidOperationException($"Custom \"Read Memory\" returned {blocks.Count} blocks instead of 1");
+                // Permissions issue?
+                return new List<byte>();
             }
             return blocks[0].Body.ToList();
         }
@@ -119,6 +120,7 @@ namespace BitFab.KW1281Test.Cluster
         {
             const byte blockSize = 15;
 
+            bool succeeded = true;
             using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
             {
                 for (uint addr = startAddress; addr < startAddress + length; addr += blockSize)
@@ -127,12 +129,22 @@ namespace BitFab.KW1281Test.Cluster
                     var blockBytes = CustomReadMemory(addr, readLength);
                     if (blockBytes.Count != readLength)
                     {
-                        throw new InvalidOperationException(
-                            $"Expected {readLength} bytes from CustomReadMemory() but received {blockBytes.Count} bytes");
+                        succeeded = false;
+                        blockBytes.AddRange(
+                            Enumerable.Repeat((byte)0, readLength - blockBytes.Count));
                     }
                     fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
                     fs.Flush();
                 }
+            }
+
+            if (!succeeded)
+            {
+                Logger.WriteLine();
+                Logger.WriteLine("**********************************************************************");
+                Logger.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
+                Logger.WriteLine("**********************************************************************");
+                Logger.WriteLine();
             }
         }
 
