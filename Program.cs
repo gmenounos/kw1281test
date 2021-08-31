@@ -979,11 +979,19 @@ namespace BitFab.KW1281Test
                     if (!cluster.RequiresSeedKey())
                     {
                         Logger.WriteLine(
-                            "Cluster is unlocked for EEPROM access. Skipping Seed/Key login.");
+                            "Cluster is unlocked for ROM/EEPROM access. Skipping Seed/Key login.");
                         return;
                     }
 
                     cluster.SeedKeyAuthenticate();
+                    if (cluster.RequiresSeedKey())
+                    {
+                        Logger.WriteLine("Failed to unlock cluster.");
+                    }
+                    else
+                    {
+                        Logger.WriteLine("Cluster is unlocked for ROM/EEPROM access.");
+                    }
                     break;
             }
         }
