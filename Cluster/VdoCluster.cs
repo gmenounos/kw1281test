@@ -270,7 +270,7 @@ namespace BitFab.KW1281Test.Cluster
                 case 0x090:
                 case 0x0AC:
                     // Immo2
-                    skc = Utils.GetShort(bytes, 0x0BA - startAddress);
+                    skc = Utils.GetBcd(bytes, 0x0BA - startAddress);
                     return skc;
                 case 0x0A2:
                     // VWK501

@@ -100,6 +100,24 @@ namespace BitFab.KW1281Test
         }
 
         /// <summary>
+        /// Little-Endian Binary Coded Decimal
+        /// </summary>
+        public static short GetBcd(byte[] buf, int offset)
+        {
+            var binary = GetShort(buf, offset);
+
+            short bcd = (short)
+                (
+                    (binary >> 12) * 1000 +
+                    ((binary >> 8) & 0x0F) * 100 +
+                    ((binary >> 4) & 0x0F) * 10 +
+                    (binary & 0x0F)
+                );
+
+            return bcd;
+        }
+
+        /// <summary>
         /// Little-Endian
         /// </summary>
         public static byte[] GetBytes(uint value)
