@@ -28,9 +28,9 @@ namespace BitFab.KW1281Test
 
             Thread.Sleep(350);
 
-            Logger.WriteLine($"Saving EEPROM dump to {dumpFileName}");
+            Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             DumpMemory(address, length, maxReadLength: 32, dumpFileName);
-            Logger.WriteLine($"Saved EEPROM dump to {dumpFileName}");
+            Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
 
             EcuReset(0x01);
         }
@@ -160,7 +160,7 @@ namespace BitFab.KW1281Test
 
             _kwpCommon.WriteByte(message.Checksum);
 
-            Logger.WriteLine($"Sent: {message}");
+            Log.WriteLine($"Sent: {message}");
         }
 
         public Kwp2000Message ReceiveMessage()
@@ -189,7 +189,7 @@ namespace BitFab.KW1281Test
 
             var message = new Kwp2000Message(
                 formatByte, destAddress, srcAddress, lengthByte, service, body, checksum);
-            Logger.WriteLine($"Received: {message}");
+            Log.WriteLine($"Received: {message}");
             return message;
         }
 

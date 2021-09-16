@@ -93,7 +93,7 @@ namespace BitFab.KW1281Test.EDC15
             }
 
             File.WriteAllBytes(filename, eeprom.ToArray());
-            Logger.WriteLine($"Saved EEPROM to {filename}");
+            Log.WriteLine($"Saved EEPROM to {filename}");
 
             resp = kwp2000.ReceiveMessage();
 
@@ -106,7 +106,7 @@ namespace BitFab.KW1281Test.EDC15
             b = _kwpCommon.Interface.ReadByte();
             if (b == 0x55)
             {
-                Logger.WriteLine($"Reboot successful!");
+                Log.WriteLine($"Reboot successful!");
             }
         }
 
@@ -197,9 +197,14 @@ namespace BitFab.KW1281Test.EDC15
         /// </summary>
         private static byte[] GetLoader()
         {
-            var assembly = Assembly.GetEntryAssembly();
+            var assembly = Assembly.GetEntryAssembly()!;
             var resourceStream = assembly.GetManifestResourceStream(
                 "BitFab.KW1281Test.EDC15.Loader.bin");
+            if (resourceStream == null)
+            {
+                throw new InvalidOperationException(
+                    $"Unable to load BitFab.KW1281Test.EDC15.Loader.bin embedded resource.");
+            }
 
             var loaderLength = resourceStream.Length + 4; // Add 4 bytes for checksum correction
             loaderLength = (loaderLength + 7) / 8 * 8; // Round up to a multiple of 8 bytes

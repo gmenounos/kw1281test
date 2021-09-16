@@ -24,13 +24,13 @@ namespace BitFab.KW1281Test.Blocks
 
         private void Dump()
         {
-            Logger.Write("Received \"Actuator Test Response\" block:");
+            Log.Write("Received \"Actuator Test Response\" block:");
             foreach (var b in Body)
             {
-                Logger.Write($" {b:X2}");
+                Log.Write($" {b:X2}");
             }
 
-            Logger.WriteLine();
+            Log.WriteLine();
         }
 
         private static readonly Dictionary<string, string> _idToName = new()

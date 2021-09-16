@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <RootNamespace>BitFab.KW1281Test</RootNamespace>
     <LangVersion>latest</LangVersion>
     <AssemblyVersion>0.66.0.0</AssemblyVersion>

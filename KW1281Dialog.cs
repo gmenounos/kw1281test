@@ -13,8 +13,6 @@ namespace BitFab.KW1281Test
     /// </summary>
     internal interface IKW1281Dialog
     {
-        ControllerInfo ReadEcuInfo();
-
         void EndCommunication();
 
         void Login(ushort code, int workshopCode);
@@ -69,15 +67,9 @@ namespace BitFab.KW1281Test
 
     internal class KW1281Dialog : IKW1281Dialog
     {
-        public ControllerInfo ReadEcuInfo()
-        {
-            var blocks = ReceiveBlocks();
-            return new ControllerInfo(blocks.Where(b => !b.IsAckNak));
-        }
-
         public void Login(ushort code, int workshopCode)
         {
-            Logger.WriteLine("Sending Login block");
+            Log.WriteLine("Sending Login block");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.Login,
@@ -97,7 +89,7 @@ namespace BitFab.KW1281Test
             bool moreAvailable;
             do
             {
-                Logger.WriteLine("Sending ReadIdent block");
+                Log.WriteLine("Sending ReadIdent block");
 
                 SendBlock(new List<byte> { (byte)BlockTitle.ReadIdent });
 
@@ -121,7 +113,7 @@ namespace BitFab.KW1281Test
         /// <returns>The bytes or null if the bytes could not be read</returns>
         public List<byte>? ReadEeprom(ushort address, byte count)
         {
-            Logger.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
+            Log.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.ReadEeprom,
@@ -155,7 +147,7 @@ namespace BitFab.KW1281Test
         /// <returns>The bytes or null if the bytes could not be read</returns>
         public List<byte>? ReadCcmRom(byte seg, byte msb, byte lsb, byte count)
         {
-            Logger.WriteLine(
+            Log.WriteLine(
                 $"Sending ReadEeprom block (Address: ${seg:X2}{msb:X2}{lsb:X2}, Count: ${count:X2})");
             var block = new List<byte>
             {
@@ -166,13 +158,13 @@ namespace BitFab.KW1281Test
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 (byte)(seg << 4)
             };
-            // Logger.WriteLine($"SEND {Utils.Dump(block)}");
+            // Log.WriteLine($"SEND {Utils.Dump(block)}");
             SendBlock(block);
             var blocks = ReceiveBlocks();
 
             if (blocks.Count == 1 && blocks[0] is NakBlock)
             {
-                // Logger.WriteLine($"RECV {Utils.Dump(blocks.First().Bytes)}");
+                // Log.WriteLine($"RECV {Utils.Dump(blocks.First().Bytes)}");
                 // Permissions issue
                 return null;
             }
@@ -187,7 +179,7 @@ namespace BitFab.KW1281Test
 
         public bool WriteEeprom(ushort address, List<byte> values)
         {
-            Logger.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Values: {Utils.DumpBytes(values)}");
+            Log.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Values: {Utils.DumpBytes(values)}");
 
             byte count = (byte)values.Count;
             var sendBody = new List<byte>
@@ -205,27 +197,27 @@ namespace BitFab.KW1281Test
             if (blocks.Count == 1 && blocks[0] is NakBlock)
             {
                 // Permissions issue
-                Logger.WriteLine("WriteEeprom failed");
+                Log.WriteLine("WriteEeprom failed");
                 return false;
             }
 
             blocks = blocks.Where(b => !b.IsAckNak).ToList();
             if (blocks.Count != 1)
             {
-                Logger.WriteLine($"WriteEeprom returned {blocks.Count} blocks instead of 1");
+                Log.WriteLine($"WriteEeprom returned {blocks.Count} blocks instead of 1");
                 return false;
             }
 
             var block = blocks[0];
             if (!(block is WriteEepromResponseBlock))
             {
-                Logger.WriteLine($"Expected WriteEepromResponseBlock but got {block.GetType()}");
+                Log.WriteLine($"Expected WriteEepromResponseBlock but got {block.GetType()}");
                 return false;
             }
 
             if (!Enumerable.SequenceEqual(block.Body, sendBody.Skip(1).Take(4)))
             {
-                Logger.WriteLine("WriteEepromResponseBlock body does not match WriteEepromBlock");
+                Log.WriteLine("WriteEepromResponseBlock body does not match WriteEepromBlock");
                 return false;
             }
 
@@ -234,7 +226,7 @@ namespace BitFab.KW1281Test
 
         public List<byte> ReadRomEeprom(ushort address, byte count)
         {
-            Logger.WriteLine($"Sending ReadRomEeprom block (Address: ${address:X4}, Count: ${count:X2})");
+            Log.WriteLine($"Sending ReadRomEeprom block (Address: ${address:X4}, Count: ${count:X2})");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.ReadRomEeprom,
@@ -259,7 +251,7 @@ namespace BitFab.KW1281Test
 
         public void EndCommunication()
         {
-            Logger.WriteLine("Sending EndCommunication block");
+            Log.WriteLine("Sending EndCommunication block");
             SendBlock(new List<byte> { (byte)BlockTitle.End });
         }
 
@@ -267,7 +259,7 @@ namespace BitFab.KW1281Test
         {
             var blockLength = (byte)(blockBytes.Count + 2);
 
-            blockBytes.Insert(0, _blockCounter.Value);
+            blockBytes.Insert(0, _blockCounter!.Value);
             _blockCounter++;
 
             blockBytes.Insert(0, blockLength);
@@ -385,7 +377,7 @@ namespace BitFab.KW1281Test
 
         public ActuatorTestResponseBlock? ActuatorTest(byte value)
         {
-            Logger.WriteLine($"Sending actuator test 0x{value:X2} block");
+            Log.WriteLine($"Sending actuator test 0x{value:X2} block");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.ActuatorTest,
@@ -396,14 +388,14 @@ namespace BitFab.KW1281Test
             blocks = blocks.Where(b => !b.IsAckNak).ToList();
             if (blocks.Count != 1)
             {
-                Logger.WriteLine($"ActuatorTest returned {blocks.Count} blocks instead of 1");
+                Log.WriteLine($"ActuatorTest returned {blocks.Count} blocks instead of 1");
                 return null;
             }
 
             var block = blocks[0];
-            if (!(block is ActuatorTestResponseBlock))
+            if (block is not ActuatorTestResponseBlock)
             {
-                Logger.WriteLine($"Expected ActuatorTestResponseBlock but got {block.GetType()}");
+                Log.WriteLine($"Expected ActuatorTestResponseBlock but got {block.GetType()}");
                 return null;
             }
 
@@ -412,7 +404,7 @@ namespace BitFab.KW1281Test
 
         public List<FaultCode>? ReadFaultCodes()
         {
-            Logger.WriteLine($"Sending ReadFaultCodes block");
+            Log.WriteLine($"Sending ReadFaultCodes block");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.FaultCodesRead
@@ -426,7 +418,7 @@ namespace BitFab.KW1281Test
             {
                 if (!(block is FaultCodesBlock))
                 {
-                    Logger.WriteLine($"Expected FaultCodesBlock but got {block.GetType()}");
+                    Log.WriteLine($"Expected FaultCodesBlock but got {block.GetType()}");
                     return null;
                 }
 
@@ -439,7 +431,7 @@ namespace BitFab.KW1281Test
 
         public bool ClearFaultCodes(int controllerAddress)
         {
-            Logger.WriteLine($"Sending ClearFaultCodes block");
+            Log.WriteLine($"Sending ClearFaultCodes block");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.FaultCodesDelete
@@ -485,7 +477,7 @@ namespace BitFab.KW1281Test
                 bytes[2]++;
             }
 
-            Logger.WriteLine($"Sending SoftwareCoding block");
+            Log.WriteLine($"Sending SoftwareCoding block");
             SendBlock(bytes);
 
             var blocks = ReceiveBlocks();
@@ -508,7 +500,7 @@ namespace BitFab.KW1281Test
                 channelNumber
             };
 
-            Logger.WriteLine($"Sending AdaptationRead block");
+            Log.WriteLine($"Sending AdaptationRead block");
             SendBlock(bytes);
 
             return ReceiveAdaptationBlock();
@@ -524,7 +516,7 @@ namespace BitFab.KW1281Test
                 (byte)(channelValue % 256)
             };
 
-            Logger.WriteLine($"Sending AdaptationTest block");
+            Log.WriteLine($"Sending AdaptationTest block");
             SendBlock(bytes);
 
             return ReceiveAdaptationBlock();
@@ -540,7 +532,7 @@ namespace BitFab.KW1281Test
                 (byte)(channelValue % 256)
             };
 
-            Logger.WriteLine($"Sending AdaptationSave block");
+            Log.WriteLine($"Sending AdaptationSave block");
             SendBlock(bytes);
 
             return ReceiveAdaptationBlock();
@@ -551,35 +543,37 @@ namespace BitFab.KW1281Test
             var blocks = ReceiveBlocks();
             if (blocks.Count == 1 && blocks[0] is NakBlock)
             {
-                Logger.WriteLine($"Received a NAK.");
+                Log.WriteLine($"Received a NAK.");
                 return false;
             }
 
             var responseBlock = blocks.Where(b => !b.IsAckNak).FirstOrDefault();
             if (responseBlock == null)
             {
-                Logger.WriteLine($"Didn't receive an Adaptation response block.");
+                Log.WriteLine($"Didn't receive an Adaptation response block.");
                 return false;
             }
 
             if (responseBlock is not AdaptationResponseBlock adaptationResponse)
             {
-                Logger.WriteLine($"Expected an Adaptation response block but received a ${responseBlock.Title:X2} block.");
+                Log.WriteLine($"Expected an Adaptation response block but received a ${responseBlock.Title:X2} block.");
                 return false;
             }
 
-            Logger.WriteLine($"Adaptation value: {adaptationResponse.ChannelValue}");
+            Log.WriteLine($"Adaptation value: {adaptationResponse.ChannelValue}");
 
             return true;
         }
 
         public IKwpCommon KwpCommon { get; }
 
-        private byte? _blockCounter = null;
+        private byte? _blockCounter;
 
-        public KW1281Dialog(IKwpCommon kwpCommon)
+        public KW1281Dialog(IKwpCommon kwpCommon, out ControllerInfo ecuInfo)
         {
             KwpCommon = kwpCommon;
+            var blocks = ReceiveBlocks();
+            ecuInfo = new ControllerInfo(blocks.Where(b => !b.IsAckNak));
         }
     }
 
@@ -598,7 +592,7 @@ namespace BitFab.KW1281Test
             _kw1281Dialog = kw1281Dialog;
         }
 
-        public ActuatorTestResponseBlock ActuatorTest(byte value)
+        public ActuatorTestResponseBlock? ActuatorTest(byte value)
         {
             Pause();
             var result = _kw1281Dialog.ActuatorTest(value);

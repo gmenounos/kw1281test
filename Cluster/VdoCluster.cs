@@ -17,7 +17,7 @@ namespace BitFab.KW1281Test.Cluster
         {
             var versionBlocks = new Dictionary<int, Block>();
 
-            Logger.WriteLine("Sending Custom \"Read Software Version\" blocks");
+            Log.WriteLine("Sending Custom \"Read Software Version\" blocks");
 
             // The cluster can return 4 variations of software version, specified by the 2nd byte
             // of the block:
@@ -32,11 +32,11 @@ namespace BitFab.KW1281Test.Cluster
                 {
                     if (variation == 0x00 || variation == 0x03)
                     {
-                        Logger.WriteLine($"{variation:X2}: {DumpMixedContent(block)}");
+                        Log.WriteLine($"{variation:X2}: {DumpMixedContent(block)}");
                     }
                     else
                     {
-                        Logger.WriteLine($"{variation:X2}: {DumpBinaryContent(block)}");
+                        Log.WriteLine($"{variation:X2}: {DumpBinaryContent(block)}");
                     }
                     versionBlocks[variation] = block;
                 }
@@ -47,13 +47,13 @@ namespace BitFab.KW1281Test.Cluster
 
         public void CustomReset()
         {
-            Logger.WriteLine("Sending Custom Reset block");
+            Log.WriteLine("Sending Custom Reset block");
             SendCustom(new List<byte> { 0x82 });
         }
 
         public List<byte> CustomReadMemory(uint address, byte count)
         {
-            Logger.WriteLine($"Sending Custom \"Read Memory\" block (Address: ${address:X6}, Count: ${count:X2})");
+            Log.WriteLine($"Sending Custom \"Read Memory\" block (Address: ${address:X6}, Count: ${count:X2})");
             var blocks = SendCustom(new List<byte>
             {
                 0x86,
@@ -81,7 +81,7 @@ namespace BitFab.KW1281Test.Cluster
         /// <returns></returns>
         public List<byte> CustomReadNecRom(ushort address, byte count)
         {
-            Logger.WriteLine($"Sending Custom \"Read NEC ROM\" block (Address: ${address:X4}, Count: ${count:X2})");
+            Log.WriteLine($"Sending Custom \"Read NEC ROM\" block (Address: ${address:X4}, Count: ${count:X2})");
             var blocks = SendCustom(new List<byte>
             {
                 0xA6,
@@ -140,11 +140,11 @@ namespace BitFab.KW1281Test.Cluster
 
             if (!succeeded)
             {
-                Logger.WriteLine();
-                Logger.WriteLine("**********************************************************************");
-                Logger.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-                Logger.WriteLine("**********************************************************************");
-                Logger.WriteLine();
+                Log.WriteLine();
+                Log.WriteLine("**********************************************************************");
+                Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
+                Log.WriteLine("**********************************************************************");
+                Log.WriteLine();
             }
         }
 
@@ -166,7 +166,7 @@ namespace BitFab.KW1281Test.Cluster
             var versionBlocks = CustomReadSoftwareVersion();
 
             // Now we need to send an unlock code that is unique to each ROM version
-            Logger.WriteLine("Sending Custom \"Unlock partial EEPROM read\" block");
+            Log.WriteLine("Sending Custom \"Unlock partial EEPROM read\" block");
             var softwareVersion = SoftwareVersionToString(versionBlocks[0].Body);
             var unlockCodes = GetClusterUnlockCodes(softwareVersion);
             var unlocked = false;
@@ -182,11 +182,11 @@ namespace BitFab.KW1281Test.Cluster
                 }
                 if (unlockResponse[0].IsAck)
                 {
-                    Logger.WriteLine(
+                    Log.WriteLine(
                         $"Unlock code for software version {softwareVersion} is {Utils.Dump(unlockCode)}");
                     if (unlockCodes.Length > 1)
                     {
-                        Logger.WriteLine("Please report this to the program maintainer.");
+                        Log.WriteLine("Please report this to the program maintainer.");
                     }
                     unlocked = true;
                     break;
@@ -203,17 +203,17 @@ namespace BitFab.KW1281Test.Cluster
         public void SeedKeyAuthenticate()
         {
             // Perform Seed/Key authentication
-            Logger.WriteLine("Sending Custom \"Seed request\" block");
+            Log.WriteLine("Sending Custom \"Seed request\" block");
             var response = SendCustom(new List<byte> { 0x96, 0x01 });
 
             var responseBlocks = response.Where(b => !b.IsAckNak).ToList();
             if (responseBlocks.Count == 1 && responseBlocks[0] is CustomBlock customBlock)
             {
-                Logger.WriteLine($"Block: {Utils.Dump(customBlock.Body)}");
+                Log.WriteLine($"Block: {Utils.Dump(customBlock.Body)}");
 
                 var keyBytes = VdoKeyFinder.FindKey(customBlock.Body.ToArray());
 
-                Logger.WriteLine("Sending Custom \"Key response\" block");
+                Log.WriteLine("Sending Custom \"Key response\" block");
 
                 var keyResponse = new List<byte> { 0x96, 0x02 };
                 keyResponse.AddRange(keyBytes);
@@ -224,7 +224,7 @@ namespace BitFab.KW1281Test.Cluster
 
         public bool RequiresSeedKey()
         {
-            Logger.WriteLine("Sending Custom \"Need Seed/Key?\" block");
+            Log.WriteLine("Sending Custom \"Need Seed/Key?\" block");
             var response = SendCustom(new List<byte> { 0x96, 0x04 });
             var responseBlocks = response.Where(b => !b.IsAckNak).ToList();
             if (responseBlocks.Count == 1 && responseBlocks[0] is CustomBlock)
@@ -258,7 +258,7 @@ namespace BitFab.KW1281Test.Cluster
                 @"[A-Z]{2}Z\dZ0[A-Z]\d{7}");
             if (!immoMatch.Success)
             {
-                Logger.WriteLine("GetSkc: Unable to find Immobilizer ID in cluster dump.");
+                Log.WriteLine("GetSkc: Unable to find Immobilizer ID in cluster dump.");
                 return null;
             }
 
@@ -281,7 +281,7 @@ namespace BitFab.KW1281Test.Cluster
                     skc = Utils.GetShort(bytes, 0x10A - startAddress);
                     return skc;
                 default:
-                    Logger.WriteLine(
+                    Log.WriteLine(
                         $"GetSkc: Unknown EEPROM (Immobilizer offset: 0x{immoMatch.Index:X3})");
                     return null;
             }
@@ -293,7 +293,7 @@ namespace BitFab.KW1281Test.Cluster
         /// </summary>
         private void CustomUnlockAdditionalCommands()
         {
-            Logger.WriteLine("Sending Custom \"Unlock Additional Commands\" block");
+            Log.WriteLine("Sending Custom \"Unlock Additional Commands\" block");
             SendCustom(new List<byte> { 0x80, 0x01, 0x02, 0x03, 0x04 });
         }
 

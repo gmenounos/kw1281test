@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -7,7 +6,7 @@ namespace BitFab.KW1281Test.Interface
 {
     class FtdiInterface : IInterface
     {
-        private FT? _ft = null;
+        private FT _ft;
         private IntPtr _handle = IntPtr.Zero;
         private readonly byte[] _buf = new byte[1];
 
@@ -60,11 +59,7 @@ namespace BitFab.KW1281Test.Interface
                 FT.AssertOk(status);
             }
 
-            if (_ft != null)
-            {
-                _ft.Dispose();
-                _ft = null;
-            }
+            _ft.Dispose();
         }
 
         public byte ReadByte()
@@ -126,23 +121,23 @@ namespace BitFab.KW1281Test.Interface
 
         // Delegates used to call into the FTID D2xx DLL
 #pragma warning disable CS0649
-        private readonly FTDll.SetVidPid? _setVidPid;
-        private readonly FTDll.OpenBySerialNumber? _openBySerialNumber;
-        private readonly FTDll.Close? _close;
-        private readonly FTDll.SetBaudRate? _setBaudRate;
-        private readonly FTDll.SetDataCharacteristics? _setDataCharacteristics;
-        private readonly FTDll.SetFlowControl? _setFlowControl;
-        private readonly FTDll.SetDtr? _setDtr;
-        private readonly FTDll.ClrDtr? _clrDtr;
-        private readonly FTDll.SetRts? _setRts;
-        private readonly FTDll.ClrRts? _clrRts;
-        private readonly FTDll.SetTimeouts? _setTimeouts;
-        private readonly FTDll.SetLatencyTimer? _setLatencyTimer;
-        private readonly FTDll.Purge? _purge;
-        private readonly FTDll.SetBreakOn? _setBreakOn;
-        private readonly FTDll.SetBreakOff? _setBreakOff;
-        private readonly FTDll.Read? _read;
-        private readonly FTDll.Write? _write;
+        private readonly FTDll.SetVidPid _setVidPid;
+        private readonly FTDll.OpenBySerialNumber _openBySerialNumber;
+        private readonly FTDll.Close _close;
+        private readonly FTDll.SetBaudRate _setBaudRate;
+        private readonly FTDll.SetDataCharacteristics _setDataCharacteristics;
+        private readonly FTDll.SetFlowControl _setFlowControl;
+        private readonly FTDll.SetDtr _setDtr;
+        private readonly FTDll.ClrDtr _clrDtr;
+        private readonly FTDll.SetRts _setRts;
+        private readonly FTDll.ClrRts _clrRts;
+        private readonly FTDll.SetTimeouts _setTimeouts;
+        private readonly FTDll.SetLatencyTimer _setLatencyTimer;
+        private readonly FTDll.Purge _purge;
+        private readonly FTDll.SetBreakOn _setBreakOn;
+        private readonly FTDll.SetBreakOff _setBreakOff;
+        private readonly FTDll.Read _read;
+        private readonly FTDll.Write _write;
 #pragma warning restore CS0649
 
         public FT()
@@ -173,38 +168,29 @@ namespace BitFab.KW1281Test.Interface
             _d2xx = NativeLibrary.Load(
                 libName, typeof(FT).Assembly, DllImportSearchPath.SafeDirectories);
 
-            List<string> fieldNames = new()
-            {
-                nameof(_openBySerialNumber),
-                nameof(_close),
-                nameof(_setBaudRate),
-                nameof(_setDataCharacteristics),
-                nameof(_setFlowControl),
-                nameof(_setDtr),
-                nameof(_clrDtr),
-                nameof(_setRts),
-                nameof(_clrRts),
-                nameof(_setTimeouts),
-                nameof(_setLatencyTimer),
-                nameof(_purge),
-                nameof(_setBreakOn),
-                nameof(_setBreakOff),
-                nameof(_read),
-                nameof(_write),
-            };
+            InitDelegate(nameof(_openBySerialNumber), out _openBySerialNumber);
+            InitDelegate(nameof(_close), out _close);
+            InitDelegate(nameof(_setBaudRate), out _setBaudRate);
+            InitDelegate(nameof(_setDataCharacteristics), out _setDataCharacteristics);
+            InitDelegate(nameof(_setFlowControl), out _setFlowControl);
+            InitDelegate(nameof(_setDtr), out _setDtr);
+            InitDelegate(nameof(_clrDtr), out _clrDtr);
+            InitDelegate(nameof(_setRts), out _setRts);
+            InitDelegate(nameof(_clrRts), out _clrRts);
+            InitDelegate(nameof(_setTimeouts), out _setTimeouts);
+            InitDelegate(nameof(_setLatencyTimer), out _setLatencyTimer);
+            InitDelegate(nameof(_purge), out _purge);
+            InitDelegate(nameof(_setBreakOn), out _setBreakOn);
+            InitDelegate(nameof(_setBreakOff), out _setBreakOff);
+            InitDelegate(nameof(_read), out _read);
+            InitDelegate(nameof(_write), out _write);
             if (isMacOs || isLinux)
             {
-                fieldNames.Add(nameof(_setVidPid));
+                InitDelegate(nameof(_setVidPid), out _setVidPid);
             }
-
-            foreach (var fieldName in fieldNames)
+            else
             {
-                var fieldInfo = typeof(FT).GetField(
-                    fieldName, BindingFlags.NonPublic | BindingFlags.Instance);
-                var nativeMethodName = fieldInfo.FieldType.GetCustomAttribute<SymbolNameAttribute>().Name;
-                var export = NativeLibrary.GetExport(_d2xx, nativeMethodName);
-                var delegateVal = Marshal.GetDelegateForFunctionPointer(export, fieldInfo.FieldType);
-                fieldInfo.SetValue(this, delegateVal);
+                _setVidPid = (uint vid, uint pid) => Status.Ok;
             }
 
             if (isMacOs || isLinux)
@@ -215,11 +201,24 @@ namespace BitFab.KW1281Test.Interface
                 {
                     var vid = Utils.ParseUint(vidStr);
                     var pid = Utils.ParseUint(pidStr);
-                    Logger.WriteLine($"Setting FTDI VID=0x{vid:X4}, PID=0x{pid:X4}");
+                    Log.WriteLine($"Setting FTDI VID=0x{vid:X4}, PID=0x{pid:X4}");
                     var status = SetVidPid(vid, pid);
                     AssertOk(status);
                 }
             }
+        }
+
+        private void InitDelegate<T>(string fieldName, out T delegateVal) where T : Delegate
+        {
+            var symbolNameAttribute = typeof(T).GetCustomAttribute<SymbolNameAttribute>();
+            if (symbolNameAttribute == null)
+            {
+                throw new InvalidOperationException(
+                    $"Type {typeof(T)} is missing required SymbolName attribute.");
+            }
+            var nativeMethodName = symbolNameAttribute.Name;
+            var export = NativeLibrary.GetExport(_d2xx, nativeMethodName);
+            delegateVal = Marshal.GetDelegateForFunctionPointer<T>(export);
         }
 
         public void Dispose()

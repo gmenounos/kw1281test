@@ -15,7 +15,7 @@ namespace BitFab.KW1281Test.Cluster
             {
                 throw new InvalidOperationException($"Received unexpected identificationOption: {responseMsg.Body[0]:X2}");
             }
-            Logger.WriteLine(Utils.DumpAscii(responseMsg.Body.Skip(1)));
+            Log.WriteLine(Utils.DumpAscii(responseMsg.Body.Skip(1)));
 
             const int maxTries = 16;
             for (var i = 0; i < maxTries; i++)
@@ -44,14 +44,14 @@ namespace BitFab.KW1281Test.Cluster
                             (byte)(key & 0xFF)
                         });
 
-                    Logger.WriteLine("Success!!!");
+                    Log.WriteLine("Success!!!");
                     return true;
                 }
                 catch (NegativeResponseException)
                 {
                     if (i < (maxTries - 1))
                     {
-                        Logger.WriteLine("Trying again.");
+                        Log.WriteLine("Trying again.");
                     }
                 }
             }

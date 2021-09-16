@@ -25,14 +25,14 @@ namespace BitFab.KW1281Test.Blocks
 
         private void Dump()
         {
-            Logger.Write($"Received Ascii data block: \"{ToString()}\"");
+            Log.Write($"Received Ascii data block: \"{ToString()}\"");
 
             if (MoreDataAvailable)
             {
-                Logger.Write(" (More data available via ReadIdent)");
+                Log.Write(" (More data available via ReadIdent)");
             }
 
-            Logger.WriteLine();
+            Log.WriteLine();
         }
     }
 }

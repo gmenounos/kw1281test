@@ -42,32 +42,32 @@ namespace BitFab.KW1281Test.Cluster
             }
             else if (address == 3072 && count == 1024)
             {
-                Logger.WriteLine("Untested cluster version! You may need to disconnect your battery if this fails.");
+                Log.WriteLine("Untested cluster version! You may need to disconnect your battery if this fails.");
 
                 entryH = 0x02;
                 regBlockH = 0x08;
             }
             else if (address == 14336 && count == 2048)
             {
-                Logger.WriteLine("Untested cluster version! You may need to disconnect your battery if this fails.");
+                Log.WriteLine("Untested cluster version! You may need to disconnect your battery if this fails.");
 
                 entryH = 0x18;
                 regBlockH = 0x20;
             }
             else
             {
-                Logger.WriteLine("Unsupported cluster software version");
+                Log.WriteLine("Unsupported cluster software version");
                 return Array.Empty<byte>();
             }
 
             filename ??= $"marelli_mem_${address:X4}.bin";
 
-            Logger.WriteLine("Sending block 0x6C");
+            Log.WriteLine("Sending block 0x6C");
             kwp1281.SendBlock(new List<byte> { 0x6C });
 
             Thread.Sleep(250);
 
-            Logger.WriteLine("Writing data to cluster microcontroller");
+            Log.WriteLine("Writing data to cluster microcontroller");
             var data = new byte[]
             {
                 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x50, 0x34,
@@ -80,7 +80,7 @@ namespace BitFab.KW1281Test.Cluster
 
             // Now we write a small memory dump program to the 68HC12 processor
 
-            Logger.WriteLine("Writing memory dump program to cluster microcontroller");
+            Log.WriteLine("Writing memory dump program to cluster microcontroller");
 
             var startH = (byte)(address / 256);
             var startL = (byte)(address % 256);
@@ -138,7 +138,7 @@ namespace BitFab.KW1281Test.Cluster
                 return Array.Empty<byte>();
             }
 
-            Logger.WriteLine("Receiving memory dump");
+            Log.WriteLine("Receiving memory dump");
 
             var mem = new List<byte>();
             for (int i = 0; i < count; i++)
@@ -148,9 +148,9 @@ namespace BitFab.KW1281Test.Cluster
             }
 
             File.WriteAllBytes(filename, mem.ToArray());
-            Logger.WriteLine($"Saved memory dump to {filename}");
+            Log.WriteLine($"Saved memory dump to {filename}");
 
-            Logger.WriteLine("Done");
+            Log.WriteLine("Done");
 
             return mem.ToArray();
         }
@@ -174,7 +174,7 @@ namespace BitFab.KW1281Test.Cluster
 
             var expectedAck = new byte[] { 0x03, 0x09, 0x00, 0x0C };
 
-            Logger.WriteLine("Receiving ACK");
+            Log.WriteLine("Receiving ACK");
             var ack = new List<byte>();
             for (int i = 0; i < 4; i++)
             {
@@ -183,7 +183,7 @@ namespace BitFab.KW1281Test.Cluster
             }
             if (!ack.SequenceEqual(expectedAck))
             {
-                Logger.WriteLine($"Expected ACK but received {Utils.Dump(ack)}");
+                Log.WriteLine($"Expected ACK but received {Utils.Dump(ack)}");
                 return false;
             }
 

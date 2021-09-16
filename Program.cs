@@ -1,6 +1,9 @@
-﻿using BitFab.KW1281Test.Cluster;
+﻿global using static BitFab.KW1281Test.Program;
+
+using BitFab.KW1281Test.Cluster;
 using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
+using BitFab.KW1281Test.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,23 +18,25 @@ namespace BitFab.KW1281Test
 {
     class Program
     {
+        public static ILog Log { get; private set; } = new ConsoleLog();
+
         static void Main(string[] args)
         {
             try
             {
-                Logger.Open("KW1281Test.log");
+                Log = new FileLog("KW1281Test.log");
 
                 var tester = new Program();
                 tester.Run(args);
             }
             catch (Exception ex)
             {
-                Logger.WriteLine($"Caught: {ex.GetType()} {ex.Message}");
-                Logger.WriteLine($"Unhandled exception: {ex}");
+                Log.WriteLine($"Caught: {ex.GetType()} {ex.Message}");
+                Log.WriteLine($"Unhandled exception: {ex}");
             }
             finally
             {
-                Logger.Close();
+                Log.Close();
             }
         }
 
@@ -48,11 +53,11 @@ namespace BitFab.KW1281Test
             var version = GetType().GetTypeInfo().Assembly
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
                 .InformationalVersion;
-            Logger.WriteLine($"Version {version} (https://github.com/gmenounos/kw1281test/releases)");
-            Logger.WriteLine($"Args: {string.Join(' ', args)}");
-            Logger.WriteLine($"OSVersion: {Environment.OSVersion}");
-            Logger.WriteLine($".NET Version: {Environment.Version}");
-            Logger.WriteLine($"Culture: {CultureInfo.InstalledUICulture}");
+            Log.WriteLine($"Version {version} (https://github.com/gmenounos/kw1281test/releases)");
+            Log.WriteLine($"Args: {string.Join(' ', args)}");
+            Log.WriteLine($"OSVersion: {Environment.OSVersion}");
+            Log.WriteLine($".NET Version: {Environment.Version}");
+            Log.WriteLine($"Culture: {CultureInfo.InstalledUICulture}");
 
             if (args.Length < 4)
             {
@@ -138,13 +143,13 @@ namespace BitFab.KW1281Test
                 softwareCoding = (int)Utils.ParseUint(args[4]);
                 if (softwareCoding > 32767)
                 {
-                    Logger.WriteLine("SoftwareCoding cannot be greater than 32767.");
+                    Log.WriteLine("SoftwareCoding cannot be greater than 32767.");
                     return;
                 }
                 workshopCode = (int)Utils.ParseUint(args[5]);
                 if (workshopCode > 99999)
                 {
-                    Logger.WriteLine("WorkshopCode cannot be greater than 99999.");
+                    Log.WriteLine("WorkshopCode cannot be greater than 99999.");
                     return;
                 }
             }
@@ -331,7 +336,7 @@ namespace BitFab.KW1281Test
 
         private ControllerInfo Kwp1281Wakeup(bool evenParityWakeup = false)
         {
-            Logger.WriteLine("Sending wakeup message");
+            Log.WriteLine("Sending wakeup message");
 
             var kwpVersion = _kwpCommon!.WakeUp((byte)_controllerAddress, evenParityWakeup);
 
@@ -340,17 +345,15 @@ namespace BitFab.KW1281Test
                 throw new InvalidOperationException("Expected KWP1281 protocol.");
             }
 
-            _kwp1281 = new KW1281Dialog(_kwpCommon);
-
-            var ecuInfo = _kwp1281.ReadEcuInfo();
-            Logger.WriteLine($"ECU: {ecuInfo}");
+            _kwp1281 = new KW1281Dialog(_kwpCommon, out ControllerInfo ecuInfo);
+            Log.WriteLine($"ECU: {ecuInfo}");
 
             return ecuInfo;
         }
 
         private KW2000Dialog Kwp2000Wakeup(bool evenParityWakeup = false)
         {
-            Logger.WriteLine("Sending wakeup message");
+            Log.WriteLine("Sending wakeup message");
 
             var kwpVersion = _kwpCommon!.WakeUp((byte)_controllerAddress, evenParityWakeup);
 
@@ -377,12 +380,12 @@ namespace BitFab.KW1281Test
         {
             if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
             {
-                Logger.WriteLine($"Opening FTDI serial port {portName}");
+                Log.WriteLine($"Opening FTDI serial port {portName}");
                 return new FtdiInterface(portName, baudRate);
             }
             else
             {
-                Logger.WriteLine($"Opening serial port {portName}");
+                Log.WriteLine($"Opening serial port {portName}");
                 return new GenericInterface(portName, baudRate);
             }
         }
@@ -399,10 +402,10 @@ namespace BitFab.KW1281Test
                 var response = keepAlive.ActuatorTest(0x00);
                 if (response == null || response.ActuatorName == "End")
                 {
-                    Logger.WriteLine("End of test.");
+                    Log.WriteLine("End of test.");
                     break;
                 }
-                Logger.WriteLine($"Actuator Test: {response.ActuatorName}");
+                Log.WriteLine($"Actuator Test: {response.ActuatorName}");
 
                 // Press any key to advance to next test or press Q to exit
                 Console.Write("Press 'N' to advance to next test or 'Q' to quit");
@@ -456,7 +459,7 @@ namespace BitFab.KW1281Test
         {
             if (_controllerAddress != (int)ControllerAddress.Radio)
             {
-                Logger.WriteLine("Only supported for radio address 56");
+                Log.WriteLine("Only supported for radio address 56");
                 return;
             }
 
@@ -469,17 +472,17 @@ namespace BitFab.KW1281Test
 
             if (block == null)
             {
-                Logger.WriteLine("No response received from radio.");
+                Log.WriteLine("No response received from radio.");
             }
             else if (block.Title != readWriteSafeCode)
             {
-                Logger.WriteLine(
+                Log.WriteLine(
                     $"Unexpected response received from radio. Block title: ${block.Title:X2}");
             }
             else
             {
                 var safeCode = block.Body[0] * 256 + block.Body[1];
-                Logger.WriteLine($"Safe code: {safeCode:X4}");
+                Log.WriteLine($"Safe code: {safeCode:X4}");
             }
         }
 
@@ -488,11 +491,11 @@ namespace BitFab.KW1281Test
             var succeeded = kwp1281.ClearFaultCodes(_controllerAddress);
             if (succeeded)
             {
-                Logger.WriteLine("Fault codes cleared.");
+                Log.WriteLine("Fault codes cleared.");
             }
             else
             {
-                Logger.WriteLine("Failed to clear fault codes.");
+                Log.WriteLine("Failed to clear fault codes.");
             }
         }
 
@@ -500,7 +503,7 @@ namespace BitFab.KW1281Test
         {
             if (_controllerAddress != (int)ControllerAddress.RadioManufacturing)
             {
-                Logger.WriteLine("Only supported for radio manufacturing address 7C");
+                Log.WriteLine("Only supported for radio manufacturing address 7C");
                 return;
             }
 
@@ -511,7 +514,7 @@ namespace BitFab.KW1281Test
 
             kwp1281.Login(code, workshopCode);
             var bytes = kwp1281.ReadRomEeprom(0x0014, 2);
-            Logger.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
+            Log.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
         }
 
         private void DumpCcmRom(IKW1281Dialog kwp1281)
@@ -519,7 +522,7 @@ namespace BitFab.KW1281Test
             if (_controllerAddress != (int)ControllerAddress.CCM &&
                 _controllerAddress != (int)ControllerAddress.CentralLocking)
             {
-                Logger.WriteLine("Only supported for CCM and Central Locking");
+                Log.WriteLine("Only supported for CCM and Central Locking");
                 return;
             }
 
@@ -528,7 +531,7 @@ namespace BitFab.KW1281Test
             var dumpFileName = _filename ?? "ccm_rom_dump.bin";
             const byte blockSize = 8;
 
-            Logger.WriteLine($"Saving CCM ROM to {dumpFileName}");
+            Log.WriteLine($"Saving CCM ROM to {dumpFileName}");
 
             bool succeeded = true;
             using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
@@ -560,11 +563,11 @@ namespace BitFab.KW1281Test
 
             if (!succeeded)
             {
-                Logger.WriteLine();
-                Logger.WriteLine("**********************************************************************");
-                Logger.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-                Logger.WriteLine("**********************************************************************");
-                Logger.WriteLine();
+                Log.WriteLine();
+                Log.WriteLine("**********************************************************************");
+                Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
+                Log.WriteLine("**********************************************************************");
+                Log.WriteLine();
             }
         }
 
@@ -572,14 +575,14 @@ namespace BitFab.KW1281Test
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
-                Logger.WriteLine("Only supported for cluster");
+                Log.WriteLine("Only supported for cluster");
                 return;
             }
 
             var dumpFileName = _filename ?? "cluster_nec_rom_dump.bin";
             const byte blockSize = 16;
 
-            Logger.WriteLine($"Saving cluster NEC ROM to {dumpFileName}");
+            Log.WriteLine($"Saving cluster NEC ROM to {dumpFileName}");
 
             bool succeeded = true;
             using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
@@ -607,11 +610,11 @@ namespace BitFab.KW1281Test
 
             if (!succeeded)
             {
-                Logger.WriteLine();
-                Logger.WriteLine("**********************************************************************");
-                Logger.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-                Logger.WriteLine("**********************************************************************");
-                Logger.WriteLine();
+                Log.WriteLine();
+                Log.WriteLine("**********************************************************************");
+                Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
+                Log.WriteLine("**********************************************************************");
+                Log.WriteLine();
             }
         }
 
@@ -655,7 +658,7 @@ namespace BitFab.KW1281Test
                     DumpCcmEeprom(kwp1281, (ushort)address, (ushort)length);
                     break;
                 default:
-                    Logger.WriteLine("Only supported for cluster, CCM and Central Locking");
+                    Log.WriteLine("Only supported for cluster, CCM and Central Locking");
                     break;
             }
         }
@@ -664,7 +667,7 @@ namespace BitFab.KW1281Test
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
-                Logger.WriteLine("Only supported for clusters");
+                Log.WriteLine("Only supported for clusters");
             }
             else
             {
@@ -678,7 +681,7 @@ namespace BitFab.KW1281Test
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
-                Logger.WriteLine("Only supported for cluster");
+                Log.WriteLine("Only supported for cluster");
                 return;
             }
 
@@ -693,7 +696,7 @@ namespace BitFab.KW1281Test
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
-                Logger.WriteLine("Only supported for cluster (address 17)");
+                Log.WriteLine("Only supported for cluster (address 17)");
                 return null;
             }
 
@@ -722,12 +725,12 @@ namespace BitFab.KW1281Test
                         switch(partNumberMatch.Groups[2].Value)
                         {
                             case "19": // Non-CAN
-                                Logger.WriteLine($"Cluster is non-Immo so there is no SKC.");
+                                Log.WriteLine($"Cluster is non-Immo so there is no SKC.");
                                 return;
                             case "20": // CAN
                                 break;
                             default:
-                                Logger.WriteLine($"Unknown cluster: {ecuInfo.Text}");
+                                Log.WriteLine($"Unknown cluster: {ecuInfo.Text}");
                                 return;
                         }
 
@@ -737,11 +740,11 @@ namespace BitFab.KW1281Test
                         var skc = VdoCluster.GetSkc(buf, startAddress);
                         if (skc.HasValue)
                         {
-                            Logger.WriteLine($"SKC: {skc:D5}");
+                            Log.WriteLine($"SKC: {skc:D5}");
                         }
                         else
                         {
-                            Logger.WriteLine($"Unable to determine SKC.");
+                            Log.WriteLine($"Unable to determine SKC.");
                         }
                     }
                     else
@@ -760,7 +763,7 @@ namespace BitFab.KW1281Test
                         Kwp2000Wakeup(evenParityWakeup: true), 0x1040E, 2);
                     var buf = File.ReadAllBytes(dumpFileName!);
                     var skc = Utils.GetShort(buf, 0);
-                    Logger.WriteLine($"SKC: {skc:D5}");
+                    Log.WriteLine($"SKC: {skc:D5}");
                 }
                 else if (ecuInfo.Text.Contains("M73"))
                 {
@@ -769,12 +772,12 @@ namespace BitFab.KW1281Test
                     if (buf.Length == 0x400)
                     {
                         var skc = Utils.GetShortBE(buf, 0x313);
-                        Logger.WriteLine($"SKC: {skc:D5}");
+                        Log.WriteLine($"SKC: {skc:D5}");
                     }
                     else if (buf.Length == 0x800)
                     {
                         var skc = Utils.GetShortBE(buf, 0x348);
-                        Logger.WriteLine($"SKC: {skc:D5}");
+                        Log.WriteLine($"SKC: {skc:D5}");
                     }
                     else
                     {
@@ -794,12 +797,12 @@ namespace BitFab.KW1281Test
                 var immo1 = buf[0x1B0];
                 var immo2 = buf[0x1DE];
                 var immoStatus = immo1 == 0x60 && immo2 == 0x60 ? "Off" : "On";
-                Logger.WriteLine($"SKC: {skc:D5}");
-                Logger.WriteLine($"Immo is {immoStatus} (${immo1:X2}, ${immo2:X2})");
+                Log.WriteLine($"SKC: {skc:D5}");
+                Log.WriteLine($"Immo is {immoStatus} (${immo1:X2}, ${immo2:X2})");
             }
             else
             {
-                Logger.WriteLine("Only supported for clusters (address 17) and ECUs (address 1)");
+                Log.WriteLine("Only supported for clusters (address 17) and ECUs (address 1)");
             }
         }
 
@@ -807,7 +810,7 @@ namespace BitFab.KW1281Test
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
-                Logger.WriteLine("Only supported for cluster");
+                Log.WriteLine("Only supported for cluster");
                 return;
             }
 
@@ -826,7 +829,7 @@ namespace BitFab.KW1281Test
                     MapCcmEeprom(kwp1281);
                     break;
                 default:
-                    Logger.WriteLine("Only supported for cluster, CCM and Central Locking");
+                    Log.WriteLine("Only supported for cluster, CCM and Central Locking");
                     break;
             }
         }
@@ -838,12 +841,12 @@ namespace BitFab.KW1281Test
             var blockBytes = kwp1281.ReadEeprom((ushort)address, 1);
             if (blockBytes == null)
             {
-                Logger.WriteLine("EEPROM read failed");
+                Log.WriteLine("EEPROM read failed");
             }
             else
             {
                 var value = blockBytes[0];
-                Logger.WriteLine(
+                Log.WriteLine(
                     $"Address {address} (${address:X4}): Value {value} (${value:X2})");
             }
         }
@@ -853,10 +856,10 @@ namespace BitFab.KW1281Test
             var faultCodes = kwp1281.ReadFaultCodes();
             if (faultCodes != null)
             {
-                Logger.WriteLine("Fault codes:");
+                Log.WriteLine("Fault codes:");
                 foreach (var faultCode in faultCodes)
                 {
-                    Logger.WriteLine($"    {faultCode}");
+                    Log.WriteLine($"    {faultCode}");
                 }
             }
         }
@@ -865,7 +868,7 @@ namespace BitFab.KW1281Test
         {
             foreach (var identInfo in kwp1281.ReadIdent())
             {
-                Logger.WriteLine($"Ident: {identInfo}");
+                Log.WriteLine($"Ident: {identInfo}");
             }
         }
 
@@ -878,7 +881,7 @@ namespace BitFab.KW1281Test
             }
             else
             {
-                Logger.WriteLine("Only supported for cluster");
+                Log.WriteLine("Only supported for cluster");
             }
         }
 
@@ -891,7 +894,7 @@ namespace BitFab.KW1281Test
             }
             else
             {
-                Logger.WriteLine("Only supported for cluster");
+                Log.WriteLine("Only supported for cluster");
             }
         }
 
@@ -901,11 +904,11 @@ namespace BitFab.KW1281Test
             var succeeded = kwp1281.SetSoftwareCoding(_controllerAddress, softwareCoding, workshopCode);
             if (succeeded)
             {
-                Logger.WriteLine("Software coding set.");
+                Log.WriteLine("Software coding set.");
             }
             else
             {
-                Logger.WriteLine("Failed to set software coding.");
+                Log.WriteLine("Failed to set software coding.");
             }
         }
 
@@ -933,7 +936,7 @@ namespace BitFab.KW1281Test
                 bytes.AddRange(blockBytes);
             }
             var dumpFileName = _filename ?? "ccm_eeprom_map.bin";
-            Logger.WriteLine($"Saving EEPROM map to {dumpFileName}");
+            Log.WriteLine($"Saving EEPROM map to {dumpFileName}");
             File.WriteAllBytes(dumpFileName, bytes.ToArray());
         }
 
@@ -944,7 +947,7 @@ namespace BitFab.KW1281Test
             var map = cluster.MapEeprom();
 
             var mapFileName = _filename ?? "eeprom_map.bin";
-            Logger.WriteLine($"Saving EEPROM map to {mapFileName}");
+            Log.WriteLine($"Saving EEPROM map to {mapFileName}");
             File.WriteAllBytes(mapFileName, map.ToArray());
         }
 
@@ -954,9 +957,9 @@ namespace BitFab.KW1281Test
 
             var dumpFileName = _filename ?? $"ccm_eeprom_${startAddress:X4}.bin";
 
-            Logger.WriteLine($"Saving EEPROM dump to {dumpFileName}");
+            Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             DumpEeprom(kwp1281, startAddress, length, maxReadLength: 12, dumpFileName);
-            Logger.WriteLine($"Saved EEPROM dump to {dumpFileName}");
+            Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
         }
 
         private void UnlockControllerForEepromReadWrite(IKW1281Dialog kwp1281)
@@ -973,12 +976,12 @@ namespace BitFab.KW1281Test
                     var cluster = new VdoCluster(kwp1281);
                     if (!cluster.Unlock())
                     {
-                        Logger.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
+                        Log.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
                     }
 
                     if (!cluster.RequiresSeedKey())
                     {
-                        Logger.WriteLine(
+                        Log.WriteLine(
                             "Cluster is unlocked for ROM/EEPROM access. Skipping Seed/Key login.");
                         return;
                     }
@@ -986,11 +989,11 @@ namespace BitFab.KW1281Test
                     cluster.SeedKeyAuthenticate();
                     if (cluster.RequiresSeedKey())
                     {
-                        Logger.WriteLine("Failed to unlock cluster.");
+                        Log.WriteLine("Failed to unlock cluster.");
                     }
                     else
                     {
-                        Logger.WriteLine("Cluster is unlocked for ROM/EEPROM access.");
+                        Log.WriteLine("Cluster is unlocked for ROM/EEPROM access.");
                     }
                     break;
             }
@@ -1019,11 +1022,11 @@ namespace BitFab.KW1281Test
 
             if (!succeeded)
             {
-                Logger.WriteLine();
-                Logger.WriteLine("**********************************************************************");
-                Logger.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-                Logger.WriteLine("**********************************************************************");
-                Logger.WriteLine();
+                Log.WriteLine();
+                Log.WriteLine("**********************************************************************");
+                Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
+                Log.WriteLine("**********************************************************************");
+                Log.WriteLine();
             }
         }
 
@@ -1045,7 +1048,7 @@ namespace BitFab.KW1281Test
 
             if (!succeeded)
             {
-                Logger.WriteLine("EEPROM write failed. You should probably try again.");
+                Log.WriteLine("EEPROM write failed. You should probably try again.");
             }
         }
 
@@ -1059,9 +1062,9 @@ namespace BitFab.KW1281Test
 
             var dumpFileName = _filename ?? $"{identInfo}_${startAddress:X4}_eeprom.bin";
 
-            Logger.WriteLine($"Saving EEPROM dump to {dumpFileName}");
+            Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             DumpEeprom(kwp1281, startAddress, length, maxReadLength: 16, dumpFileName);
-            Logger.WriteLine($"Saved EEPROM dump to {dumpFileName}");
+            Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
 
             return dumpFileName;
         }
@@ -1074,14 +1077,14 @@ namespace BitFab.KW1281Test
 
             if (!File.Exists(filename))
             {
-                Logger.WriteLine($"File {filename} does not exist.");
+                Log.WriteLine($"File {filename} does not exist.");
                 return;
             }
 
-            Logger.WriteLine($"Reading {filename}");
+            Log.WriteLine($"Reading {filename}");
             var bytes = File.ReadAllBytes(filename);
 
-            Logger.WriteLine("Writing to cluster...");
+            Log.WriteLine("Writing to cluster...");
             WriteEeprom(kwp1281, address, bytes, 16);
         }
 
@@ -1090,7 +1093,7 @@ namespace BitFab.KW1281Test
             var cluster = new VdoCluster(kwp1281);
             if (!cluster.RequiresSeedKey())
             {
-                Logger.WriteLine(
+                Log.WriteLine(
                     "Cluster is unlocked for memory access. Skipping Seed/Key login.");
             }
             else
@@ -1099,16 +1102,16 @@ namespace BitFab.KW1281Test
             }
 
             var dumpFileName = _filename ?? $"cluster_mem_${startAddress:X6}.bin";
-            Logger.WriteLine($"Saving memory dump to {dumpFileName}");
+            Log.WriteLine($"Saving memory dump to {dumpFileName}");
 
             cluster.DumpMem(dumpFileName, startAddress, length);
 
-            Logger.WriteLine($"Saved memory dump to {dumpFileName}");
+            Log.WriteLine($"Saved memory dump to {dumpFileName}");
         }
 
         private static void ShowUsage()
         {
-            Logger.WriteLine(@"Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
+            Log.WriteLine(@"Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
     PORT = COM1|COM2|etc.
     BAUD = 10400|9600|etc.
     ADDRESS = The controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)

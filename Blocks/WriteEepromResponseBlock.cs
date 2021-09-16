@@ -12,13 +12,13 @@ namespace BitFab.KW1281Test.Blocks
 
         private void Dump()
         {
-            Logger.Write("Received \"Write EEPROM Response\" block:");
+            Log.Write("Received \"Write EEPROM Response\" block:");
             foreach (var b in Body)
             {
-                Logger.Write($" {b:X2}");
+                Log.Write($" {b:X2}");
             }
 
-            Logger.WriteLine();
+            Log.WriteLine();
         }
     }
 }

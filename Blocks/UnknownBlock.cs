@@ -11,12 +11,12 @@ namespace BitFab.KW1281Test.Blocks
 
         private void Dump()
         {
-            Logger.Write($"Received ${Title:X2} block:");
+            Log.Write($"Received ${Title:X2} block:");
             foreach (var b in Bytes)
             {
-                Logger.Write($" 0x{b:X2}");
+                Log.Write($" 0x{b:X2}");
             }
-            Logger.WriteLine();
+            Log.WriteLine();
         }
     }
 }

@@ -42,7 +42,7 @@ namespace BitFab.KW1281Test
                 // Throw away anything that might be in the receive buffer
                 Interface.ClearReceiveBuffer();
 
-                Logger.WriteLine("Reading sync byte");
+                Log.WriteLine("Reading sync byte");
                 try
                 {
                     syncByte = Interface.ReadByte();
@@ -52,7 +52,7 @@ namespace BitFab.KW1281Test
                 {
                     if (i < maxTries)
                     {
-                        Logger.WriteLine("Retrying wakeup message...");
+                        Log.WriteLine("Retrying wakeup message...");
                     }
                     else
                     {
@@ -73,16 +73,16 @@ namespace BitFab.KW1281Test
             }
 
             var keywordLsb = Interface.ReadByte();
-            Logger.WriteLine($"Keyword Lsb ${keywordLsb:X2}");
+            Log.WriteLine($"Keyword Lsb ${keywordLsb:X2}");
 
             var keywordMsb = ReadByte();
-            Logger.WriteLine($"Keyword Msb ${keywordMsb:X2}");
+            Log.WriteLine($"Keyword Msb ${keywordMsb:X2}");
 
             Thread.Sleep(25);
             WriteComplement(keywordMsb);
 
             var protocolVersion = ((keywordMsb & 0x7F) << 7) + (keywordLsb & 0x7F);
-            Logger.WriteLine($"Protocol is KW {protocolVersion} (8N1)");
+            Log.WriteLine($"Protocol is KW {protocolVersion} (8N1)");
 
             if (protocolVersion >= 2000)
             {

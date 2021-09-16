@@ -12,7 +12,7 @@ namespace BitFab.KW1281Test.Blocks
 
         private void Dump()
         {
-            Logger.WriteLine("Received ACK block");
+            Log.WriteLine("Received ACK block");
         }
     }
 }
