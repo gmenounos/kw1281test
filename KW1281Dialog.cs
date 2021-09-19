@@ -62,6 +62,8 @@ namespace BitFab.KW1281Test
         /// <returns>True if successful.</returns>
         bool SetSoftwareCoding(int controllerAddress, int softwareCoding, int workshopCode);
 
+        bool GroupReading(byte groupNumber);
+
         public IKwpCommon KwpCommon { get; }
     }
 
@@ -337,6 +339,7 @@ namespace BitFab.KW1281Test
                 (byte)BlockTitle.ReadRomEepromResponse => new ReadRomEepromResponse(blockBytes),
                 (byte)BlockTitle.WriteEepromResponse => new WriteEepromResponseBlock(blockBytes),
                 (byte)BlockTitle.AdaptationResponse => new AdaptationResponseBlock(blockBytes),
+                (byte)BlockTitle.GroupReadingResponse => new GroupReadingResponseBlock(blockBytes),
                 _ => new UnknownBlock(blockBytes),
             };
         }
@@ -561,6 +564,42 @@ namespace BitFab.KW1281Test
             }
 
             Log.WriteLine($"Adaptation value: {adaptationResponse.ChannelValue}");
+
+            return true;
+        }
+
+        public bool GroupReading(byte groupNumber)
+        {
+            var bytes = new List<byte>
+            {
+                (byte)BlockTitle.GroupReading,
+                groupNumber
+            };
+
+            Log.WriteLine($"Sending Group Reading block");
+            SendBlock(bytes);
+
+            var blocks = ReceiveBlocks();
+            if (blocks.Count == 1 && blocks[0] is NakBlock)
+            {
+                Log.WriteLine($"Received a NAK.");
+                return false;
+            }
+
+            var responseBlock = blocks.Where(b => !b.IsAckNak).FirstOrDefault();
+            if (responseBlock == null)
+            {
+                Log.WriteLine($"Didn't receive a Group Reading response block.");
+                return false;
+            }
+
+            if (responseBlock is not GroupReadingResponseBlock groupReading)
+            {
+                Log.WriteLine($"Expected a Group Reading response block but received a ${responseBlock.Title:X2} block.");
+                return false;
+            }
+
+            Log.WriteLine(groupReading.ToString());
 
             return true;
         }

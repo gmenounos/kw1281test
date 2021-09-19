@@ -47,6 +47,8 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
             CHANNEL = Channel number (0-99)
             VALUE = Channel value (0-65535)
             LOGIN = Optional login (0-65535)
+        BasicSettings GROUP
+            GROUP = Group number (1-255)
         ClarionVWPremium4SafeCode
         ClearFaultCodes
         DelcoVWPremium5SafeCode
@@ -69,6 +71,8 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
             LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
             FILENAME = Optional filename
         GetSKC
+        GroupReading GROUP
+            GROUP = Group number (1-255)
         LoadEeprom START FILENAME
             START = Start address in decimal (e.g. 0) or hex (e.g. $0)
             FILENAME = Name of file containing binary data to load into EEPROM
