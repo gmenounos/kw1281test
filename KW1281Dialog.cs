@@ -62,7 +62,7 @@ namespace BitFab.KW1281Test
         /// <returns>True if successful.</returns>
         bool SetSoftwareCoding(int controllerAddress, int softwareCoding, int workshopCode);
 
-        bool GroupReading(byte groupNumber);
+        bool GroupRead(byte groupNumber, bool useBasicSetting = false);
 
         public IKwpCommon KwpCommon { get; }
     }
@@ -339,7 +339,8 @@ namespace BitFab.KW1281Test
                 (byte)BlockTitle.ReadRomEepromResponse => new ReadRomEepromResponse(blockBytes),
                 (byte)BlockTitle.WriteEepromResponse => new WriteEepromResponseBlock(blockBytes),
                 (byte)BlockTitle.AdaptationResponse => new AdaptationResponseBlock(blockBytes),
-                (byte)BlockTitle.GroupReadingResponse => new GroupReadingResponseBlock(blockBytes),
+                (byte)BlockTitle.GroupReadResponse => new GroupReadResponseBlock(blockBytes),
+                (byte)BlockTitle.RawDataReadResponse => new RawDataReadResponseBlock(blockBytes),
                 _ => new UnknownBlock(blockBytes),
             };
         }
@@ -568,40 +569,123 @@ namespace BitFab.KW1281Test
             return true;
         }
 
-        public bool GroupReading(byte groupNumber)
+        public bool GroupRead(byte groupNumber, bool useBasicSetting = false)
         {
-            var bytes = new List<byte>
+            if (groupNumber == 0)
             {
-                (byte)BlockTitle.GroupReading,
-                groupNumber
-            };
-
-            Log.WriteLine($"Sending Group Reading block");
-            SendBlock(bytes);
-
-            var blocks = ReceiveBlocks();
-            if (blocks.Count == 1 && blocks[0] is NakBlock)
-            {
-                Log.WriteLine($"Received a NAK.");
-                return false;
+                return RawDataRead(useBasicSetting);
             }
 
-            var responseBlock = blocks.Where(b => !b.IsAckNak).FirstOrDefault();
-            if (responseBlock == null)
+            if (useBasicSetting)
             {
-                Log.WriteLine($"Didn't receive a Group Reading response block.");
-                return false;
+                Log.WriteLine($"Sending Basic Setting Read blocks...");
+            }
+            else
+            {
+                Log.WriteLine($"Sending Group Read blocks...");
             }
 
-            if (responseBlock is not GroupReadingResponseBlock groupReading)
+            Console.WriteLine("[Up arrow | Down arrow | Q to quit]");
+            while (true)
             {
-                Log.WriteLine($"Expected a Group Reading response block but received a ${responseBlock.Title:X2} block.");
-                return false;
-            }
+                if (Console.KeyAvailable)
+                {
+                    var keyInfo = Console.ReadKey(intercept: true);
+                    if (keyInfo.Key == ConsoleKey.UpArrow)
+                    {
+                        if (groupNumber < 255)
+                        {
+                            groupNumber++;
+                        }
+                    }
+                    else if (keyInfo.Key == ConsoleKey.DownArrow)
+                    {
+                        if (groupNumber > 1)
+                        {
+                            groupNumber--;
+                        }
+                    }
+                    else if (keyInfo.Key == ConsoleKey.Q)
+                    {
+                        break;
+                    }
+                }
 
-            Log.WriteLine(groupReading.ToString());
+                var bytes = new List<byte>
+                {
+                    (byte)(useBasicSetting ? BlockTitle.BasicSettingRead : BlockTitle.GroupRead),
+                    groupNumber
+                };
+                SendBlock(bytes);
+
+                var responseBlock = ReceiveBlock();
+                if (responseBlock is NakBlock)
+                {
+                    Overlay($"Group {groupNumber:D3}: Not Available");
+                }
+                else if (responseBlock is not GroupReadResponseBlock groupReading)
+                {
+                    Log.WriteLine($"Expected a Group Reading response block but received a ${responseBlock.Title:X2} block.");
+                    return false;
+                }
+                else
+                {
+                    Overlay($"Group {groupNumber:D3}: {groupReading}");
+                }
+            }
+            Console.WriteLine();
 
             return true;
+        }
+
+        private bool RawDataRead(bool useBasicSetting)
+        {
+            if (useBasicSetting)
+            {
+                Log.WriteLine($"Sending Basic Setting Raw Data Read block");
+            }
+            else
+            {
+                Log.WriteLine($"Sending Raw Data Read block");
+            }
+
+            Console.WriteLine("[Press a key to quit]");
+            while (!Console.KeyAvailable)
+            {
+                var bytes = new List<byte>
+                {
+                    (byte)(useBasicSetting ? BlockTitle.BasicSettingRawDataRead : BlockTitle.RawDataRead)
+                };
+                SendBlock(bytes);
+
+                var responseBlock = ReceiveBlock();
+
+                if (responseBlock is not RawDataReadResponseBlock rawDataReadResponse)
+                {
+                    Log.WriteLine($"Expected a Raw Data Read response block but received a ${responseBlock.Title:X2} block.");
+                    return false;
+                }
+
+                Overlay(rawDataReadResponse.ToString());
+            }
+            Console.WriteLine();
+
+            return true;
+        }
+
+        /// <summary>
+        /// Erase the current console line and replace it with message.
+        /// </summary>
+        private void Overlay(string message)
+        {
+            (int left, int top) = Console.GetCursorPosition();
+            Console.SetCursorPosition(0, top);
+            if (left > 0)
+            {
+                Console.Write(new string(' ', left));
+                Console.SetCursorPosition(0, top);
+            }
+            Console.Write(message);
         }
 
         public IKwpCommon KwpCommon { get; }

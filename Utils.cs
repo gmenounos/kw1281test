@@ -27,6 +27,16 @@ namespace BitFab.KW1281Test
             return sb.ToString();
         }
 
+        public static string DumpDecimal(IEnumerable<byte> bytes)
+        {
+            var sb = new StringBuilder();
+            foreach (var b in bytes)
+            {
+                sb.Append($" {b:D3}");
+            }
+            return sb.ToString();
+        }
+
         public static string DumpAscii(IEnumerable<byte> bytes)
         {
             var sb = new StringBuilder();

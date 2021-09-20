@@ -201,8 +201,8 @@ namespace BitFab.KW1281Test
                 }
             }
             else if (
-                string.Compare(command, "BasicSettings", true) == 0 ||
-                string.Compare(command, "GroupReading", true) == 0)
+                string.Compare(command, "BasicSetting", true) == 0 ||
+                string.Compare(command, "GroupRead", true) == 0)
             {
                 if (args.Length < 5)
                 {
@@ -239,9 +239,9 @@ namespace BitFab.KW1281Test
                     AdaptationTest(_kwp1281!, channel, channelValue, login, ecuInfo.WorkshopCode);
                     break;
 
-                case "basicsettings":
+                case "basicsetting":
                     ecuInfo = Kwp1281Wakeup();
-                    BasicSettings(_kwp1281!, groupNumber);
+                    BasicSettingRead(_kwp1281!, groupNumber);
                     break;
 
                 case "clarionvwpremium4safecode":
@@ -296,9 +296,9 @@ namespace BitFab.KW1281Test
                     GetSkc();
                     break;
 
-                case "groupreading":
+                case "groupread":
                     ecuInfo = Kwp1281Wakeup();
-                    GroupReading(_kwp1281!, groupNumber);
+                    GroupRead(_kwp1281!, groupNumber);
                     break;
 
                 case "loadeeprom":
@@ -478,9 +478,9 @@ namespace BitFab.KW1281Test
             kwp1281.AdaptationTest(channel, channelValue);
         }
 
-        private void BasicSettings(IKW1281Dialog iKW1281Dialog, byte groupNumber)
+        private void BasicSettingRead(IKW1281Dialog kwp1281, byte groupNumber)
         {
-            throw new NotImplementedException();
+            var succeeded = kwp1281.GroupRead(groupNumber, useBasicSetting: true);
         }
 
         private void ClarionVWPremium4SafeCode(IKW1281Dialog kwp1281)
@@ -834,9 +834,9 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private void GroupReading(IKW1281Dialog kwp1281, byte groupNumber)
+        private void GroupRead(IKW1281Dialog kwp1281, byte groupNumber)
         {
-            var succeeded = kwp1281.GroupReading(groupNumber);
+            var succeeded = kwp1281.GroupRead(groupNumber);
         }
 
         private void LoadEeprom(IKW1281Dialog kwp1281, uint address)
@@ -1161,8 +1161,9 @@ namespace BitFab.KW1281Test
             CHANNEL = Channel number (0-99)
             VALUE = Channel value (0-65535)
             LOGIN = Optional login (0-65535)
-        BasicSettings GROUP
-            GROUP = Group number (1-255)
+        BasicSetting GROUP
+            GROUP = Group number (0-255)
+            (Group 0: Raw controller data)
         ClarionVWPremium4SafeCode
         ClearFaultCodes
         DelcoVWPremium5SafeCode
@@ -1185,8 +1186,9 @@ namespace BitFab.KW1281Test
             LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
             FILENAME = Optional filename
         GetSKC
-        GroupReading GROUP
-            GROUP = Group number (1-255)
+        GroupRead GROUP
+            GROUP = Group number (0-255)
+            (Group 0: Raw controller data)
         LoadEeprom START FILENAME
             START = Start address in decimal (e.g. 0) or hex (e.g. $0)
             FILENAME = Name of file containing binary data to load into EEPROM

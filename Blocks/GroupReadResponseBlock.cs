@@ -5,9 +5,9 @@ using System.Text;
 
 namespace BitFab.KW1281Test.Blocks
 {
-    internal class GroupReadingResponseBlock : Block
+    internal class GroupReadResponseBlock : Block
     {
-        public GroupReadingResponseBlock(List<byte> bytes) : base(bytes)
+        public GroupReadResponseBlock(List<byte> bytes) : base(bytes)
         {
             SensorValues = new List<SensorValue>();
 
@@ -23,7 +23,7 @@ namespace BitFab.KW1281Test.Blocks
             if (bodyBytes.Count > 0)
             {
                 throw new InvalidOperationException(
-                    $"GroupReadingResponse body ({Utils.DumpBytes(Body)}) should be a multiple of 3 bytes long.");
+                    $"{nameof(GroupReadResponseBlock)} body ({Utils.DumpBytes(Body)}) should be a multiple of 3 bytes long.");
             }
         }
 
