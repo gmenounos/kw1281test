@@ -459,12 +459,18 @@ namespace BitFab.KW1281Test
             {
                 kwp1281.Login(login.Value, workshopCode);
             }
+
+            if (!kwp1281.AdaptationRead(channel))
+            {
+                return;
+            }
+
             if (channel != 0 && !kwp1281.AdaptationTest(channel, channelValue))
             {
                 return;
             }
 
-            kwp1281.AdaptationSave(channel, channelValue);
+            kwp1281.AdaptationSave(channel, channelValue, workshopCode);
         }
 
         private void AdaptationTest(

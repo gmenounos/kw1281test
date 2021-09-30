@@ -29,7 +29,7 @@ namespace BitFab.KW1281Test
 
         bool AdaptationTest(byte channelNumber, ushort channelValue);
 
-        bool AdaptationSave(byte channelNumber, ushort channelValue);
+        bool AdaptationSave(byte channelNumber, ushort channelValue, int workshopCode);
 
         void SendBlock(List<byte> blockBytes);
 
@@ -526,14 +526,17 @@ namespace BitFab.KW1281Test
             return ReceiveAdaptationBlock();
         }
 
-        public bool AdaptationSave(byte channelNumber, ushort channelValue)
+        public bool AdaptationSave(byte channelNumber, ushort channelValue, int workshopCode)
         {
             var bytes = new List<byte>
             {
                 (byte)BlockTitle.AdaptationSave,
                 channelNumber,
                 (byte)(channelValue / 256),
-                (byte)(channelValue % 256)
+                (byte)(channelValue % 256),
+                (byte)(workshopCode >> 16),
+                (byte)((workshopCode >> 8) & 0xFF),
+                (byte)(workshopCode & 0xFF)
             };
 
             Log.WriteLine($"Sending AdaptationSave block");
@@ -544,17 +547,10 @@ namespace BitFab.KW1281Test
 
         private bool ReceiveAdaptationBlock()
         {
-            var blocks = ReceiveBlocks();
-            if (blocks.Count == 1 && blocks[0] is NakBlock)
+            var responseBlock = ReceiveBlock();
+            if (responseBlock is NakBlock)
             {
                 Log.WriteLine($"Received a NAK.");
-                return false;
-            }
-
-            var responseBlock = blocks.Where(b => !b.IsAckNak).FirstOrDefault();
-            if (responseBlock == null)
-            {
-                Log.WriteLine($"Didn't receive an Adaptation response block.");
                 return false;
             }
 
