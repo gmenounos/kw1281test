@@ -1,8 +1,8 @@
 ﻿using BitFab.KW1281Test.Blocks;
+using BitFab.KW1281Test.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -326,21 +326,22 @@ namespace BitFab.KW1281Test
                     $"Received block end ${blockEnd:X2} but expected $03");
             }
 
-            return blockTitle switch
+            return (BlockTitle)blockTitle switch
             {
-                (byte)BlockTitle.ACK => new AckBlock(blockBytes),
-                (byte)BlockTitle.ActuatorTestResponse => new ActuatorTestResponseBlock(blockBytes),
-                (byte)BlockTitle.AsciiData =>
+                BlockTitle.ACK => new AckBlock(blockBytes),
+                BlockTitle.GroupReadResponseWithText => new GroupReadResponseWithTextBlock(blockBytes),
+                BlockTitle.ActuatorTestResponse => new ActuatorTestResponseBlock(blockBytes),
+                BlockTitle.AsciiData =>
                     blockBytes[3] == 0x00 ? new CodingWscBlock(blockBytes) : new AsciiDataBlock(blockBytes),
-                (byte)BlockTitle.Custom => new CustomBlock(blockBytes),
-                (byte)BlockTitle.NAK => new NakBlock(blockBytes),
-                (byte)BlockTitle.ReadEepromResponse => new ReadEepromResponseBlock(blockBytes),
-                (byte)BlockTitle.FaultCodesResponse => new FaultCodesBlock(blockBytes),
-                (byte)BlockTitle.ReadRomEepromResponse => new ReadRomEepromResponse(blockBytes),
-                (byte)BlockTitle.WriteEepromResponse => new WriteEepromResponseBlock(blockBytes),
-                (byte)BlockTitle.AdaptationResponse => new AdaptationResponseBlock(blockBytes),
-                (byte)BlockTitle.GroupReadResponse => new GroupReadResponseBlock(blockBytes),
-                (byte)BlockTitle.RawDataReadResponse => new RawDataReadResponseBlock(blockBytes),
+                BlockTitle.Custom => new CustomBlock(blockBytes),
+                BlockTitle.NAK => new NakBlock(blockBytes),
+                BlockTitle.ReadEepromResponse => new ReadEepromResponseBlock(blockBytes),
+                BlockTitle.FaultCodesResponse => new FaultCodesBlock(blockBytes),
+                BlockTitle.ReadRomEepromResponse => new ReadRomEepromResponse(blockBytes),
+                BlockTitle.WriteEepromResponse => new WriteEepromResponseBlock(blockBytes),
+                BlockTitle.AdaptationResponse => new AdaptationResponseBlock(blockBytes),
+                BlockTitle.GroupReadResponse => new GroupReadResponseBlock(blockBytes),
+                BlockTitle.RawDataReadResponse => new RawDataReadResponseBlock(blockBytes),
                 _ => new UnknownBlock(blockBytes),
             };
         }
@@ -581,7 +582,7 @@ namespace BitFab.KW1281Test
                 Log.WriteLine($"Sending Group Read blocks...");
             }
 
-            Console.WriteLine("[Up arrow | Down arrow | Q to quit]");
+            Log.WriteLine("[Up arrow | Down arrow | Q to quit]", LogDest.Console);
             while (true)
             {
                 if (Console.KeyAvailable)
@@ -619,17 +620,21 @@ namespace BitFab.KW1281Test
                 {
                     Overlay($"Group {groupNumber:D3}: Not Available");
                 }
-                else if (responseBlock is not GroupReadResponseBlock groupReading)
+                else if (responseBlock is GroupReadResponseWithTextBlock groupReadResponseWithText)
+                {
+                    Overlay($"Group {groupNumber:D3}: {groupReadResponseWithText}");
+                }
+                else if (responseBlock is GroupReadResponseBlock groupReading)
+                {
+                    Overlay($"Group {groupNumber:D3}: {groupReading}");
+                }
+                else
                 {
                     Log.WriteLine($"Expected a Group Reading response block but received a ${responseBlock.Title:X2} block.");
                     return false;
                 }
-                else
-                {
-                    Overlay($"Group {groupNumber:D3}: {groupReading}");
-                }
             }
-            Console.WriteLine();
+            Log.WriteLine(LogDest.Console);
 
             return true;
         }
@@ -645,7 +650,7 @@ namespace BitFab.KW1281Test
                 Log.WriteLine($"Sending Raw Data Read block");
             }
 
-            Console.WriteLine("[Press a key to quit]");
+            Log.WriteLine("[Press a key to quit]", LogDest.Console);
             while (!Console.KeyAvailable)
             {
                 var bytes = new List<byte>
@@ -664,13 +669,14 @@ namespace BitFab.KW1281Test
 
                 Overlay(rawDataReadResponse.ToString());
             }
-            Console.WriteLine();
+            Log.WriteLine(LogDest.Console);
 
             return true;
         }
 
         /// <summary>
         /// Erase the current console line and replace it with message.
+        /// Also writes the message to the log.
         /// </summary>
         private void Overlay(string message)
         {
@@ -678,10 +684,11 @@ namespace BitFab.KW1281Test
             Console.SetCursorPosition(0, top);
             if (left > 0)
             {
-                Console.Write(new string(' ', left));
+                Log.Write(new string(' ', left), LogDest.Console);
                 Console.SetCursorPosition(0, top);
             }
-            Console.Write(message);
+            Log.Write(message, LogDest.Console);
+            Log.WriteLine(message, LogDest.File);
         }
 
         public IKwpCommon KwpCommon { get; }
@@ -744,7 +751,7 @@ namespace BitFab.KW1281Test
             while (!_cancel)
             {
                 _kw1281Dialog.KeepAlive();
-                Console.Write(".");
+                Log.Write(".", LogDest.Console);
             }
         }
     }

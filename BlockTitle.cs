@@ -3,6 +3,7 @@
     public enum BlockTitle : byte
     {
         ReadIdent = 0x00,
+        GroupReadResponseWithText = 0x02,
         ReadRomEeprom = 0x03,
         ActuatorTest = 0x04,
         FaultCodesDelete = 0x05,

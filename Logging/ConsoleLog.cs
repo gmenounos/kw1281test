@@ -4,19 +4,28 @@ namespace BitFab.KW1281Test.Logging
 {
     internal class ConsoleLog : ILog
     {
-        public void Write(string message)
+        public void Write(string message, LogDest dest)
         {
-            Console.Write(message);
+            if (dest != LogDest.File)
+            {
+                Console.Write(message);
+            }
         }
 
-        public void WriteLine()
+        public void WriteLine(LogDest dest)
         {
-            Console.WriteLine();
+            if (dest != LogDest.File)
+            {
+                Console.WriteLine();
+            }
         }
 
-        public void WriteLine(string message)
+        public void WriteLine(string message, LogDest dest)
         {
-            Console.WriteLine(message);
+            if (dest != LogDest.File)
+            {
+                Console.WriteLine(message);
+            }
         }
 
         public void Close()

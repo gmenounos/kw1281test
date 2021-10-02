@@ -12,22 +12,40 @@ namespace BitFab.KW1281Test.Logging
             _writer = new StreamWriter(filename, append: true);
         }
 
-        public void WriteLine(string message)
+        public void WriteLine(string message, LogDest dest)
         {
-            Console.WriteLine(message);
-            _writer.WriteLine(message);
+            if (dest != LogDest.File)
+            {
+                Console.WriteLine(message);
+            }
+            if (dest != LogDest.Console)
+            {
+                _writer.WriteLine(message);
+            }
         }
 
-        public void WriteLine()
+        public void WriteLine(LogDest dest)
         {
-            Console.WriteLine();
-            _writer.WriteLine();
+            if (dest != LogDest.File)
+            {
+                Console.WriteLine();
+            }
+            if (dest != LogDest.Console)
+            {
+                _writer.WriteLine();
+            }
         }
 
-        public void Write(string message)
+        public void Write(string message, LogDest dest)
         {
-            Console.Write(message);
-            _writer.Write(message);
+            if (dest != LogDest.File)
+            {
+                Console.Write(message);
+            }
+            if (dest != LogDest.Console)
+            {
+                _writer.Write(message);
+            }
         }
 
         public void Close()
