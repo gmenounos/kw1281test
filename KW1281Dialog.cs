@@ -628,6 +628,10 @@ namespace BitFab.KW1281Test
                 {
                     Overlay($"Group {groupNumber:D3}: {groupReading}");
                 }
+                else if (responseBlock is RawDataReadResponseBlock rawData)
+                {
+                    Overlay($"Group {groupNumber:D3}: {rawData}");
+                }
                 else
                 {
                     Log.WriteLine($"Expected a Group Reading response block but received a ${responseBlock.Title:X2} block.");
