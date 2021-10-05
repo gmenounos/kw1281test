@@ -3,6 +3,7 @@ using BitFab.KW1281Test.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -582,6 +583,8 @@ namespace BitFab.KW1281Test
                 Log.WriteLine($"Sending Group Read blocks...");
             }
 
+            GroupReadResponseWithTextBlock? textBlock = null;
+
             Log.WriteLine("[Up arrow | Down arrow | Q to quit]", LogDest.Console);
             while (true)
             {
@@ -622,7 +625,8 @@ namespace BitFab.KW1281Test
                 }
                 else if (responseBlock is GroupReadResponseWithTextBlock groupReadResponseWithText)
                 {
-                    Overlay($"Group {groupNumber:D3}: {groupReadResponseWithText}");
+                    Log.WriteLine($"{groupReadResponseWithText}", LogDest.File);
+                    textBlock = groupReadResponseWithText;
                 }
                 else if (responseBlock is GroupReadResponseBlock groupReading)
                 {
@@ -630,7 +634,17 @@ namespace BitFab.KW1281Test
                 }
                 else if (responseBlock is RawDataReadResponseBlock rawData)
                 {
-                    Overlay($"Group {groupNumber:D3}: {rawData}");
+                    if (textBlock != null && rawData.Body.Count > 0)
+                    {
+                        var sb = new StringBuilder($"Group {groupNumber:D3}: ");
+                        sb.Append(textBlock.GetText(rawData.Body[0]));
+                        sb.Append(Utils.DumpDecimal(rawData.Body.Skip(1)));
+                        Overlay(sb.ToString());
+                    }
+                    else
+                    {
+                        Overlay($"Group {groupNumber:D3}: {rawData}");
+                    }
                 }
                 else
                 {

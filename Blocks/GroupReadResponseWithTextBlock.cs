@@ -33,6 +33,11 @@ namespace BitFab.KW1281Test.Blocks
 
                 SubBlocks.Add(subBlock);
                 
+                if (subBlock.BlockType == 0x8D)
+                {
+                    var text = Encoding.ASCII.GetString(subBlock.Body, 0, subBlock.Body.Length);
+                    _text = text.Split((char)0x03).ToList();
+                }
             }
 
             if (bodyBytes.Count > 0)
@@ -40,6 +45,18 @@ namespace BitFab.KW1281Test.Blocks
                 throw new InvalidOperationException(
                     $"{nameof(GroupReadResponseWithTextBlock)} body ({Utils.DumpBytes(Body)}) contains extra bytes after sub-blocks.");
             }
+        }
+
+        private readonly List<string> _text = new();
+
+        public string GetText(int i)
+        {
+            if (i >= 0 && i < _text.Count)
+            {
+                return $"\"{_text[i]}\"";
+            }
+
+            return i.ToString();
         }
 
         public override string ToString()
