@@ -30,6 +30,7 @@ namespace BitFab.KW1281Test.Cluster
                 count ??= 1024;
             }
             else if (
+                ecuInfo.Contains("M73 V02") || // Beetle 1C0920951A
                 ecuInfo.Contains("M73 V08") || // Beetle 1C0920921G
                 ecuInfo.Contains("M73 D14") || // Audi TT 8N2920980A
                 ecuInfo.Contains("M73 D55")    // Audi TT 8N2920930C
