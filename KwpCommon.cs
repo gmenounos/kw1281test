@@ -19,8 +19,6 @@ namespace BitFab.KW1281Test
         /// <param name="b">The byte to write.</param>
         void WriteByte(byte b);
 
-        byte ReadAndAckByte();
-
         void ReadComplement(byte b);
     }
 
@@ -37,6 +35,8 @@ namespace BitFab.KW1281Test
             const int maxTries = 3;
             for (int i = 1; i <= maxTries; i++)
             {
+                Thread.Sleep(300);
+
                 BitBang5Baud(controllerAddress, evenParity);
 
                 // Throw away anything that might be in the receive buffer
@@ -79,7 +79,9 @@ namespace BitFab.KW1281Test
             Log.WriteLine($"Keyword Msb ${keywordMsb:X2}");
 
             Thread.Sleep(25);
-            WriteComplement(keywordMsb);
+
+            var complement = (byte)~keywordMsb;
+            WriteByte(complement);
 
             var protocolVersion = ((keywordMsb & 0x7F) << 7) + (keywordLsb & 0x7F);
             Log.WriteLine($"Protocol is KW {protocolVersion} (8N1)");
@@ -102,13 +104,6 @@ namespace BitFab.KW1281Test
             WriteByteAndDiscardEcho(b);
         }
 
-        public byte ReadAndAckByte()
-        {
-            var b = Interface.ReadByte();
-            WriteComplement(b);
-            return b;
-        }
-
         public void ReadComplement(byte b)
         {
             var expectedComplement = (byte)~b;
@@ -118,12 +113,6 @@ namespace BitFab.KW1281Test
                 throw new InvalidOperationException(
                     $"Received complement ${actualComplement:X2} but expected ${expectedComplement:X2}");
             }
-        }
-
-        private void WriteComplement(byte b)
-        {
-            var complement = (byte)~b;
-            WriteByteAndDiscardEcho(complement);
         }
 
         /// <summary>

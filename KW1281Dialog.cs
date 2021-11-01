@@ -267,10 +267,12 @@ namespace BitFab.KW1281Test
 
             blockBytes.Insert(0, blockLength);
 
+            Thread.Sleep(1);
+
             foreach (var b in blockBytes)
             {
                 WriteByteAndReadAck(b);
-                Thread.Sleep(5);
+                Thread.Sleep(1);
             }
 
             KwpCommon.WriteByte(0x03); // Block end, does not get ACK'd
@@ -304,18 +306,18 @@ namespace BitFab.KW1281Test
         {
             var blockBytes = new List<byte>();
 
-            var blockLength = KwpCommon.ReadAndAckByte();
+            var blockLength = ReadAndAckByte();
             blockBytes.Add(blockLength);
 
             var blockCounter = ReadBlockCounter();
             blockBytes.Add(blockCounter);
 
-            var blockTitle = KwpCommon.ReadAndAckByte();
+            var blockTitle = ReadAndAckByte();
             blockBytes.Add(blockTitle);
 
             for (int i = 0; i < blockLength - 3; i++)
             {
-                var b = KwpCommon.ReadAndAckByte();
+                var b = ReadAndAckByte();
                 blockBytes.Add(b);
             }
 
@@ -355,7 +357,7 @@ namespace BitFab.KW1281Test
 
         private byte ReadBlockCounter()
         {
-            var blockCounter = KwpCommon.ReadAndAckByte();
+            var blockCounter = ReadAndAckByte();
             if (!_blockCounter.HasValue)
             {
                 // First block
@@ -368,6 +370,15 @@ namespace BitFab.KW1281Test
             }
             _blockCounter++;
             return blockCounter;
+        }
+
+        private byte ReadAndAckByte()
+        {
+            var b = KwpCommon.ReadByte();
+            Thread.Sleep(1);
+            var complement = (byte)~b;
+            KwpCommon.WriteByte(complement);
+            return b;
         }
 
         public void KeepAlive()
