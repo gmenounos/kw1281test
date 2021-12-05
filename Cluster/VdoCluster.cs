@@ -164,6 +164,11 @@ namespace BitFab.KW1281Test.Cluster
         public bool Unlock()
         {
             var versionBlocks = CustomReadSoftwareVersion();
+            if (versionBlocks.Count == 0)
+            {
+                Log.WriteLine("Cluster did not return software version.");
+                return false;
+            }
 
             // Now we need to send an unlock code that is unique to each ROM version
             Log.WriteLine("Sending Custom \"Unlock partial EEPROM read\" block");
