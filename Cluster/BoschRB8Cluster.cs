@@ -5,7 +5,7 @@ using Service = BitFab.KW1281Test.Kwp2000.DiagnosticService;
 
 namespace BitFab.KW1281Test.Cluster
 {
-    class BoschCluster
+    class BoschRB8Cluster
     {
         public static bool SecurityAccess(KW2000Dialog kwp2000, byte accessMode)
         {

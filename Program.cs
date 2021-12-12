@@ -736,7 +736,7 @@ namespace BitFab.KW1281Test
 
             var dumpFileName = _filename ?? $"RB8_${address:X6}_eeprom.bin";
 
-            BoschCluster.SecurityAccess(kwp2000, 0xFB);
+            BoschRB8Cluster.SecurityAccess(kwp2000, 0xFB);
             kwp2000.DumpEeprom(address, length, dumpFileName);
 
             return dumpFileName;
@@ -756,7 +756,7 @@ namespace BitFab.KW1281Test
                     {
                         var family = partNumberMatch.Groups[1].Value;
 
-                        switch(partNumberMatch.Groups[2].Value)
+                        switch (partNumberMatch.Groups[2].Value)
                         {
                             case "19": // Non-CAN
                                 Log.WriteLine($"Cluster is non-Immo so there is no SKC.");
@@ -817,6 +817,22 @@ namespace BitFab.KW1281Test
                     {
                         Console.WriteLine($"Unsupported cluster: {ecuInfo.Text}");
                     }
+                }
+                else if (ecuInfo.Text.Contains("BOO"))
+                {
+                    var cluster = new MotometerBOOCluster(_kwp1281!);
+                    cluster.GetClusterInfo();
+
+                    _kwp1281!.Login(11899, workshopCode: 0);
+
+                    cluster.UnlockClusterForEepromRead();
+
+                    var dumpFileName = DumpBOOClusterEeprom(
+                        _kwp1281, startAddress: 0, length: 0x10);
+
+                    var buf = File.ReadAllBytes(dumpFileName);
+                    var skc = Utils.GetBcd(buf, 0x08);
+                    Log.WriteLine($"SKC: {skc:D5}");
                 }
                 else
                 {
@@ -1100,6 +1116,29 @@ namespace BitFab.KW1281Test
             UnlockControllerForEepromReadWrite(kwp1281);
 
             var dumpFileName = _filename ?? $"{identInfo}_${startAddress:X4}_eeprom.bin";
+
+            Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
+            DumpEeprom(kwp1281, startAddress, length, maxReadLength: 16, dumpFileName);
+            Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
+
+            return dumpFileName;
+        }
+
+        private string DumpBOOClusterEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
+        {
+            var identInfo = kwp1281.ReadIdent().First().ToString()
+                .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
+                .Replace(' ', '_');
+
+            var dumpFileName = _filename ?? $"{identInfo}_${startAddress:X4}_eeprom.bin";
+            foreach (var c in Path.GetInvalidFileNameChars())
+            {
+                dumpFileName = dumpFileName.Replace(c, 'X');
+            }
+            foreach (var c in Path.GetInvalidPathChars())
+            {
+                dumpFileName = dumpFileName.Replace(c, 'X');
+            }
 
             Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
             DumpEeprom(kwp1281, startAddress, length, maxReadLength: 16, dumpFileName);
