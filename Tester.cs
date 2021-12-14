@@ -14,7 +14,7 @@ namespace BitFab.KW1281Test
     {
         private readonly IKwpCommon _kwpCommon;
         private readonly IKW1281Dialog _kwp1281;
-        private int _controllerAddress;
+        private readonly int _controllerAddress;
 
 
         public Tester(IInterface @interface, int controllerAddress)
@@ -351,9 +351,8 @@ namespace BitFab.KW1281Test
             }
             else
             {
-                var cluster = new MarelliCluster(_kwp1281);
-                cluster.DumpMem(
-                    ecuInfo.Text, filename, (ushort)address, (ushort)length);
+                ICluster cluster = new MarelliCluster(_kwp1281, ecuInfo.Text);
+                cluster.DumpEeprom(address, length, filename);
             }
         }
 
@@ -384,14 +383,14 @@ namespace BitFab.KW1281Test
 
             var dumpFileName = filename ?? $"RB8_${address:X6}_eeprom.bin";
 
-            var cluster = new BoschRB8Cluster(kwp2000);
-            cluster.SecurityAccess(0xFB);
-            kwp2000.DumpEeprom(address, length, dumpFileName);
+            ICluster cluster = new BoschRB8Cluster(kwp2000);
+            cluster.UnlockForEepromReadWrite();
+            cluster.DumpEeprom(address, length, dumpFileName);
 
             return dumpFileName;
         }
 
-        public void GetSkc(string? filename)
+        public void GetSkc()
         {
             if (_controllerAddress == (int)ControllerAddress.Cluster)
             {
@@ -419,9 +418,9 @@ namespace BitFab.KW1281Test
                         }
 
                         const int startAddress = 0x90;
-                        var dumpFileName = DumpClusterEeprom(startAddress, length: 0x7C, filename);
+                        var dumpFileName = DumpClusterEeprom(startAddress, length: 0x7C, filename: null);
                         var buf = File.ReadAllBytes(dumpFileName);
-                        var skc = VdoCluster.GetSkc(buf, startAddress);
+                        var skc = cluster.GetSkc(buf, startAddress);
                         if (skc.HasValue)
                         {
                             Log.WriteLine($"SKC: {skc:D5}");
@@ -442,15 +441,17 @@ namespace BitFab.KW1281Test
                     _kwp1281.EndCommunication();
                     Thread.Sleep(TimeSpan.FromSeconds(2));
 
-                    var dumpFileName = DumpRB8Eeprom(0x1040E, 2, filename);
+                    var dumpFileName = DumpRB8Eeprom(0x1040E, 2, filename: null);
                     var buf = File.ReadAllBytes(dumpFileName!);
                     var skc = Utils.GetShort(buf, 0);
                     Log.WriteLine($"SKC: {skc:D5}");
                 }
                 else if (ecuInfo.Text.Contains("M73"))
                 {
-                    var cluster = new MarelliCluster(_kwp1281);
-                    var buf = cluster.DumpMem(ecuInfo.Text);
+                    ICluster cluster = new MarelliCluster(_kwp1281, ecuInfo.Text);
+                    string dumpFileName = cluster.DumpEeprom(
+                        address: null, length: null, dumpFileName: null);
+                    byte[] buf = File.ReadAllBytes(dumpFileName);
                     if (buf.Length == 0x400)
                     {
                         var skc = Utils.GetShortBE(buf, 0x313);
@@ -468,15 +469,12 @@ namespace BitFab.KW1281Test
                 }
                 else if (ecuInfo.Text.Contains("BOO"))
                 {
-                    var cluster = new MotometerBOOCluster(_kwp1281!);
-                    cluster.GetClusterInfo();
+                    ICluster cluster = new MotometerBOOCluster(_kwp1281!);
 
-                    _kwp1281!.Login(11899, workshopCode: 0);
-
-                    cluster.UnlockClusterForEepromRead();
+                    cluster.UnlockForEepromReadWrite();
 
                     var dumpFileName = DumpBOOClusterEeprom(
-                        startAddress: 0, length: 0x10, filename);
+                        startAddress: 0, length: 0x10, filename: null);
 
                     var buf = File.ReadAllBytes(dumpFileName);
                     var skc = Utils.GetBcd(buf, 0x08);
@@ -489,7 +487,7 @@ namespace BitFab.KW1281Test
             }
             else if (_controllerAddress == (int)ControllerAddress.Ecu)
             {
-                var dumpFileName = DumpEdc15Eeprom(filename);
+                var dumpFileName = DumpEdc15Eeprom(filename: null);
                 var buf = File.ReadAllBytes(dumpFileName);
                 var skc = Utils.GetShort(buf, 0x012E);
                 var immo1 = buf[0x1B0];
@@ -647,18 +645,20 @@ namespace BitFab.KW1281Test
             return dumpFileName;
         }
 
-        private string DumpClusterEeprom(ushort startAddress, ushort length, string? filename)
+        private string DumpClusterEeprom(
+            ushort startAddress, ushort length, string? filename)
         {
             var identInfo = _kwp1281.ReadIdent().First().ToString()
                 .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
                 .Replace(' ', '_').Replace(":", "");
 
-            UnlockControllerForEepromReadWrite();
+            ICluster cluster = new VdoCluster(_kwp1281);
+            cluster.UnlockForEepromReadWrite();
 
             var dumpFileName = filename ?? $"{identInfo}_${startAddress:X4}_eeprom.bin";
 
             Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
-            DumpEeprom(startAddress, length, maxReadLength: 16, dumpFileName);
+            cluster.DumpEeprom(startAddress, length, dumpFileName);
             Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
 
             return dumpFileName;

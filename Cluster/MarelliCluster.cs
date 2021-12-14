@@ -6,20 +6,22 @@ using System.Threading;
 
 namespace BitFab.KW1281Test.Cluster
 {
-    class MarelliCluster
+    class MarelliCluster : ICluster
     {
-        private readonly IKW1281Dialog _kwp1281;
-
-        public MarelliCluster(IKW1281Dialog kwp1281)
+        public void UnlockForEepromReadWrite()
         {
-            _kwp1281 = kwp1281;
+            // Nothing to do
+        }
+
+        public string DumpEeprom(uint? address, uint? length, string? dumpFileName)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>
         /// Dumps memory from a Marelli cluster to a file.
         /// </summary>
         public byte[] DumpMem(
-            string ecuInfo,
             string? filename = null,
             ushort? address = null, ushort? count = null)
         {
@@ -27,7 +29,7 @@ namespace BitFab.KW1281Test.Cluster
             byte regBlockH; // High byte of register block
 
             if (
-                ecuInfo.Contains("M73 V07")    // Beetle 1C0920901C
+                _ecuInfo.Contains("M73 V07")    // Beetle 1C0920901C
                 )
             {
                 entryH = 0x02;
@@ -36,10 +38,10 @@ namespace BitFab.KW1281Test.Cluster
                 count ??= 1024;
             }
             else if (
-                ecuInfo.Contains("M73 V02") || // Beetle 1C0920951A
-                ecuInfo.Contains("M73 V08") || // Beetle 1C0920921G
-                ecuInfo.Contains("M73 D14") || // Audi TT 8N2920980A
-                ecuInfo.Contains("M73 D55")    // Audi TT 8N2920930C
+                _ecuInfo.Contains("M73 V02") || // Beetle 1C0920951A
+                _ecuInfo.Contains("M73 V08") || // Beetle 1C0920921G
+                _ecuInfo.Contains("M73 D14") || // Audi TT 8N2920980A
+                _ecuInfo.Contains("M73 D55")    // Audi TT 8N2920930C
                 )
             {
                 entryH = 0x18;
@@ -200,6 +202,15 @@ namespace BitFab.KW1281Test.Cluster
             }
 
             return true;
+        }
+
+        private readonly IKW1281Dialog _kwp1281;
+        private readonly string _ecuInfo;
+
+        public MarelliCluster(IKW1281Dialog kwp1281, string ecuInfo)
+        {
+            _kwp1281 = kwp1281;
+            _ecuInfo = ecuInfo;
         }
     }
 }

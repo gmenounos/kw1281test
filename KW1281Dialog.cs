@@ -223,7 +223,7 @@ namespace BitFab.KW1281Test
             }
 
             var block = blocks[0];
-            if (!(block is WriteEepromResponseBlock))
+            if (block is not WriteEepromResponseBlock)
             {
                 Log.WriteLine($"Expected WriteEepromResponseBlock but got {block.GetType()}");
                 return false;
@@ -453,7 +453,7 @@ namespace BitFab.KW1281Test
             var faultCodes = new List<FaultCode>();
             foreach (var block in blocks)
             {
-                if (!(block is FaultCodesBlock))
+                if (block is not FaultCodesBlock)
                 {
                     Log.WriteLine($"Expected FaultCodesBlock but got {block.GetType()}");
                     return null;
@@ -727,7 +727,7 @@ namespace BitFab.KW1281Test
         /// Erase the current console line and replace it with message.
         /// Also writes the message to the log.
         /// </summary>
-        private void Overlay(string message)
+        private static void Overlay(string message)
         {
             (int left, int top) = Console.GetCursorPosition();
             Console.SetCursorPosition(0, top);

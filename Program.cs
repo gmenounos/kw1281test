@@ -219,7 +219,7 @@ namespace BitFab.KW1281Test
                     break;
 
                 case "getskc":
-                    tester.GetSkc(_filename);
+                    tester.GetSkc();
                     break;
 
                 default:

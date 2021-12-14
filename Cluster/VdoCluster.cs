@@ -8,8 +8,45 @@ using System.Text.RegularExpressions;
 
 namespace BitFab.KW1281Test.Cluster
 {
-    class VdoCluster
+    class VdoCluster : ICluster
     {
+        public void UnlockForEepromReadWrite()
+        {
+            if (!Unlock())
+            {
+                Log.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
+            }
+
+            if (!RequiresSeedKey())
+            {
+                Log.WriteLine(
+                    "Cluster is unlocked for ROM/EEPROM access. Skipping Seed/Key login.");
+                return;
+            }
+
+            SeedKeyAuthenticate();
+            if (RequiresSeedKey())
+            {
+                Log.WriteLine("Failed to unlock cluster.");
+            }
+            else
+            {
+                Log.WriteLine("Cluster is unlocked for ROM/EEPROM access.");
+            }
+        }
+
+        public string DumpEeprom(
+            uint? optionalAddress, uint? optionalLength, string? optionalFileName)
+        {
+            uint address = optionalAddress ?? 0;
+            uint length = optionalLength ?? 0x800;
+            string filename = optionalFileName ?? $"VDO_${address:X6}_eeprom.bin";
+
+            DumpEeprom((ushort)address, (ushort)length, maxReadLength: 16, filename);
+
+            return filename;
+        }
+
         /// <summary>
         /// http://www.maltchev.com/kiti/VAG_guide.txt
         /// </summary>
@@ -251,7 +288,7 @@ namespace BitFab.KW1281Test.Cluster
         /// <param name="bytes">A portion of a VDO cluster EEPROM dump.</param>
         /// <param name="startAddress">The start address of bytes within the EEPROM.</param>
         /// <returns>The SKC or null if the SKC could not be determined.</returns>
-        public static short? GetSkc(byte[] bytes, int startAddress)
+        public short? GetSkc(byte[] bytes, int startAddress)
         {
             string text = Encoding.ASCII.GetString(bytes);
 
@@ -369,17 +406,6 @@ namespace BitFab.KW1281Test.Cluster
         private static byte[][] ToArray(byte v1, byte v2, byte v3, byte v4)
         {
             return new[] { new byte[] { v1, v2, v3, v4 } };
-        }
-
-        private static IEnumerable<byte> ClusterVersion(
-            string software, byte romMajor, byte romMinor)
-        {
-            var versionBytes = new List<byte>(Encoding.ASCII.GetBytes(software))
-            {
-                romMajor,
-                romMinor
-            };
-            return versionBytes;
         }
 
         private static readonly byte[][] _clusterUnlockCodes = new[]
@@ -651,6 +677,37 @@ namespace BitFab.KW1281Test.Cluster
             }
 
             return Utils.DumpBytes(block.Body);
+        }
+
+        private void DumpEeprom(
+            ushort startAddr, ushort length, byte maxReadLength, string fileName)
+        {
+            bool succeeded = true;
+
+            using (var fs = File.Create(fileName, maxReadLength, FileOptions.WriteThrough))
+            {
+                for (uint addr = startAddr; addr < (startAddr + length); addr += maxReadLength)
+                {
+                    byte readLength = (byte)Math.Min(startAddr + length - addr, maxReadLength);
+                    List<byte>? blockBytes = _kwp1281.ReadEeprom((ushort)addr, readLength);
+                    if (blockBytes == null)
+                    {
+                        blockBytes = Enumerable.Repeat((byte)0, readLength).ToList();
+                        succeeded = false;
+                    }
+                    fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
+                    fs.Flush();
+                }
+            }
+
+            if (!succeeded)
+            {
+                Log.WriteLine();
+                Log.WriteLine("**********************************************************************");
+                Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
+                Log.WriteLine("**********************************************************************");
+                Log.WriteLine();
+            }
         }
 
         private readonly IKW1281Dialog _kwp1281;

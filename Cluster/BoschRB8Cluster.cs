@@ -5,13 +5,23 @@ using Service = BitFab.KW1281Test.Kwp2000.DiagnosticService;
 
 namespace BitFab.KW1281Test.Cluster
 {
-    class BoschRB8Cluster
+    class BoschRB8Cluster : ICluster
     {
-        private readonly KW2000Dialog _kwp2000;
-
-        public BoschRB8Cluster(KW2000Dialog kwp2000)
+        public void UnlockForEepromReadWrite()
         {
-            _kwp2000 = kwp2000;
+            SecurityAccess(0xFB);
+        }
+
+        public string DumpEeprom(
+            uint? optionalAddress, uint? optionalLength, string? optionalFileName)
+        {
+            uint address = optionalAddress ?? 0x10400;
+            uint length = optionalLength ?? 0x400;
+            string filename = optionalFileName ?? $"RB8_${address:X6}_eeprom.bin";
+
+            _kwp2000.DumpEeprom(address, length, filename);
+
+            return filename;
         }
 
         public bool SecurityAccess(byte accessMode)
@@ -74,6 +84,13 @@ namespace BitFab.KW1281Test.Cluster
                 + (~seed | 0x07DA06B8)
                 - 2 * (seed & 0x00004000);
             return key;
+        }
+
+        private readonly KW2000Dialog _kwp2000;
+
+        public BoschRB8Cluster(KW2000Dialog kwp2000)
+        {
+            _kwp2000 = kwp2000;
         }
     }
 }
