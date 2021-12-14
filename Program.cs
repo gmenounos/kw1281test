@@ -1,15 +1,10 @@
 ﻿global using static BitFab.KW1281Test.Program;
 
-using BitFab.KW1281Test.Cluster;
-using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
 using BitFab.KW1281Test.Logging;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -70,7 +65,7 @@ namespace BitFab.KW1281Test
 
             string portName = args[0];
             var baudRate = int.Parse(args[1]);
-            _controllerAddress = int.Parse(args[2], NumberStyles.HexNumber);
+            int controllerAddress = int.Parse(args[2], NumberStyles.HexNumber);
             var command = args[3];
             uint address = 0;
             uint length = 0;
@@ -214,136 +209,121 @@ namespace BitFab.KW1281Test
             }
 
             using var @interface = OpenPort(portName, baudRate);
+            var tester = new Tester(@interface, controllerAddress);
 
-            _kwpCommon = new KwpCommon(@interface);
+            ControllerInfo ecuInfo;
+            switch (command.ToLower())
+            {
+                case "dumprb8eeprom":
+                    tester.DumpRB8Eeprom(address, length, _filename);
+                    break;
+
+                case "getskc":
+                    tester.GetSkc(_filename);
+                    break;
+
+                default:
+                    break;
+            }
+
+            ecuInfo = tester.Kwp1281Wakeup();
 
             switch (command.ToLower())
             {
                 case "actuatortest":
-                    Kwp1281Wakeup();
-                    ActuatorTest(_kwp1281!);
+                    tester.ActuatorTest();
                     break;
 
                 case "adaptationread":
-                    var ecuInfo = Kwp1281Wakeup();
-                    AdaptationRead(_kwp1281!, channel, login, ecuInfo.WorkshopCode);
+                    tester.AdaptationRead(channel, login, ecuInfo.WorkshopCode);
                     break;
 
                 case "adaptationsave":
-                    ecuInfo = Kwp1281Wakeup();
-                    AdaptationSave(_kwp1281!, channel, channelValue, login, ecuInfo.WorkshopCode);
+                    tester.AdaptationSave(channel, channelValue, login, ecuInfo.WorkshopCode);
                     break;
 
                 case "adaptationtest":
-                    ecuInfo = Kwp1281Wakeup();
-                    AdaptationTest(_kwp1281!, channel, channelValue, login, ecuInfo.WorkshopCode);
+                    tester.AdaptationTest(channel, channelValue, login, ecuInfo.WorkshopCode);
                     break;
 
                 case "basicsetting":
-                    ecuInfo = Kwp1281Wakeup();
-                    BasicSettingRead(_kwp1281!, groupNumber);
+                    tester.BasicSettingRead(groupNumber);
                     break;
 
                 case "clarionvwpremium4safecode":
-                    Kwp1281Wakeup();
-                    ClarionVWPremium4SafeCode(_kwp1281!);
+                    tester.ClarionVWPremium4SafeCode();
                     break;
 
                 case "clearfaultcodes":
-                    Kwp1281Wakeup();
-                    ClearFaultCodes(_kwp1281!);
+                    tester.ClearFaultCodes();
                     break;
 
                 case "delcovwpremium5safecode":
-                    Kwp1281Wakeup();
-                    DelcoVWPremium5SafeCode(_kwp1281!);
+                    tester.DelcoVWPremium5SafeCode();
                     break;
 
                 case "dumpccmrom":
-                    Kwp1281Wakeup();
-                    DumpCcmRom(_kwp1281!);
+                    tester.DumpCcmRom(_filename);
                     break;
 
                 case "dumpclusternecrom":
-                    Kwp1281Wakeup();
-                    DumpClusterNecRom(_kwp1281!);
+                    tester.DumpClusterNecRom(_filename);
                     break;
 
                 case "dumpedc15eeprom":
-                    DumpEdc15Eeprom();
+                    tester.DumpEdc15Eeprom(_filename);
                     break;
 
                 case "dumpeeprom":
-                    Kwp1281Wakeup();
-                    DumpEeprom(_kwp1281!, address, length);
+                    tester.DumpEeprom(address, length, _filename);
                     break;
 
                 case "dumpmarellimem":
-                    ecuInfo = Kwp1281Wakeup();
-                    DumpMarelliMem(ref _kwp1281, address, length, ecuInfo);
+                    tester.DumpMarelliMem(address, length, ecuInfo, _filename);
                     return;
 
                 case "dumpmem":
-                    Kwp1281Wakeup();
-                    DumpMem(_kwp1281!, address, length);
-                    break;
-
-                case "dumprb8eeprom":
-                    DumpRB8Eeprom(Kwp2000Wakeup(evenParityWakeup: true), address, length);
-                    break;
-
-                case "getskc":
-                    GetSkc();
+                    tester.DumpMem(address, length, _filename);
                     break;
 
                 case "groupread":
-                    ecuInfo = Kwp1281Wakeup();
-                    GroupRead(_kwp1281!, groupNumber);
+                    tester.GroupRead(groupNumber);
                     break;
 
                 case "loadeeprom":
-                    Kwp1281Wakeup();
-                    LoadEeprom(_kwp1281!, address);
+                    tester.LoadEeprom(address, _filename!);
                     break;
 
                 case "mapeeprom":
-                    Kwp1281Wakeup();
-                    MapEeprom(_kwp1281!);
+                    tester.MapEeprom(_filename);
                     break;
 
                 case "readeeprom":
-                    Kwp1281Wakeup();
-                    ReadEeprom(_kwp1281!, address);
+                    tester.ReadEeprom(address);
                     break;
 
                 case "readfaultcodes":
-                    Kwp1281Wakeup();
-                    ReadFaultCodes(_kwp1281!);
+                    tester.ReadFaultCodes();
                     break;
 
                 case "readident":
-                    Kwp1281Wakeup();
-                    ReadIdent(_kwp1281!);
+                    tester.ReadIdent();
                     break;
 
                 case "readsoftwareversion":
-                    Kwp1281Wakeup();
-                    ReadSoftwareVersion(_kwp1281!);
+                    tester.ReadSoftwareVersion();
                     break;
 
                 case "reset":
-                    Kwp1281Wakeup();
-                    Reset(_kwp1281!);
+                    tester.Reset();
                     break;
 
                 case "setsoftwarecoding":
-                    Kwp1281Wakeup();
-                    SetSoftwareCoding(_kwp1281!, softwareCoding, workshopCode);
+                    tester.SetSoftwareCoding(softwareCoding, workshopCode);
                     break;
 
                 case "writeeeprom":
-                    Kwp1281Wakeup();
-                    WriteEeprom(_kwp1281!, address, value);
+                    tester.WriteEeprom(address, value);
                     break;
 
                 default:
@@ -351,43 +331,7 @@ namespace BitFab.KW1281Test
                     break;
             }
 
-            if (_kwp1281 != null)
-            {
-                _kwp1281.EndCommunication();
-            }
-        }
-
-        private ControllerInfo Kwp1281Wakeup(bool evenParityWakeup = false)
-        {
-            Log.WriteLine("Sending wakeup message");
-
-            var kwpVersion = _kwpCommon!.WakeUp((byte)_controllerAddress, evenParityWakeup);
-
-            if (kwpVersion != 1281)
-            {
-                throw new InvalidOperationException("Expected KWP1281 protocol.");
-            }
-
-            _kwp1281 = new KW1281Dialog(_kwpCommon, out ControllerInfo ecuInfo);
-            Log.WriteLine($"ECU: {ecuInfo}");
-
-            return ecuInfo;
-        }
-
-        private KW2000Dialog Kwp2000Wakeup(bool evenParityWakeup = false)
-        {
-            Log.WriteLine("Sending wakeup message");
-
-            var kwpVersion = _kwpCommon!.WakeUp((byte)_controllerAddress, evenParityWakeup);
-
-            if (kwpVersion == 1281)
-            {
-                throw new InvalidOperationException("Expected KWP2000 protocol.");
-            }
-
-            var kwp2000 = new KW2000Dialog(_kwpCommon, (byte)_controllerAddress);
-
-            return kwp2000;
+            tester.EndCommunication();
         }
 
         /// <summary>
@@ -411,780 +355,6 @@ namespace BitFab.KW1281Test
                 Log.WriteLine($"Opening serial port {portName}");
                 return new GenericInterface(portName, baudRate);
             }
-        }
-
-        // Begin top-level commands
-
-        private static void ActuatorTest(IKW1281Dialog kwp1281)
-        {
-            using KW1281KeepAlive keepAlive = new(kwp1281);
-
-            ConsoleKeyInfo keyInfo;
-            do
-            {
-                var response = keepAlive.ActuatorTest(0x00);
-                if (response == null || response.ActuatorName == "End")
-                {
-                    Log.WriteLine("End of test.");
-                    break;
-                }
-                Log.WriteLine($"Actuator Test: {response.ActuatorName}");
-
-                // Press any key to advance to next test or press Q to exit
-                Console.Write("Press 'N' to advance to next test or 'Q' to quit");
-                do
-                {
-                    keyInfo = Console.ReadKey(intercept: true);
-                } while (keyInfo.Key != ConsoleKey.N && keyInfo.Key != ConsoleKey.Q);
-                Console.WriteLine();
-            } while (keyInfo.Key != ConsoleKey.Q);
-        }
-
-        private void AdaptationRead(
-            IKW1281Dialog kwp1281, byte channel,
-            ushort? login, int workshopCode)
-        {
-            if (login.HasValue)
-            {
-                kwp1281.Login(login.Value, workshopCode);
-            }
-            kwp1281.AdaptationRead(channel);
-        }
-
-        private void AdaptationSave(
-            IKW1281Dialog kwp1281, byte channel, ushort channelValue,
-            ushort? login, int workshopCode)
-        {
-            if (login.HasValue)
-            {
-                kwp1281.Login(login.Value, workshopCode);
-            }
-
-            if (!kwp1281.AdaptationRead(channel))
-            {
-                return;
-            }
-
-            if (channel != 0 && !kwp1281.AdaptationTest(channel, channelValue))
-            {
-                return;
-            }
-
-            kwp1281.AdaptationSave(channel, channelValue, workshopCode);
-        }
-
-        private void AdaptationTest(
-            IKW1281Dialog kwp1281, byte channel, ushort channelValue,
-            ushort? login, int workshopCode)
-        {
-            if (login.HasValue)
-            {
-                kwp1281.Login(login.Value, workshopCode);
-            }
-            kwp1281.AdaptationTest(channel, channelValue);
-        }
-
-        private void BasicSettingRead(IKW1281Dialog kwp1281, byte groupNumber)
-        {
-            var succeeded = kwp1281.GroupRead(groupNumber, useBasicSetting: true);
-        }
-
-        private void ClarionVWPremium4SafeCode(IKW1281Dialog kwp1281)
-        {
-            if (_controllerAddress != (int)ControllerAddress.Radio)
-            {
-                Log.WriteLine("Only supported for radio address 56");
-                return;
-            }
-
-            // Thanks to Mike Naberezny for this (https://github.com/mnaberez)
-            const byte readWriteSafeCode = 0xF0;
-            const byte read = 0x00;
-            kwp1281.SendBlock(new List<byte> { readWriteSafeCode, read });
-
-            var block = kwp1281.ReceiveBlocks().FirstOrDefault(b => !b.IsAckNak);
-
-            if (block == null)
-            {
-                Log.WriteLine("No response received from radio.");
-            }
-            else if (block.Title != readWriteSafeCode)
-            {
-                Log.WriteLine(
-                    $"Unexpected response received from radio. Block title: ${block.Title:X2}");
-            }
-            else
-            {
-                var safeCode = block.Body[0] * 256 + block.Body[1];
-                Log.WriteLine($"Safe code: {safeCode:X4}");
-            }
-        }
-
-        private void ClearFaultCodes(IKW1281Dialog kwp1281)
-        {
-            var succeeded = kwp1281.ClearFaultCodes(_controllerAddress);
-            if (succeeded)
-            {
-                Log.WriteLine("Fault codes cleared.");
-            }
-            else
-            {
-                Log.WriteLine("Failed to clear fault codes.");
-            }
-        }
-
-        private void DelcoVWPremium5SafeCode(IKW1281Dialog kwp1281)
-        {
-            if (_controllerAddress != (int)ControllerAddress.RadioManufacturing)
-            {
-                Log.WriteLine("Only supported for radio manufacturing address 7C");
-                return;
-            }
-
-            // Thanks to Mike Naberezny for this (https://github.com/mnaberez)
-            const string secret = "DELCO";
-            var code = (ushort)(secret[4] * 256 + secret[3]);
-            var workshopCode = secret[2] * 65536 + secret[1] * 256 + secret[0];
-
-            kwp1281.Login(code, workshopCode);
-            var bytes = kwp1281.ReadRomEeprom(0x0014, 2);
-            Log.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
-        }
-
-        private void DumpCcmRom(IKW1281Dialog kwp1281)
-        {
-            if (_controllerAddress != (int)ControllerAddress.CCM &&
-                _controllerAddress != (int)ControllerAddress.CentralLocking)
-            {
-                Log.WriteLine("Only supported for CCM and Central Locking");
-                return;
-            }
-
-            kwp1281.Login(19283, 222);
-
-            var dumpFileName = _filename ?? "ccm_rom_dump.bin";
-            const byte blockSize = 8;
-
-            Log.WriteLine($"Saving CCM ROM to {dumpFileName}");
-
-            bool succeeded = true;
-            using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
-            {
-                for (int seg = 0; seg < 16; seg++)
-                {
-                    for (int msb = 0; msb < 16; msb++)
-                    {
-                        for (int lsb = 0; lsb < 256; lsb += blockSize)
-                        {
-                            var blockBytes = kwp1281.ReadCcmRom((byte)seg, (byte)msb, (byte)lsb, blockSize);
-                            if (blockBytes == null)
-                            {
-                                blockBytes = Enumerable.Repeat((byte)0, blockSize).ToList();
-                                succeeded = false;
-                            }
-                            else if (blockBytes.Count < blockSize)
-                            {
-                                blockBytes.AddRange(Enumerable.Repeat((byte)0, blockSize - blockBytes.Count));
-                                succeeded = false;
-                            }
-
-                            fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
-                            fs.Flush();
-                        }
-                    }
-                }
-            }
-
-            if (!succeeded)
-            {
-                Log.WriteLine();
-                Log.WriteLine("**********************************************************************");
-                Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-                Log.WriteLine("**********************************************************************");
-                Log.WriteLine();
-            }
-        }
-
-        private void DumpClusterNecRom(IKW1281Dialog kwp1281)
-        {
-            if (_controllerAddress != (int)ControllerAddress.Cluster)
-            {
-                Log.WriteLine("Only supported for cluster");
-                return;
-            }
-
-            var dumpFileName = _filename ?? "cluster_nec_rom_dump.bin";
-            const byte blockSize = 16;
-
-            Log.WriteLine($"Saving cluster NEC ROM to {dumpFileName}");
-
-            bool succeeded = true;
-            using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
-            {
-                var cluster = new VdoCluster(kwp1281);
-
-                for (int address = 0; address < 65536; address += blockSize)
-                {
-                    var blockBytes = cluster.CustomReadNecRom((ushort)address, blockSize);
-                    if (blockBytes == null)
-                    {
-                        blockBytes = Enumerable.Repeat((byte)0, blockSize).ToList();
-                        succeeded = false;
-                    }
-                    else if (blockBytes.Count < blockSize)
-                    {
-                        blockBytes.AddRange(Enumerable.Repeat((byte)0, blockSize - blockBytes.Count));
-                        succeeded = false;
-                    }
-
-                    fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
-                    fs.Flush();
-                }
-            }
-
-            if (!succeeded)
-            {
-                Log.WriteLine();
-                Log.WriteLine("**********************************************************************");
-                Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-                Log.WriteLine("**********************************************************************");
-                Log.WriteLine();
-            }
-        }
-
-        private string DumpEdc15Eeprom()
-        {
-            Kwp1281Wakeup();
-            _kwp1281!.EndCommunication();
-
-            Thread.Sleep(1000);
-
-            // Now wake it up again, hopefully in KW2000 mode
-            _kwpCommon!.Interface.SetBaudRate(10400);
-            var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParity: false);
-            if (kwpVersion < 2000)
-            {
-                throw new InvalidOperationException(
-                    $"Unable to wake up ECU in KW2000 mode. KW version: {kwpVersion}");
-            }
-            Console.WriteLine($"KW Version: {kwpVersion}");
-
-            var edc15 = new Edc15VM(_kwpCommon, _controllerAddress);
-
-            var dumpFileName = _filename ?? $"EDC15_EEPROM.bin";
-
-            edc15.DumpEeprom(dumpFileName);
-
-            _kwp1281 = null;
-
-            return dumpFileName;
-        }
-
-        private void DumpEeprom(IKW1281Dialog kwp1281, uint address, uint length)
-        {
-            switch (_controllerAddress)
-            {
-                case (int)ControllerAddress.Cluster:
-                    DumpClusterEeprom(kwp1281, (ushort)address, (ushort)length);
-                    break;
-                case (int)ControllerAddress.CCM:
-                case (int)ControllerAddress.CentralLocking:
-                    DumpCcmEeprom(kwp1281, (ushort)address, (ushort)length);
-                    break;
-                default:
-                    Log.WriteLine("Only supported for cluster, CCM and Central Locking");
-                    break;
-            }
-        }
-
-        private void DumpMarelliMem(ref IKW1281Dialog? kwp1281, uint address, uint length, ControllerInfo ecuInfo)
-        {
-            if (_controllerAddress != (int)ControllerAddress.Cluster)
-            {
-                Log.WriteLine("Only supported for clusters");
-            }
-            else
-            {
-                MarelliCluster.DumpMem(
-                    kwp1281!, ecuInfo.Text, _filename, (ushort)address, (ushort)length);
-                kwp1281 = null; // Don't try to send EndCommunication block
-            }
-        }
-
-        private void DumpMem(IKW1281Dialog kwp1281, uint address, uint length)
-        {
-            if (_controllerAddress != (int)ControllerAddress.Cluster)
-            {
-                Log.WriteLine("Only supported for cluster");
-                return;
-            }
-
-            DumpClusterMem(kwp1281, address, length);
-        }
-
-        /// <summary>
-        /// Dumps the EEPROM of a Bosch RB8 cluster to a file.
-        /// </summary>
-        /// <returns>The dump file name or null if the EEPROM was not dumped.</returns>
-        private string? DumpRB8Eeprom(KW2000Dialog kwp2000, uint address, uint length)
-        {
-            if (_controllerAddress != (int)ControllerAddress.Cluster)
-            {
-                Log.WriteLine("Only supported for cluster (address 17)");
-                return null;
-            }
-
-            var dumpFileName = _filename ?? $"RB8_${address:X6}_eeprom.bin";
-
-            BoschRB8Cluster.SecurityAccess(kwp2000, 0xFB);
-            kwp2000.DumpEeprom(address, length, dumpFileName);
-
-            return dumpFileName;
-        }
-
-        private void GetSkc()
-        {
-            if (_controllerAddress == (int)ControllerAddress.Cluster)
-            {
-                var ecuInfo = Kwp1281Wakeup();
-                if (ecuInfo.Text.Contains("VDO"))
-                {
-                    var partNumberMatch = Regex.Match(
-                        ecuInfo.Text,
-                        "\\b(\\d[a-zA-Z])\\d9(\\d{2})\\d{3}[a-zA-Z][a-zA-Z]?\\b");
-                    if (partNumberMatch.Success)
-                    {
-                        var family = partNumberMatch.Groups[1].Value;
-
-                        switch (partNumberMatch.Groups[2].Value)
-                        {
-                            case "19": // Non-CAN
-                                Log.WriteLine($"Cluster is non-Immo so there is no SKC.");
-                                return;
-                            case "20": // CAN
-                                break;
-                            default:
-                                Log.WriteLine($"Unknown cluster: {ecuInfo.Text}");
-                                return;
-                        }
-
-                        const int startAddress = 0x90;
-                        var dumpFileName = DumpClusterEeprom(_kwp1281!, startAddress, length: 0x7C);
-                        var buf = File.ReadAllBytes(dumpFileName);
-                        var skc = VdoCluster.GetSkc(buf, startAddress);
-                        if (skc.HasValue)
-                        {
-                            Log.WriteLine($"SKC: {skc:D5}");
-                        }
-                        else
-                        {
-                            Log.WriteLine($"Unable to determine SKC.");
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"ECU Info: {ecuInfo.Text}");
-                    }
-                }
-                else if (ecuInfo.Text.Contains("RB8"))
-                {
-                    // Need to quit KWP1281 before switching to KWP2000
-                    _kwp1281!.EndCommunication();
-                    _kwp1281 = null;
-                    Thread.Sleep(TimeSpan.FromSeconds(2));
-
-                    var dumpFileName = DumpRB8Eeprom(
-                        Kwp2000Wakeup(evenParityWakeup: true), 0x1040E, 2);
-                    var buf = File.ReadAllBytes(dumpFileName!);
-                    var skc = Utils.GetShort(buf, 0);
-                    Log.WriteLine($"SKC: {skc:D5}");
-                }
-                else if (ecuInfo.Text.Contains("M73"))
-                {
-                    var buf = MarelliCluster.DumpMem(_kwp1281!, ecuInfo.Text);
-                    _kwp1281 = null; // Don't try to send EndCommunication block
-                    if (buf.Length == 0x400)
-                    {
-                        var skc = Utils.GetShortBE(buf, 0x313);
-                        Log.WriteLine($"SKC: {skc:D5}");
-                    }
-                    else if (buf.Length == 0x800)
-                    {
-                        var skc = Utils.GetShortBE(buf, 0x348);
-                        Log.WriteLine($"SKC: {skc:D5}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Unsupported cluster: {ecuInfo.Text}");
-                    }
-                }
-                else if (ecuInfo.Text.Contains("BOO"))
-                {
-                    var cluster = new MotometerBOOCluster(_kwp1281!);
-                    cluster.GetClusterInfo();
-
-                    _kwp1281!.Login(11899, workshopCode: 0);
-
-                    cluster.UnlockClusterForEepromRead();
-
-                    var dumpFileName = DumpBOOClusterEeprom(
-                        _kwp1281, startAddress: 0, length: 0x10);
-
-                    var buf = File.ReadAllBytes(dumpFileName);
-                    var skc = Utils.GetBcd(buf, 0x08);
-                    Log.WriteLine($"SKC: {skc:D5}");
-                }
-                else
-                {
-                    Console.WriteLine($"Unsupported cluster: {ecuInfo.Text}");
-                }
-            }
-            else if (_controllerAddress == (int)ControllerAddress.Ecu)
-            {
-                var dumpFileName = DumpEdc15Eeprom();
-                var buf = File.ReadAllBytes(dumpFileName);
-                var skc = Utils.GetShort(buf, 0x012E);
-                var immo1 = buf[0x1B0];
-                var immo2 = buf[0x1DE];
-                var immoStatus = immo1 == 0x60 && immo2 == 0x60 ? "Off" : "On";
-                Log.WriteLine($"SKC: {skc:D5}");
-                Log.WriteLine($"Immo is {immoStatus} (${immo1:X2}, ${immo2:X2})");
-            }
-            else
-            {
-                Log.WriteLine("Only supported for clusters (address 17) and ECUs (address 1)");
-            }
-        }
-
-        private void GroupRead(IKW1281Dialog kwp1281, byte groupNumber)
-        {
-            var succeeded = kwp1281.GroupRead(groupNumber);
-        }
-
-        private void LoadEeprom(IKW1281Dialog kwp1281, uint address)
-        {
-            if (_controllerAddress != (int)ControllerAddress.Cluster)
-            {
-                Log.WriteLine("Only supported for cluster");
-                return;
-            }
-
-            LoadClusterEeprom(kwp1281, (ushort)address, _filename!);
-        }
-
-        private void MapEeprom(IKW1281Dialog kwp1281)
-        {
-            switch (_controllerAddress)
-            {
-                case (int)ControllerAddress.Cluster:
-                    MapClusterEeprom(kwp1281);
-                    break;
-                case (int)ControllerAddress.CCM:
-                case (int)ControllerAddress.CentralLocking:
-                    MapCcmEeprom(kwp1281);
-                    break;
-                default:
-                    Log.WriteLine("Only supported for cluster, CCM and Central Locking");
-                    break;
-            }
-        }
-
-        private void ReadEeprom(IKW1281Dialog kwp1281, uint address)
-        {
-            UnlockControllerForEepromReadWrite(kwp1281);
-
-            var blockBytes = kwp1281.ReadEeprom((ushort)address, 1);
-            if (blockBytes == null)
-            {
-                Log.WriteLine("EEPROM read failed");
-            }
-            else
-            {
-                var value = blockBytes[0];
-                Log.WriteLine(
-                    $"Address {address} (${address:X4}): Value {value} (${value:X2})");
-            }
-        }
-
-        private static void ReadFaultCodes(IKW1281Dialog kwp1281)
-        {
-            var faultCodes = kwp1281.ReadFaultCodes();
-            if (faultCodes != null)
-            {
-                Log.WriteLine("Fault codes:");
-                foreach (var faultCode in faultCodes)
-                {
-                    Log.WriteLine($"    {faultCode}");
-                }
-            }
-        }
-
-        private static void ReadIdent(IKW1281Dialog kwp1281)
-        {
-            foreach (var identInfo in kwp1281.ReadIdent())
-            {
-                Log.WriteLine($"Ident: {identInfo}");
-            }
-        }
-
-        private void ReadSoftwareVersion(IKW1281Dialog kwp1281)
-        {
-            if (_controllerAddress == (int)ControllerAddress.Cluster)
-            {
-                var cluster = new VdoCluster(kwp1281);
-                cluster.CustomReadSoftwareVersion();
-            }
-            else
-            {
-                Log.WriteLine("Only supported for cluster");
-            }
-        }
-
-        private void Reset(IKW1281Dialog kwp1281)
-        {
-            if (_controllerAddress == (int)ControllerAddress.Cluster)
-            {
-                var cluster = new VdoCluster(kwp1281);
-                cluster.CustomReset();
-            }
-            else
-            {
-                Log.WriteLine("Only supported for cluster");
-            }
-        }
-
-        private void SetSoftwareCoding(
-            IKW1281Dialog kwp1281, int softwareCoding, int workshopCode)
-        {
-            var succeeded = kwp1281.SetSoftwareCoding(_controllerAddress, softwareCoding, workshopCode);
-            if (succeeded)
-            {
-                Log.WriteLine("Software coding set.");
-            }
-            else
-            {
-                Log.WriteLine("Failed to set software coding.");
-            }
-        }
-
-        private void WriteEeprom(IKW1281Dialog kwp1281, uint address, byte value)
-        {
-            UnlockControllerForEepromReadWrite(kwp1281);
-
-            kwp1281.WriteEeprom((ushort)address, new List<byte> { value });
-        }
-
-        // End top-level commands
-
-        private void MapCcmEeprom(IKW1281Dialog kwp1281)
-        {
-            kwp1281.Login(19283, 222);
-
-            var bytes = new List<byte>();
-            const byte blockSize = 1;
-            for (int addr = 0; addr <= 65535; addr += blockSize)
-            {
-                var blockBytes = kwp1281.ReadEeprom((ushort)addr, blockSize);
-                blockBytes = Enumerable.Repeat(
-                    blockBytes == null ? (byte)0 : (byte)0xFF,
-                    blockSize).ToList();
-                bytes.AddRange(blockBytes);
-            }
-            var dumpFileName = _filename ?? "ccm_eeprom_map.bin";
-            Log.WriteLine($"Saving EEPROM map to {dumpFileName}");
-            File.WriteAllBytes(dumpFileName, bytes.ToArray());
-        }
-
-        private void MapClusterEeprom(IKW1281Dialog kwp1281)
-        {
-            var cluster = new VdoCluster(kwp1281);
-
-            var map = cluster.MapEeprom();
-
-            var mapFileName = _filename ?? "eeprom_map.bin";
-            Log.WriteLine($"Saving EEPROM map to {mapFileName}");
-            File.WriteAllBytes(mapFileName, map.ToArray());
-        }
-
-        private void DumpCcmEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
-        {
-            UnlockControllerForEepromReadWrite(kwp1281);
-
-            var dumpFileName = _filename ?? $"ccm_eeprom_${startAddress:X4}.bin";
-
-            Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
-            DumpEeprom(kwp1281, startAddress, length, maxReadLength: 12, dumpFileName);
-            Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
-        }
-
-        private void UnlockControllerForEepromReadWrite(IKW1281Dialog kwp1281)
-        {
-            switch ((ControllerAddress)_controllerAddress)
-            {
-                case ControllerAddress.CCM:
-                case ControllerAddress.CentralLocking:
-                    kwp1281.Login(code: 19283, workshopCode: 222); // This is what VDS-PRO uses
-                    break;
-
-                case ControllerAddress.Cluster:
-                    // TODO:UnlockCluster() is only needed for EEPROM read, not memory read
-                    var cluster = new VdoCluster(kwp1281);
-                    if (!cluster.Unlock())
-                    {
-                        Log.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
-                    }
-
-                    if (!cluster.RequiresSeedKey())
-                    {
-                        Log.WriteLine(
-                            "Cluster is unlocked for ROM/EEPROM access. Skipping Seed/Key login.");
-                        return;
-                    }
-
-                    cluster.SeedKeyAuthenticate();
-                    if (cluster.RequiresSeedKey())
-                    {
-                        Log.WriteLine("Failed to unlock cluster.");
-                    }
-                    else
-                    {
-                        Log.WriteLine("Cluster is unlocked for ROM/EEPROM access.");
-                    }
-                    break;
-            }
-        }
-
-        private static void DumpEeprom(
-            IKW1281Dialog kwp1281, ushort startAddr, ushort length, byte maxReadLength, string fileName)
-        {
-            bool succeeded = true;
-
-            using (var fs = File.Create(fileName, maxReadLength, FileOptions.WriteThrough))
-            {
-                for (uint addr = startAddr; addr < (startAddr + length); addr += maxReadLength)
-                {
-                    var readLength = (byte)Math.Min(startAddr + length - addr, maxReadLength);
-                    var blockBytes = kwp1281.ReadEeprom((ushort)addr, (byte)readLength);
-                    if (blockBytes == null)
-                    {
-                        blockBytes = Enumerable.Repeat((byte)0, readLength).ToList();
-                        succeeded = false;
-                    }
-                    fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
-                    fs.Flush();
-                }
-            }
-
-            if (!succeeded)
-            {
-                Log.WriteLine();
-                Log.WriteLine("**********************************************************************");
-                Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-                Log.WriteLine("**********************************************************************");
-                Log.WriteLine();
-            }
-        }
-
-        private static void WriteEeprom(
-            IKW1281Dialog kwp1281, ushort startAddr, byte[] bytes, uint maxWriteLength)
-        {
-            var succeeded = true;
-            var length = bytes.Length;
-            for (uint addr = startAddr; addr < (startAddr + length); addr += maxWriteLength)
-            {
-                var writeLength = (byte)Math.Min(startAddr + length - addr, maxWriteLength);
-                if (!kwp1281.WriteEeprom(
-                    (ushort)addr,
-                    bytes.Skip((int)(addr - startAddr)).Take(writeLength).ToList()))
-                {
-                    succeeded = false;
-                }
-            }
-
-            if (!succeeded)
-            {
-                Log.WriteLine("EEPROM write failed. You should probably try again.");
-            }
-        }
-
-        private string DumpClusterEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
-        {
-            var identInfo = kwp1281.ReadIdent().First().ToString()
-                .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
-                .Replace(' ', '_').Replace(":", "");
-
-            UnlockControllerForEepromReadWrite(kwp1281);
-
-            var dumpFileName = _filename ?? $"{identInfo}_${startAddress:X4}_eeprom.bin";
-
-            Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
-            DumpEeprom(kwp1281, startAddress, length, maxReadLength: 16, dumpFileName);
-            Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
-
-            return dumpFileName;
-        }
-
-        private string DumpBOOClusterEeprom(IKW1281Dialog kwp1281, ushort startAddress, ushort length)
-        {
-            var identInfo = kwp1281.ReadIdent().First().ToString()
-                .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
-                .Replace(' ', '_');
-
-            var dumpFileName = _filename ?? $"{identInfo}_${startAddress:X4}_eeprom.bin";
-            foreach (var c in Path.GetInvalidFileNameChars())
-            {
-                dumpFileName = dumpFileName.Replace(c, 'X');
-            }
-            foreach (var c in Path.GetInvalidPathChars())
-            {
-                dumpFileName = dumpFileName.Replace(c, 'X');
-            }
-
-            Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
-            DumpEeprom(kwp1281, startAddress, length, maxReadLength: 16, dumpFileName);
-            Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
-
-            return dumpFileName;
-        }
-
-        private void LoadClusterEeprom(IKW1281Dialog kwp1281, ushort address, string filename)
-        {
-            _ = kwp1281.ReadIdent();
-
-            UnlockControllerForEepromReadWrite(kwp1281);
-
-            if (!File.Exists(filename))
-            {
-                Log.WriteLine($"File {filename} does not exist.");
-                return;
-            }
-
-            Log.WriteLine($"Reading {filename}");
-            var bytes = File.ReadAllBytes(filename);
-
-            Log.WriteLine("Writing to cluster...");
-            WriteEeprom(kwp1281, address, bytes, 16);
-        }
-
-        private void DumpClusterMem(IKW1281Dialog kwp1281, uint startAddress, uint length)
-        {
-            var cluster = new VdoCluster(kwp1281);
-            if (!cluster.RequiresSeedKey())
-            {
-                Log.WriteLine(
-                    "Cluster is unlocked for memory access. Skipping Seed/Key login.");
-            }
-            else
-            {
-                cluster.SeedKeyAuthenticate();
-            }
-
-            var dumpFileName = _filename ?? $"cluster_mem_${startAddress:X6}.bin";
-            Log.WriteLine($"Saving memory dump to {dumpFileName}");
-
-            cluster.DumpMem(dumpFileName, startAddress, length);
-
-            Log.WriteLine($"Saved memory dump to {dumpFileName}");
         }
 
         private static void ShowUsage()
@@ -1252,9 +422,6 @@ namespace BitFab.KW1281Test
             VALUE = Value in decimal (e.g. 138) or hex (e.g. $8A)");
         }
 
-        private IKwpCommon? _kwpCommon;
-        private int _controllerAddress;
         private string? _filename = null;
-        private IKW1281Dialog? _kwp1281;
     }
 }

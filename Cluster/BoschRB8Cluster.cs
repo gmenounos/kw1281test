@@ -7,10 +7,17 @@ namespace BitFab.KW1281Test.Cluster
 {
     class BoschRB8Cluster
     {
-        public static bool SecurityAccess(KW2000Dialog kwp2000, byte accessMode)
+        private readonly KW2000Dialog _kwp2000;
+
+        public BoschRB8Cluster(KW2000Dialog kwp2000)
+        {
+            _kwp2000 = kwp2000;
+        }
+
+        public bool SecurityAccess(byte accessMode)
         {
             const byte identificationOption = 0x94;
-            var responseMsg = kwp2000.SendReceive(Service.readEcuIdentification, new byte[] { identificationOption });
+            var responseMsg = _kwp2000.SendReceive(Service.readEcuIdentification, new byte[] { identificationOption });
             if (responseMsg.Body[0] != identificationOption)
             {
                 throw new InvalidOperationException($"Received unexpected identificationOption: {responseMsg.Body[0]:X2}");
@@ -20,7 +27,7 @@ namespace BitFab.KW1281Test.Cluster
             const int maxTries = 16;
             for (var i = 0; i < maxTries; i++)
             {
-                responseMsg = kwp2000.SendReceive(Service.securityAccess, new byte[] { accessMode });
+                responseMsg = _kwp2000.SendReceive(Service.securityAccess, new byte[] { accessMode });
                 if (responseMsg.Body[0] != accessMode)
                 {
                     throw new InvalidOperationException($"Received unexpected accessMode: {responseMsg.Body[0]:X2}");
@@ -35,7 +42,7 @@ namespace BitFab.KW1281Test.Cluster
 
                 try
                 {
-                    responseMsg = kwp2000.SendReceive(Service.securityAccess,
+                    responseMsg = _kwp2000.SendReceive(Service.securityAccess,
                         new[] {
                             (byte)(accessMode + 1),
                             (byte)((key >> 24) & 0xFF),

@@ -8,11 +8,17 @@ namespace BitFab.KW1281Test.Cluster
 {
     class MarelliCluster
     {
+        private readonly IKW1281Dialog _kwp1281;
+
+        public MarelliCluster(IKW1281Dialog kwp1281)
+        {
+            _kwp1281 = kwp1281;
+        }
+
         /// <summary>
         /// Dumps memory from a Marelli cluster to a file.
         /// </summary>
-        public static byte[] DumpMem(
-            IKW1281Dialog kwp1281,
+        public byte[] DumpMem(
             string ecuInfo,
             string? filename = null,
             ushort? address = null, ushort? count = null)
@@ -64,7 +70,7 @@ namespace BitFab.KW1281Test.Cluster
             filename ??= $"marelli_mem_${address:X4}.bin";
 
             Log.WriteLine("Sending block 0x6C");
-            kwp1281.SendBlock(new List<byte> { 0x6C });
+            _kwp1281.SendBlock(new List<byte> { 0x6C });
 
             Thread.Sleep(250);
 
@@ -74,7 +80,7 @@ namespace BitFab.KW1281Test.Cluster
                 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x50, 0x34,
                 entryH, 0x00, // Entry point $xx00
             };
-            if (!WriteMarelliBlockAndReadAck(kwp1281.KwpCommon, data))
+            if (!WriteMarelliBlockAndReadAck(data))
             {
                 return Array.Empty<byte>();
             }
@@ -134,17 +140,18 @@ namespace BitFab.KW1281Test.Cluster
                 0x7A, regBlockH, 0x17,          // staa $xx17   ; COPRST
                 0x3D,                           // rts
             };
-            if (!WriteMarelliBlockAndReadAck(kwp1281.KwpCommon, program))
+            if (!WriteMarelliBlockAndReadAck(program))
             {
                 return Array.Empty<byte>();
             }
 
             Log.WriteLine("Receiving memory dump");
 
+            var kwpCommon = _kwp1281.KwpCommon;
             var mem = new List<byte>();
             for (int i = 0; i < count; i++)
             {
-                var b = kwp1281.KwpCommon.ReadByte();
+                var b = kwpCommon.ReadByte();
                 mem.Add(b);
             }
 
@@ -153,11 +160,15 @@ namespace BitFab.KW1281Test.Cluster
 
             Log.WriteLine("Done");
 
+            _kwp1281.SetDisconnected(); // Don't try to send EndCommunication block
+
             return mem.ToArray();
         }
 
-        private static bool WriteMarelliBlockAndReadAck(IKwpCommon kwpCommon, byte[] data)
+        private bool WriteMarelliBlockAndReadAck(byte[] data)
         {
+            var kwpCommon = _kwp1281.KwpCommon;
+
             var count = (ushort)(data.Length + 2); // Count includes 2-byte checksum
             var countH = (byte)(count / 256);
             var countL = (byte)(count % 256);

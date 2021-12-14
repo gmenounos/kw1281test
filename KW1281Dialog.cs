@@ -14,7 +14,11 @@ namespace BitFab.KW1281Test
     /// </summary>
     internal interface IKW1281Dialog
     {
+        ControllerInfo Connect();
+
         void EndCommunication();
+
+        void SetDisconnected();
 
         void Login(ushort code, int workshopCode);
 
@@ -70,6 +74,13 @@ namespace BitFab.KW1281Test
 
     internal class KW1281Dialog : IKW1281Dialog
     {
+        public ControllerInfo Connect()
+        {
+            _isConnected = true;
+            var blocks = ReceiveBlocks();
+            return new ControllerInfo(blocks.Where(b => !b.IsAckNak));
+        }
+
         public void Login(ushort code, int workshopCode)
         {
             Log.WriteLine("Sending Login block");
@@ -254,8 +265,17 @@ namespace BitFab.KW1281Test
 
         public void EndCommunication()
         {
-            Log.WriteLine("Sending EndCommunication block");
-            SendBlock(new List<byte> { (byte)BlockTitle.End });
+            if (_isConnected)
+            {
+                Log.WriteLine("Sending EndCommunication block");
+                SendBlock(new List<byte> { (byte)BlockTitle.End });
+                _isConnected = false;
+            }
+        }
+
+        public void SetDisconnected()
+        {
+            _isConnected = false;
         }
 
         public void SendBlock(List<byte> blockBytes)
@@ -722,13 +742,15 @@ namespace BitFab.KW1281Test
 
         public IKwpCommon KwpCommon { get; }
 
+        private bool _isConnected;
+
         private byte? _blockCounter;
 
-        public KW1281Dialog(IKwpCommon kwpCommon, out ControllerInfo ecuInfo)
+        public KW1281Dialog(IKwpCommon kwpCommon)
         {
             KwpCommon = kwpCommon;
-            var blocks = ReceiveBlocks();
-            ecuInfo = new ControllerInfo(blocks.Where(b => !b.IsAckNak));
+            _isConnected = false;
+            _blockCounter = null;
         }
     }
 
