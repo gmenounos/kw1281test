@@ -67,8 +67,8 @@ namespace BitFab.KW1281Test.Cluster
                 y = x << 1;
 
                 bool carry = true;
-                work[1] = SubtractWithCarry(work[1], obfu[y], ref carry);
-                work[2] = SubtractWithCarry(work[2], obfu[y + 1], ref carry);
+                (work[1], carry) = SubtractWithCarry(work[1], obfu[y], carry);
+                (work[2], carry) = SubtractWithCarry(work[2], obfu[y + 1], carry);
             }
 
             Scramble(work);
@@ -85,7 +85,8 @@ namespace BitFab.KW1281Test.Cluster
             key[3] = key[5];
         }
 
-        private static byte SetOrClearBits(byte value, byte mask, bool set)
+        private static byte SetOrClearBits(
+            byte value, byte mask, bool set)
         {
             if (set)
             {
@@ -100,15 +101,16 @@ namespace BitFab.KW1281Test.Cluster
         /// <summary>
         /// Right-Rotate the first 4 bytes of a buffer count times.
         /// </summary>
-        private static void RightRotateFirst4Bytes(byte[] buf, int count)
+        private static void RightRotateFirst4Bytes(
+            byte[] buf, int count)
         {
             while (count != 0)
             {
-                var carry = (buf[0] & 0x01) != 0;
-                buf[3] = RightRotate(buf[3], ref carry);
-                buf[2] = RightRotate(buf[2], ref carry);
-                buf[1] = RightRotate(buf[1], ref carry);
-                buf[0] = RightRotate(buf[0], ref carry);
+                bool carry = (buf[0] & 0x01) != 0;
+                (buf[3], carry) = RightRotate(buf[3], carry);
+                (buf[2], carry) = RightRotate(buf[2], carry);
+                (buf[1], carry) = RightRotate(buf[1], carry);
+                (buf[0], carry) = RightRotate(buf[0], carry);
                 count--;
             }
         }
@@ -116,28 +118,28 @@ namespace BitFab.KW1281Test.Cluster
         /// <summary>
         /// Rotate a byte right.
         /// </summary>
-        private static byte RightRotate(byte value, ref bool carry)
+        private static (byte result, bool carry) RightRotate(
+            byte value, bool carry)
         {
             var newCarry = (value & 0x01) != 0;
             if (carry)
             {
-                carry = newCarry;
-                return (byte)((value >> 1) | 0x80);
+                return ((byte)((value >> 1) | 0x80), newCarry);
             }
             else
             {
-                carry = newCarry;
-                return (byte)(value >> 1);
+                return ((byte)(value >> 1), newCarry);
             }
         }
 
-        private static void LeftRotateMiddle2Bytes(byte[] key, int count)
+        private static void LeftRotateMiddle2Bytes(
+            byte[] key, int count)
         {
             while (count != 0)
             {
-                var carry = (key[2] & 0x80) != 0;
-                key[1] = LeftRotate(key[1], ref carry);
-                key[2] = LeftRotate(key[2], ref carry);
+                bool carry = (key[2] & 0x80) != 0;
+                (key[1], carry) = LeftRotate(key[1], carry);
+                (key[2], carry) = LeftRotate(key[2], carry);
                 count--;
             }
         }
@@ -145,12 +147,13 @@ namespace BitFab.KW1281Test.Cluster
         /// <summary>
         /// Left-Rotate a value count-times.
         /// </summary>
-        private static byte LeftRotate(byte value, int count)
+        private static byte LeftRotate(
+            byte value, int count)
         {
             while (count != 0)
             {
-                var carry = (value & 0x80) != 0;
-                value = LeftRotate(value, ref carry);
+                bool carry = (value & 0x80) != 0;
+                (value, carry) = LeftRotate(value, carry);
                 count--;
             }
 
@@ -160,34 +163,27 @@ namespace BitFab.KW1281Test.Cluster
         /// <summary>
         /// Left-Rotate a value.
         /// </summary>
-        private static byte LeftRotate(byte value, ref bool carry)
+        private static (byte result, bool carry) LeftRotate(
+            byte value, bool carry)
         {
             var newCarry = (value & 0x80) != 0;
             if (carry)
             {
-                carry = newCarry;
-                return (byte)((value << 1) | 0x01);
+                return ((byte)((value << 1) | 0x01), newCarry);
             }
             else
             {
-                carry = newCarry;
-                return (byte)(value << 1);
+                return ((byte)(value << 1), newCarry);
             }
         }
 
-        private static byte SubtractWithCarry(byte minuend, byte subtrahend, ref bool carry)
+        private static (byte result, bool carry) SubtractWithCarry(
+            byte minuend, byte subtrahend, bool carry)
         {
-            if (!carry)
-            {
-                subtrahend++;
-            }
+            int result = minuend - subtrahend - (carry ? 0 : 1);
+            carry = !(result < 0);
 
-            if (subtrahend > minuend)
-            {
-                carry = false;
-            }
-
-            return (byte)(minuend - subtrahend);
+            return ((byte)result, carry);
         }
     }
 }
