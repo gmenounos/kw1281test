@@ -77,7 +77,7 @@ namespace BitFab.KW1281Test
             ushort? login = null;
             byte groupNumber = 0;
 
-            if (string.Compare(command, "ReadEeprom", true) == 0)
+            if (string.Compare(command, "ReadEeprom", ignoreCase: true) == 0)
             {
                 if (args.Length < 5)
                 {
@@ -87,10 +87,10 @@ namespace BitFab.KW1281Test
 
                 address = Utils.ParseUint(args[4]);
             }
-            else if (string.Compare(command, "DumpMarelliMem", true) == 0 ||
-                     string.Compare(command, "DumpEeprom", true) == 0 ||
-                     string.Compare(command, "DumpMem", true) == 0 ||
-                     string.Compare(command, "DumpRB8Eeprom", true) == 0)
+            else if (string.Compare(command, "DumpMarelliMem", ignoreCase: true) == 0 ||
+                     string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 ||
+                     string.Compare(command, "DumpMem", ignoreCase: true) == 0 ||
+                     string.Compare(command, "DumpRB8Eeprom", ignoreCase: true) == 0)
             {
                 if (args.Length < 6)
                 {
@@ -106,7 +106,7 @@ namespace BitFab.KW1281Test
                     _filename = args[6];
                 }
             }
-            else if (string.Compare(command, "WriteEeprom", true) == 0)
+            else if (string.Compare(command, "WriteEeprom", ignoreCase: true) == 0)
             {
                 if (args.Length < 6)
                 {
@@ -117,7 +117,7 @@ namespace BitFab.KW1281Test
                 address = Utils.ParseUint(args[4]);
                 value = (byte)Utils.ParseUint(args[5]);
             }
-            else if (string.Compare(command, "LoadEeprom", true) == 0)
+            else if (string.Compare(command, "LoadEeprom", ignoreCase: true) == 0)
             {
                 if (args.Length < 6)
                 {
@@ -128,7 +128,7 @@ namespace BitFab.KW1281Test
                 address = Utils.ParseUint(args[4]);
                 _filename = args[5];
             }
-            else if (string.Compare(command, "SetSoftwareCoding", true) == 0)
+            else if (string.Compare(command, "SetSoftwareCoding", ignoreCase: true) == 0)
             {
                 if (args.Length < 6)
                 {
@@ -149,7 +149,7 @@ namespace BitFab.KW1281Test
                     return;
                 }
             }
-            else if (string.Compare(command, "DumpEdc15Eeprom", true) == 0)
+            else if (string.Compare(command, "DumpEdc15Eeprom", ignoreCase: true) == 0)
             {
                 if (args.Length < 4)
                 {
@@ -162,7 +162,7 @@ namespace BitFab.KW1281Test
                     _filename = args[4];
                 }
             }
-            else if (string.Compare(command, "AdaptationRead", true) == 0)
+            else if (string.Compare(command, "AdaptationRead", ignoreCase: true) == 0)
             {
                 if (args.Length < 5)
                 {
@@ -178,8 +178,8 @@ namespace BitFab.KW1281Test
                 }
             }
             else if (
-                string.Compare(command, "AdaptationSave", true) == 0 ||
-                string.Compare(command, "AdaptationTest", true) == 0)
+                string.Compare(command, "AdaptationSave", ignoreCase: true) == 0 ||
+                string.Compare(command, "AdaptationTest", ignoreCase: true) == 0)
             {
                 if (args.Length < 6)
                 {
@@ -196,8 +196,8 @@ namespace BitFab.KW1281Test
                 }
             }
             else if (
-                string.Compare(command, "BasicSetting", true) == 0 ||
-                string.Compare(command, "GroupRead", true) == 0)
+                string.Compare(command, "BasicSetting", ignoreCase: true) == 0 ||
+                string.Compare(command, "GroupRead", ignoreCase: true) == 0)
             {
                 if (args.Length < 5)
                 {
@@ -216,11 +216,13 @@ namespace BitFab.KW1281Test
             {
                 case "dumprb8eeprom":
                     tester.DumpRB8Eeprom(address, length, _filename);
-                    break;
+                    tester.EndCommunication();
+                    return;
 
                 case "getskc":
                     tester.GetSkc();
-                    break;
+                    tester.EndCommunication();
+                    return;
 
                 default:
                     break;
