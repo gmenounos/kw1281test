@@ -28,7 +28,7 @@ namespace BitFab.KW1281Test
         {
             Log.WriteLine("Sending wakeup message");
 
-            var kwpVersion = _kwpCommon!.WakeUp((byte)_controllerAddress, evenParityWakeup);
+            var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParityWakeup);
 
             if (kwpVersion != 1281)
             {
