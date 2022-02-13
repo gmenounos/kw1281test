@@ -350,6 +350,7 @@ namespace BitFab.KW1281Test.Cluster
                 case "MPV501MH 01.00": // 7M3920820H V57
                     return ToArray(0x38, 0x47, 0x34, 0x3A);
 
+                case "VWK501MH 00.92": // 3B0920827C V06
                 case "VWK501MH 01.10":
                     return ToArray(0x39, 0x34, 0x34, 0x40);
 
