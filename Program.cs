@@ -207,6 +207,17 @@ namespace BitFab.KW1281Test
 
                 groupNumber = byte.Parse(args[4]);
             }
+            else if (
+                string.Compare(command, "FindLogins", ignoreCase: true) == 0)
+            {
+                if (args.Length < 5)
+                {
+                    ShowUsage();
+                    return;
+                }
+
+                login = ushort.Parse(args[4]);
+            }
 
             using var @interface = OpenPort(portName, baudRate);
             var tester = new Tester(@interface, controllerAddress);
@@ -286,6 +297,10 @@ namespace BitFab.KW1281Test
 
                 case "dumpmem":
                     tester.DumpMem(address, length, _filename);
+                    break;
+
+                case "findlogins":
+                    tester.FindLogins(login!.Value, ecuInfo.WorkshopCode);
                     break;
 
                 case "groupread":
@@ -402,6 +417,8 @@ namespace BitFab.KW1281Test
             START = Start address in decimal (e.g. 66560) or hex (e.g. $10400)
             LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
             FILENAME = Optional filename
+        FindLogins LOGIN
+            LOGIN = Known good login (0-65535)
         GetSKC
         GroupRead GROUP
             GROUP = Group number (0-255)

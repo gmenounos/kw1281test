@@ -300,6 +300,33 @@ namespace BitFab.KW1281Test
             }
         }
 
+        public void FindLogins(ushort goodLogin, int workshopCode)
+        {
+            for (int login = 0; login <= 65535; login++)
+            {
+                if (login == goodLogin)
+                {
+                    Log.WriteLine("Skipping known good login");
+                    continue;
+                }
+
+                _kwp1281.Login(goodLogin, workshopCode);
+
+                try
+                {
+                    Log.WriteLine($"Trying {login:D5}");
+                    _kwp1281.Login((ushort)login, workshopCode);
+                    Log.WriteLine("{login:D5} succeeded");
+                    continue;
+                }
+                catch(TimeoutException)
+                {
+                    _kwp1281.SetDisconnected();
+                    Kwp1281Wakeup();
+                }
+            }
+        }
+
         public string DumpEdc15Eeprom(string? filename)
         {
             _kwp1281.EndCommunication();

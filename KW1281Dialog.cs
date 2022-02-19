@@ -276,6 +276,7 @@ namespace BitFab.KW1281Test
         public void SetDisconnected()
         {
             _isConnected = false;
+            _blockCounter = null;
         }
 
         public void SendBlock(List<byte> blockBytes)
