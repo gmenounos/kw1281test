@@ -302,27 +302,30 @@ namespace BitFab.KW1281Test
 
         public void FindLogins(ushort goodLogin, int workshopCode)
         {
-            for (int login = 0; login <= 65535; login++)
+            const int start = 0;
+            for (int login = start; login <= 65535; login++)
             {
-                if (login == goodLogin)
-                {
-                    Log.WriteLine("Skipping known good login");
-                    continue;
-                }
-
                 _kwp1281.Login(goodLogin, workshopCode);
 
                 try
                 {
                     Log.WriteLine($"Trying {login:D5}");
                     _kwp1281.Login((ushort)login, workshopCode);
-                    Log.WriteLine("{login:D5} succeeded");
+                    Log.WriteLine($"{login:D5} succeeded");
                     continue;
                 }
                 catch(TimeoutException)
                 {
                     _kwp1281.SetDisconnected();
-                    Kwp1281Wakeup();
+                    try
+                    {
+                        Kwp1281Wakeup();
+                    }
+                    catch(InvalidOperationException)
+                    {
+                        _kwp1281.SetDisconnected();
+                        Kwp1281Wakeup();
+                    }
                 }
             }
         }
@@ -427,7 +430,7 @@ namespace BitFab.KW1281Test
                     var cluster = new VdoCluster(_kwp1281);
                     var partNumberMatch = Regex.Match(
                         ecuInfo.Text,
-                        "\\b(\\d[a-zA-Z])\\d9(\\d{2})\\d{3}[a-zA-Z][a-zA-Z]?\\b");
+                        "\\b(\\d[a-zA-Z])\\d9(\\d{2})\\d{3}[a-zA-Z]{0,2}\\b");
                     if (partNumberMatch.Success)
                     {
                         var family = partNumberMatch.Groups[1].Value;

@@ -221,8 +221,7 @@ namespace BitFab.KW1281Test
 
             using var @interface = OpenPort(portName, baudRate);
             var tester = new Tester(@interface, controllerAddress);
-
-            ControllerInfo ecuInfo;
+            
             switch (command.ToLower())
             {
                 case "dumprb8eeprom":
@@ -239,7 +238,7 @@ namespace BitFab.KW1281Test
                     break;
             }
 
-            ecuInfo = tester.Kwp1281Wakeup();
+            ControllerInfo ecuInfo = tester.Kwp1281Wakeup();
 
             switch (command.ToLower())
             {
