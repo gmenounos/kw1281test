@@ -78,11 +78,7 @@ namespace BitFab.KW1281Test.Cluster
 
         static uint CalcRB8Key(uint seed)
         {
-            uint key =
-                0xFB4ACBBA
-                + (seed & 0x07DA06B8)
-                + (~seed | 0x07DA06B8)
-                - 2 * (seed & 0x00004000);
+            uint key = 0x03249272 + (seed ^ 0xf8253947);
             return key;
         }
 
