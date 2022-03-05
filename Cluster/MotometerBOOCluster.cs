@@ -10,7 +10,7 @@ namespace BitFab.KW1281Test.Cluster
         {
             string softwareVersion = GetClusterInfo();
             ushort login;
-            if (!softwareVersion.StartsWith("h9340"))
+            if (softwareVersion.StartsWith("h9340"))
             {
                 login = 11899;
             }
