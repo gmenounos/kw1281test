@@ -3,6 +3,7 @@
 using BitFab.KW1281Test.Interface;
 using BitFab.KW1281Test.Logging;
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
@@ -60,8 +61,15 @@ namespace BitFab.KW1281Test
                 return;
             }
 
-            // This seems to increase the accuracy of our timing loops
-            Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.RealTime;
+            try
+            {
+                // This seems to increase the accuracy of our timing loops
+                Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.RealTime;
+            }
+            catch(Win32Exception)
+            {
+                // Ignore if we don't have permission to increase our priority
+            }
 
             string portName = args[0];
             var baudRate = int.Parse(args[1]);
