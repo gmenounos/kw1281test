@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BitFab.KW1281Test.Blocks;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -18,11 +19,50 @@ namespace BitFab.KW1281Test.Cluster
 
             _kwp1281!.Login(login, workshopCode: 0);
 
-            // TODO: If 0x08 0x15 doesn't work, try all 64K values
+            Log.WriteLine($"Sending Custom $08 $15 block");
+            if (SendCustom(0x08, 0x15))
+            {
+                return;
+            }
 
-            Log.WriteLine("Sending Custom 0x08 0x15 block");
-            _kwp1281.SendBlock(new List<byte> { 0x1B, 0x08, 0x15 });
-            _ = _kwp1281.ReceiveBlocks();
+            Log.WriteLine("$08 $15 failed. Trying all combinations (this may take a while)...");
+
+            for (int first = 0; first < 0x100; first++)
+            {
+                Log.WriteLine($"Trying ${first:X2} $00-$FF");
+
+                for (int second = 0; second < 0x100; second++)
+                {
+                    if (SendCustom(first, second))
+                    {
+                        Log.WriteLine($"Combination ${first:X2} ${second:X2} Succeeded.");
+                        Log.WriteLine("Please report this to the program maintainer.");
+                        return;
+                    }
+                }
+            }
+
+            Log.WriteLine("All combinations failed. EEPROM access will likely fail.");
+        }
+
+        private bool SendCustom(int first, int second)
+        {
+            _kwp1281.SendBlock(new List<byte> { 0x1B, (byte)first, (byte)second });
+            var block = _kwp1281.ReceiveBlocks().FirstOrDefault();
+
+            if (block is NakBlock)
+            {
+                return false;
+            }
+            else if (block is AckBlock)
+            {
+                return true;
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"Expected ACK or NAK block but got: {block}");
+            }
         }
 
         private readonly Dictionary<string, ushort> VersionToLogin = new()
@@ -63,6 +103,27 @@ namespace BitFab.KW1281Test.Cluster
             uint length = optionalLength ?? 0x100;
             string filename = optionalFileName ?? $"BOO_${address:X6}_eeprom.bin";
 
+#if false
+            var identInfo = _kwp1281.ReadIdent().First().ToString()
+                .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
+                .Replace(' ', '_');
+
+            var dumpFileName = filename ?? $"{identInfo}_${startAddress:X4}_eeprom.bin";
+            foreach (var c in Path.GetInvalidFileNameChars())
+            {
+                dumpFileName = dumpFileName.Replace(c, 'X');
+            }
+            foreach (var c in Path.GetInvalidPathChars())
+            {
+                dumpFileName = dumpFileName.Replace(c, 'X');
+            }
+
+            Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
+            DumpEeprom(startAddress, length, maxReadLength: 16, dumpFileName);
+            Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
+
+            return dumpFileName;
+#endif
             throw new NotImplementedException();
         }
 

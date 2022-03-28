@@ -25,6 +25,7 @@ namespace BitFab.KW1281Test.Interface
 
         public void Dispose()
         {
+            SetDtr(false);
             _port.Close();
         }
 
@@ -40,14 +41,9 @@ namespace BitFab.KW1281Test.Interface
             _port.Write(_buf, 0, 1);
         }
 
-        public void SetBreakOn()
+        public void SetBreak(bool on)
         {
-            _port.BreakState = true;
-        }
-
-        public void SetBreakOff()
-        {
-            _port.BreakState = false;
+            _port.BreakState = on;
         }
 
         public void ClearReceiveBuffer()
@@ -58,6 +54,16 @@ namespace BitFab.KW1281Test.Interface
         public void SetBaudRate(int baudRate)
         {
             _port.BaudRate = baudRate;
+        }
+
+        public void SetDtr(bool on)
+        {
+            _port.DtrEnable = on;
+        }
+
+        public void SetRts(bool on)
+        {
+            _port.RtsEnable = on;
         }
 
         private readonly SerialPort _port;

@@ -33,11 +33,8 @@ namespace BitFab.KW1281Test.Interface
                 FT.FlowControl.None, 0, 0);
             FT.AssertOk(status);
 
-            status = _ft.ClrRts(_handle);
-            FT.AssertOk(status);
-
-            status = _ft.SetDtr(_handle);
-            FT.AssertOk(status);
+            SetRts(false);
+            SetDtr(true);
 
             status = _ft.SetTimeouts(
                 _handle,
@@ -54,6 +51,8 @@ namespace BitFab.KW1281Test.Interface
         {
             if (_handle != IntPtr.Zero)
             {
+                SetDtr(false);
+
                 var status = _ft.Close(_handle);
                 _handle = IntPtr.Zero;
                 FT.AssertOk(status);
@@ -90,15 +89,17 @@ namespace BitFab.KW1281Test.Interface
             }
         }
 
-        public void SetBreakOn()
+        public void SetBreak(bool on)
         {
-            var status = _ft.SetBreakOn(_handle);
-            FT.AssertOk(status);
-        }
-
-        public void SetBreakOff()
-        {
-            var status = _ft.SetBreakOff(_handle);
+            FT.Status status;
+            if (on)
+            {
+                status = _ft.SetBreakOn(_handle);
+            }
+            else
+            {
+                status = _ft.SetBreakOff(_handle);
+            }
             FT.AssertOk(status);
         }
 
@@ -111,6 +112,34 @@ namespace BitFab.KW1281Test.Interface
         public void SetBaudRate(int baudRate)
         {
             var status = _ft.SetBaudRate(_handle, (uint)baudRate);
+            FT.AssertOk(status);
+        }
+
+        public void SetDtr(bool on)
+        {
+            FT.Status status;
+            if (on)
+            {
+                status = _ft.SetDtr(_handle);
+            }
+            else
+            {
+                status = _ft.ClrDtr(_handle);
+            }
+            FT.AssertOk(status);
+        }
+
+        public void SetRts(bool on)
+        {
+            FT.Status status;
+            if (on)
+            {
+                status = _ft.SetRts(_handle);
+            }
+            else
+            {
+                status = _ft.ClrRts(_handle);
+            }
             FT.AssertOk(status);
         }
     }

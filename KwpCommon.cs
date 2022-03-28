@@ -29,7 +29,11 @@ namespace BitFab.KW1281Test
         public int WakeUp(byte controllerAddress, bool evenParity)
         {
             // Disable garbage collection int this time-critical method
-            bool noGc = GC.TryStartNoGCRegion(1024 * 1024);
+            bool noGC = GC.TryStartNoGCRegion(1024 * 1024);
+            if (!noGC)
+            {
+                Log.WriteLine("Warning: Unable to disable GC so timing may be compromised.");
+            }
 
             byte syncByte = 0;
             const int maxTries = 3;
@@ -61,7 +65,7 @@ namespace BitFab.KW1281Test
                 }
             }
 
-            if (noGc)
+            if (noGC)
             {
                 GC.EndNoGCRegion();
             }
@@ -126,7 +130,8 @@ namespace BitFab.KW1281Test
         private void BitBang5Baud(byte b, bool evenParity)
         {
             const int bitsPerSec = 5;
-            long ticksPerBit = Stopwatch.Frequency / bitsPerSec;
+            long ticksPerSecond = Stopwatch.Frequency;
+            long ticksPerBit = ticksPerSecond / bitsPerSec;
 
             long maxTick;
 
@@ -137,11 +142,16 @@ namespace BitFab.KW1281Test
                     ;
                 if (bit)
                 {
-                    Interface.SetBreakOff();
+                    Interface.SetRts(false);
+                    Interface.SetBreak(false);
                 }
                 else
                 {
-                    Interface.SetBreakOn();
+                    // On Windows (and maybe just non-USB cables), SetRts must be called before
+                    // SetBreak or else it will cancel the break because it internally calls
+                    // the Win32 SetCommState function, which reinitializes the port.
+                    Interface.SetRts(true);
+                    Interface.SetBreak(true);
                 }
 
                 maxTick += ticksPerBit;
@@ -149,7 +159,9 @@ namespace BitFab.KW1281Test
 
             bool parity = !evenParity; // XORed with each bit to calculate parity bit
 
-            maxTick = Stopwatch.GetTimestamp();
+            Interface.SetDtr(false);
+
+            var startTick = maxTick = Stopwatch.GetTimestamp();
             BitBang(false); // Start bit
 
             for (int i = 0; i < 7; i++)
@@ -165,9 +177,15 @@ namespace BitFab.KW1281Test
 
             BitBang(true); // Stop bit
 
+            Interface.SetDtr(true);
+
             // Wait for end of stop bit
-            while (Stopwatch.GetTimestamp() < maxTick)
+            long stopTick;
+            while ((stopTick = Stopwatch.GetTimestamp()) < maxTick)
                 ;
+
+            Log.WriteLine(
+                $"Wakeup duration: {(double)(stopTick - startTick) / ticksPerSecond} seconds");
         }
 
         /// <summary>

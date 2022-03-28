@@ -15,12 +15,14 @@ namespace BitFab.KW1281Test.Interface
         /// </summary>
         void WriteByteRaw(byte b);
 
-        void SetBreakOn();
-
-        void SetBreakOff();
+        void SetBreak(bool on);
 
         void ClearReceiveBuffer();
 
         void SetBaudRate(int baudRate);
+
+        void SetDtr(bool on);
+
+        void SetRts(bool on);
     }
 }
