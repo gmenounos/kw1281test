@@ -3,6 +3,7 @@
     public enum BlockTitle : byte
     {
         ReadIdent = 0x00,
+        ReadRam = 0x01,
         GroupReadResponseWithText = 0x02,
         ReadRomEeprom = 0x03,
         ActuatorTest = 0x04,
@@ -32,6 +33,7 @@
         WriteEepromResponse = 0xF9,
         FaultCodesResponse = 0xFC,
         ReadRomEepromResponse = 0xFD,
+        ReadRamResponse = 0xFE,
     }
 
     // http://nefariousmotorsports.com/forum/index.php?topic=8274.0

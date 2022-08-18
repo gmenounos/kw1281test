@@ -363,11 +363,12 @@ namespace BitFab.KW1281Test
                     DumpClusterEeprom((ushort)address, (ushort)length, filename);
                     break;
                 case (int)ControllerAddress.CCM:
+                case (int)ControllerAddress.CentralElectric:
                 case (int)ControllerAddress.CentralLocking:
                     DumpCcmEeprom((ushort)address, (ushort)length, filename);
                     break;
                 default:
-                    Log.WriteLine("Only supported for cluster, CCM and Central Locking");
+                    Log.WriteLine("Only supported for cluster, CCM, Central Locking and Central Electric");
                     break;
             }
         }
@@ -556,11 +557,12 @@ namespace BitFab.KW1281Test
                     MapClusterEeprom(filename);
                     break;
                 case (int)ControllerAddress.CCM:
+                case (int)ControllerAddress.CentralElectric:
                 case (int)ControllerAddress.CentralLocking:
                     MapCcmEeprom(filename);
                     break;
                 default:
-                    Log.WriteLine("Only supported for cluster, CCM and Central Locking");
+                    Log.WriteLine("Only supported for cluster, CCM, Central Locking and Central Electric");
                     break;
             }
         }
@@ -573,6 +575,40 @@ namespace BitFab.KW1281Test
             if (blockBytes == null)
             {
                 Log.WriteLine("EEPROM read failed");
+            }
+            else
+            {
+                var value = blockBytes[0];
+                Log.WriteLine(
+                    $"Address {address} (${address:X4}): Value {value} (${value:X2})");
+            }
+        }
+
+        public void ReadRam(uint address)
+        {
+            UnlockControllerForEepromReadWrite();
+
+            var blockBytes = _kwp1281.ReadRam((ushort)address, 1);
+            if (blockBytes == null)
+            {
+                Log.WriteLine("RAM read failed");
+            }
+            else
+            {
+                var value = blockBytes[0];
+                Log.WriteLine(
+                    $"Address {address} (${address:X4}): Value {value} (${value:X2})");
+            }
+        }
+
+        public void ReadRom(uint address)
+        {
+            UnlockControllerForEepromReadWrite();
+
+            var blockBytes = _kwp1281.ReadRomEeprom((ushort)address, 1);
+            if (blockBytes == null)
+            {
+                Log.WriteLine("ROM read failed");
             }
             else
             {
@@ -741,7 +777,15 @@ namespace BitFab.KW1281Test
             {
                 case ControllerAddress.CCM:
                 case ControllerAddress.CentralLocking:
-                    _kwp1281.Login(code: 19283, workshopCode: 222); // This is what VDS-PRO uses
+                    _kwp1281.Login(
+                        code: 19283,
+                        workshopCode: 222); // This is what VDS-PRO uses
+                    break;
+
+                case ControllerAddress.CentralElectric:
+                    _kwp1281.Login(
+                        code: 21318,
+                        workshopCode: 222); // This is what VDS-PRO uses
                     break;
 
                 case ControllerAddress.Cluster:

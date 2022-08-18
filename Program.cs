@@ -85,7 +85,9 @@ namespace BitFab.KW1281Test
             ushort? login = null;
             byte groupNumber = 0;
 
-            if (string.Compare(command, "ReadEeprom", ignoreCase: true) == 0)
+            if (string.Compare(command, "ReadEeprom", ignoreCase: true) == 0 ||
+                string.Compare(command, "ReadRAM", ignoreCase: true) == 0 ||
+                string.Compare(command, "ReadROM", ignoreCase: true) == 0)
             {
                 if (args.Length < 5)
                 {
@@ -326,6 +328,14 @@ namespace BitFab.KW1281Test
                     tester.ReadEeprom(address);
                     break;
 
+                case "readram":
+                    tester.ReadRam(address);
+                    break;
+
+                case "readrom":
+                    tester.ReadRom(address);
+                    break;
+
                 case "readfaultcodes":
                     tester.ReadFaultCodes();
                     break;
@@ -437,6 +447,10 @@ namespace BitFab.KW1281Test
         ReadFaultCodes
         ReadIdent
         ReadEeprom ADDRESS
+            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
+        ReadRAM ADDRESS
+            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
+        ReadROM ADDRESS
             ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
         ReadSoftwareVersion
         Reset

@@ -24,11 +24,22 @@ namespace BitFab.KW1281Test
 
         List<ControllerIdent> ReadIdent();
 
+        /// <summary>
+        /// Corresponds to VDS-Pro function 19
+        /// </summary>
         List<byte>? ReadEeprom(ushort address, byte count);
 
         bool WriteEeprom(ushort address, List<byte> values);
 
+        /// <summary>
+        /// Corresponds to VDS-Pro functions 21 and 22
+        /// </summary>
         List<byte> ReadRomEeprom(ushort address, byte count);
+
+        /// <summary>
+        /// Corresponds to VDS-Pro functions 20 and 25
+        /// </summary>
+        List<byte>? ReadRam(ushort address, byte count);
 
         bool AdaptationRead(byte channelNumber);
 
@@ -131,6 +142,38 @@ namespace BitFab.KW1281Test
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.ReadEeprom,
+                count,
+                (byte)(address >> 8),
+                (byte)(address & 0xFF)
+            });
+            var blocks = ReceiveBlocks();
+
+            if (blocks.Count == 1 && blocks[0] is NakBlock)
+            {
+                // Permissions issue
+                return null;
+            }
+
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
+            if (blocks.Count != 1)
+            {
+                throw new InvalidOperationException($"ReadEeprom returned {blocks.Count} blocks instead of 1");
+            }
+            return blocks[0].Body.ToList();
+        }
+
+        /// <summary>
+        /// Reads a range of bytes from the RAM.
+        /// </summary>
+        /// <param name="address"></param>
+        /// <param name="count"></param>
+        /// <returns>The bytes or null if the bytes could not be read</returns>
+        public List<byte>? ReadRam(ushort address, byte count)
+        {
+            Log.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
+            SendBlock(new List<byte>
+            {
+                (byte)BlockTitle.ReadRam,
                 count,
                 (byte)(address >> 8),
                 (byte)(address & 0xFF)
