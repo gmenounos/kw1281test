@@ -388,6 +388,9 @@ namespace BitFab.KW1281Test.Cluster
                 case "SS5501LM 01.00": // 1M0920802D V05
                     return ToArray(0x3C, 0x34, 0x47, 0x35);
 
+                case "$00 $00 $13 $01 ": // 8D0919880M  B5-KOMBIINSTR. VDO D02
+                    return ToArray(0x09, 0x06, 0x05, 0x02);
+
                 default:
                     return _clusterUnlockCodes;
             };
