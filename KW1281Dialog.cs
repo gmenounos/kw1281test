@@ -170,7 +170,7 @@ namespace BitFab.KW1281Test
         /// <returns>The bytes or null if the bytes could not be read</returns>
         public List<byte>? ReadRam(ushort address, byte count)
         {
-            Log.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
+            Log.WriteLine($"Sending ReadRam block (Address: ${address:X4}, Count: ${count:X2})");
             SendBlock(new List<byte>
             {
                 (byte)BlockTitle.ReadRam,
