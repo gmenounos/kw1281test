@@ -15,17 +15,40 @@ namespace BitFab.KW1281Test.Cluster
 
         public string DumpEeprom(uint? address, uint? length, string? dumpFileName)
         {
-            DumpMem(
-                dumpFileName, (ushort)address!, (ushort)length!);
-            return dumpFileName ?? $"marelli_mem_${address:X4}.bin";
+            address ??= GetDefaultAddress();
+            dumpFileName ??= $"marelli_mem_${address:X4}.bin";
+
+            DumpMem(dumpFileName, (ushort)address, (ushort?)length);
+
+            return dumpFileName;
+        }
+
+        private ushort GetDefaultAddress()
+        {
+            if (_ecuInfo.Contains("1C0920901"))
+            {
+                return 3072; // $0C00
+            }
+            else if (
+                _ecuInfo.Contains("1C0920921") ||
+                _ecuInfo.Contains("1C0920951") ||
+                _ecuInfo.Contains("8N2920930") ||
+                _ecuInfo.Contains("8N2920980"))
+            {
+                return 14336; // $3800
+            }
+            else
+            {
+                throw new InvalidOperationException("Unsupported cluster version.");
+            }
         }
 
         /// <summary>
         /// Dumps memory from a Marelli cluster to a file.
         /// </summary>
-        public byte[] DumpMem(
-            string? filename = null,
-            ushort? address = null,
+        private byte[] DumpMem(
+            string filename,
+            ushort address,
             ushort? count = null)
         {
             byte entryH; // High byte of code entry point
@@ -38,7 +61,6 @@ namespace BitFab.KW1281Test.Cluster
 
                 entryH = 0x02; // $0200
                 regBlockH = 0x08; // $0800
-                address ??= 3072; // $0C00
                 count ??= 1024; // $0400
             }
             else if (
@@ -55,7 +77,6 @@ namespace BitFab.KW1281Test.Cluster
 
                 entryH = 0x18; // $1800
                 regBlockH = 0x20; // $2000
-                address ??= 14336; // $3800
                 count ??= 2048; // $0800
             }
             else if (address == 3072 && count == 1024)
@@ -77,8 +98,6 @@ namespace BitFab.KW1281Test.Cluster
                 Log.WriteLine("Unsupported cluster software version");
                 return Array.Empty<byte>();
             }
-
-            filename ??= $"marelli_mem_${address:X4}.bin";
 
             Log.WriteLine("Sending block 0x6C");
             _kwp1281.SendBlock(new List<byte> { 0x6C });
