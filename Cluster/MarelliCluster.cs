@@ -15,7 +15,9 @@ namespace BitFab.KW1281Test.Cluster
 
         public string DumpEeprom(uint? address, uint? length, string? dumpFileName)
         {
-            throw new NotImplementedException();
+            DumpMem(
+                dumpFileName, (ushort)address!, (ushort)length!);
+            return dumpFileName ?? $"marelli_mem_${address:X4}.bin";
         }
 
         /// <summary>
@@ -23,31 +25,38 @@ namespace BitFab.KW1281Test.Cluster
         /// </summary>
         public byte[] DumpMem(
             string? filename = null,
-            ushort? address = null, ushort? count = null)
+            ushort? address = null,
+            ushort? count = null)
         {
             byte entryH; // High byte of code entry point
             byte regBlockH; // High byte of register block
 
-            if (
-                _ecuInfo.Contains("M73 V07")    // Beetle 1C0920901C
-                )
+            if (_ecuInfo.Contains("1C0920901"))
             {
-                entryH = 0x02;
-                regBlockH = 0x08;
-                address ??= 3072;
-                count ??= 1024;
+                // Tested:
+                // Beetle 1C0920901C M73 V07
+
+                entryH = 0x02; // $0200
+                regBlockH = 0x08; // $0800
+                address ??= 3072; // $0C00
+                count ??= 1024; // $0400
             }
             else if (
-                _ecuInfo.Contains("M73 V02") || // Beetle 1C0920951A
-                _ecuInfo.Contains("M73 V08") || // Beetle 1C0920921G
-                _ecuInfo.Contains("M73 D14") || // Audi TT 8N2920980A
-                _ecuInfo.Contains("M73 D55")    // Audi TT 8N2920930C
-                )
+                _ecuInfo.Contains("1C0920921") || // Beetle 1C0920951A
+                _ecuInfo.Contains("1C0920951") || // Beetle 1C0920921G
+                _ecuInfo.Contains("8N2920930") || // Audi TT 8N2920980A
+                _ecuInfo.Contains("8N2920980"))    // Audi TT 8N2920930C)
             {
-                entryH = 0x18;
-                regBlockH = 0x20;
-                address ??= 14336;
-                count ??= 2048;
+                // Tested:
+                // Beetle 1C0920921G M73 V08
+                // Beetle 1C0920951A M73 V02
+                // Audi TT 8N2920930C M73 D55
+                // Audi TT 8N2920980A M73 D14
+
+                entryH = 0x18; // $1800
+                regBlockH = 0x20; // $2000
+                address ??= 14336; // $3800
+                count ??= 2048; // $0800
             }
             else if (address == 3072 && count == 1024)
             {

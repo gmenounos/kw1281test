@@ -83,6 +83,10 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
         ReadIdent
         ReadEeprom ADDRESS
             ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
+        ReadRAM ADDRESS
+            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
+        ReadROM ADDRESS
+            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
         ReadSoftwareVersion
         Reset
         SetSoftwareCoding CODING WORKSHOP

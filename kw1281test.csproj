@@ -7,7 +7,7 @@
     <LangVersion>latest</LangVersion>
     <AssemblyVersion>0.75.0.0</AssemblyVersion>
     <FileVersion>0.75.0.0</FileVersion>
-    <Version>0.75-alpha</Version>
+    <Version>0.75-beta</Version>
     <Copyright>Copyright © 2022 Greg Menounos</Copyright>
     <DebugType>embedded</DebugType>
     <DebugSymbols>true</DebugSymbols>
