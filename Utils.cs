@@ -55,19 +55,23 @@ namespace BitFab.KW1281Test
             {
                 if (b >= 32 && b <= 126)
                 {
+                    if (mode == 'X')
+                    {
+                        sb.Append(' ');
+                    }
                     mode = 'A';
 
                     sb.Append((char)b);
                 }
                 else
                 {
-                    if (mode == 'A')
+                    if (mode != '?')
                     {
                         sb.Append(' ');
                     }
                     mode = 'X';
 
-                    sb.Append($"${b:X2} ");
+                    sb.Append($"${b:X2}");
                 }
             }
             return sb.ToString();
