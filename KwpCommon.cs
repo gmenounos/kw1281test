@@ -186,10 +186,12 @@ namespace BitFab.KW1281Test
         {
             Interface.WriteByteRaw(b);
             var echo = Interface.ReadByte();
+#if false
             if (echo != b)
             {
                 throw new InvalidOperationException($"Wrote 0x{b:X2} to port but echo was 0x{echo:X2}");
             }
+#endif
         }
 
         public KwpCommon(IInterface @interface)
