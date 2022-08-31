@@ -142,15 +142,10 @@ namespace BitFab.KW1281Test
                     ;
                 if (bit)
                 {
-                    Interface.SetRts(false);
                     Interface.SetBreak(false);
                 }
                 else
                 {
-                    // On Windows (and maybe just non-USB cables), SetRts must be called before
-                    // SetBreak or else it will cancel the break because it internally calls
-                    // the Win32 SetCommState function, which reinitializes the port.
-                    Interface.SetRts(true);
                     Interface.SetBreak(true);
                 }
 
@@ -158,8 +153,6 @@ namespace BitFab.KW1281Test
             }
 
             bool parity = !evenParity; // XORed with each bit to calculate parity bit
-
-            Interface.SetDtr(false);
 
             var startTick = maxTick = Stopwatch.GetTimestamp();
             BitBang(false); // Start bit
@@ -176,8 +169,6 @@ namespace BitFab.KW1281Test
             BitBang(parity);
 
             BitBang(true); // Stop bit
-
-            Interface.SetDtr(true);
 
             // Wait for end of stop bit
             long stopTick;
