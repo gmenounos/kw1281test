@@ -1,10 +1,12 @@
 ﻿using BitFab.KW1281Test.Cluster;
 using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
+using BitFab.KW1281Test.Kwp2000;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -411,10 +413,10 @@ namespace BitFab.KW1281Test
         }
 
         /// <summary>
-        /// Dumps the EEPROM of a Bosch RB8 cluster to a file.
+        /// Dumps the memory of a Bosch RB4/RB8 cluster to a file.
         /// </summary>
         /// <returns>The dump file name or null if the EEPROM was not dumped.</returns>
-        public string? DumpRB8Eeprom(uint address, uint length, string? filename)
+        public string? DumpRBxMem(uint address, uint length, string? filename)
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
@@ -424,9 +426,9 @@ namespace BitFab.KW1281Test
 
             var kwp2000 = Kwp2000Wakeup(evenParityWakeup: true);
 
-            var dumpFileName = filename ?? $"RB8_${address:X6}_eeprom.bin";
+            var dumpFileName = filename ?? $"RBx_${address:X6}_mem.bin";
 
-            ICluster cluster = new BoschRB8Cluster(kwp2000);
+            ICluster cluster = new BoschRBxCluster(kwp2000);
             cluster.UnlockForEepromReadWrite();
             cluster.DumpEeprom(address, length, dumpFileName);
 
@@ -478,13 +480,31 @@ namespace BitFab.KW1281Test
                         Console.WriteLine($"ECU Info: {ecuInfo.Text}");
                     }
                 }
+                else if (ecuInfo.Text.Contains("RB4"))
+                {
+                    // Need to quit KWP1281 before switching to KWP2000
+                    _kwp1281.EndCommunication();
+                    Thread.Sleep(TimeSpan.FromSeconds(2));
+
+                    var dumpFileName = DumpRBxMem(0x10046, 2, filename: null);
+                    var buf = File.ReadAllBytes(dumpFileName!);
+                    if (buf.Length == 2)
+                    {
+                        var skc = Utils.GetShort(buf, 0);
+                        Log.WriteLine($"SKC: {skc:D5}");
+                    }
+                    else
+                    {
+                        Log.WriteLine("Unable to read SKC. Cluster not in New mode (4)?");
+                    }
+                }
                 else if (ecuInfo.Text.Contains("RB8"))
                 {
                     // Need to quit KWP1281 before switching to KWP2000
                     _kwp1281.EndCommunication();
                     Thread.Sleep(TimeSpan.FromSeconds(2));
 
-                    var dumpFileName = DumpRB8Eeprom(0x1040E, 2, filename: null);
+                    var dumpFileName = DumpRBxMem(0x1040E, 2, filename: null);
                     var buf = File.ReadAllBytes(dumpFileName!);
                     var skc = Utils.GetShort(buf, 0);
                     Log.WriteLine($"SKC: {skc:D5}");
@@ -689,6 +709,15 @@ namespace BitFab.KW1281Test
             {
                 Log.WriteLine("Failed to set software coding.");
             }
+        }
+
+        public void ToggleRB4Mode()
+        {
+            var kwp2000 = Kwp2000Wakeup(evenParityWakeup: true);
+
+            BoschRBxCluster cluster = new(kwp2000);
+            cluster.UnlockForEepromReadWrite();
+            cluster.ToggleRB4Mode();
         }
 
         public void WriteEeprom(uint address, byte value)

@@ -22,15 +22,15 @@ namespace BitFab.KW1281Test
         /// </summary>
         public int P4 { get; set; } = 5;
 
-        public void DumpEeprom(uint address, uint length, string dumpFileName)
+        public void DumpMem(uint address, uint length, string dumpFileName)
         {
             StartDiagnosticSession(0x84, 0x14);
 
             Thread.Sleep(350);
 
-            Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
+            Log.WriteLine($"Saving memory dump to {dumpFileName}");
             DumpMemory(address, length, maxReadLength: 32, dumpFileName);
-            Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
+            Log.WriteLine($"Saved memory dump to {dumpFileName}");
 
             EcuReset(0x01);
         }
@@ -42,18 +42,30 @@ namespace BitFab.KW1281Test
             for (uint addr = startAddr; addr < (startAddr + length); addr += maxReadLength)
             {
                 var readLength = (byte)Math.Min(startAddr + length - addr, maxReadLength);
-                var blockBytes = ReadMemoryByAddress(addr, readLength);
-                if (blockBytes.Length != readLength)
+                try
                 {
-                    throw new InvalidOperationException(
-                        $"Expected {readLength} bytes from ReadMemoryByAddress() but received {blockBytes.Length} bytes");
+                    var blockBytes = ReadMemoryByAddress(addr, readLength);
+                    fs.Write(blockBytes, 0, blockBytes.Length);
+
+                    if (blockBytes.Length != readLength)
+                    {
+                        throw new InvalidOperationException(
+                            $"Expected {readLength} bytes from ReadMemoryByAddress() but received {blockBytes.Length} bytes");
+                    }
                 }
-                fs.Write(blockBytes, 0, blockBytes.Length);
-                fs.Flush();
+                catch (NegativeResponseException)
+                {
+                    // Access not allowed?
+                    Log.WriteLine("Failed to read memory.");
+                }
+                finally
+                {
+                    fs.Flush();
+                }
             }
         }
 
-        private void StartDiagnosticSession(byte v1, byte v2)
+        public void StartDiagnosticSession(byte v1, byte v2)
         {
             var responseMessage = SendReceive(Service.startDiagnosticSession, new[] { v1, v2 });
             if (responseMessage.Body[0] != v1)
@@ -62,12 +74,12 @@ namespace BitFab.KW1281Test
             }
         }
 
-        private void EcuReset(byte value)
+        public void EcuReset(byte value)
         {
             var responseMessage = SendReceive(Service.ecuReset, new[] { value });
         }
 
-        private byte[] ReadMemoryByAddress(uint address, byte count)
+        public byte[] ReadMemoryByAddress(uint address, byte count)
         {
             var addressBytes = Utils.GetBytes(address);
 
@@ -77,6 +89,25 @@ namespace BitFab.KW1281Test
                     addressBytes[2], addressBytes[1], addressBytes[0],
                     count
                 });
+
+            return responseMessage.Body.ToArray();
+        }
+
+        public byte[] WriteMemoryByAddress(uint address, byte count, byte[] data)
+        {
+            var addressBytes = Utils.GetBytes(address);
+
+            var messageBytes = new List<byte>
+            {
+                addressBytes[2],
+                addressBytes[1],
+                addressBytes[0],
+                count
+            };
+            messageBytes.AddRange(data);
+
+            var responseMessage = SendReceive(Service.writeMemoryByAddress,
+                messageBytes.ToArray());
 
             return responseMessage.Body.ToArray();
         }

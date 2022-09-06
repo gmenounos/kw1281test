@@ -100,7 +100,7 @@ namespace BitFab.KW1281Test
             else if (string.Compare(command, "DumpMarelliMem", ignoreCase: true) == 0 ||
                      string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 ||
                      string.Compare(command, "DumpMem", ignoreCase: true) == 0 ||
-                     string.Compare(command, "DumpRB8Eeprom", ignoreCase: true) == 0)
+                     string.Compare(command, "DumpRBxMem", ignoreCase: true) == 0)
             {
                 if (args.Length < 6)
                 {
@@ -234,13 +234,18 @@ namespace BitFab.KW1281Test
             
             switch (command.ToLower())
             {
-                case "dumprb8eeprom":
-                    tester.DumpRB8Eeprom(address, length, _filename);
+                case "dumprbxmem":
+                    tester.DumpRBxMem(address, length, _filename);
                     tester.EndCommunication();
                     return;
 
                 case "getskc":
                     tester.GetSkc();
+                    tester.EndCommunication();
+                    return;
+
+                case "togglerb4mode":
+                    tester.ToggleRB4Mode();
                     tester.EndCommunication();
                     return;
 
@@ -430,7 +435,7 @@ namespace BitFab.KW1281Test
             START = Start address in decimal (e.g. 8192) or hex (e.g. $2000)
             LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)
             FILENAME = Optional filename
-        DumpRB8Eeprom START LENGTH [FILENAME]
+        DumpRBxMem START LENGTH [FILENAME]
             START = Start address in decimal (e.g. 66560) or hex (e.g. $10400)
             LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
             FILENAME = Optional filename
@@ -457,6 +462,7 @@ namespace BitFab.KW1281Test
         SetSoftwareCoding CODING WORKSHOP
             CODING = Software coding in decimal (e.g. 4361) or hex (e.g. $1109)
             WORKSHOP = Workshop code in decimal (e.g. 4361) or hex (e.g. $1109)
+        ToogleRB4Mode
         WriteEeprom ADDRESS VALUE
             ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
             VALUE = Value in decimal (e.g. 138) or hex (e.g. $8A)");

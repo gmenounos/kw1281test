@@ -1,11 +1,13 @@
 ﻿using BitFab.KW1281Test.Kwp2000;
 using System;
 using System.Linq;
+using System.Net;
+using System.Threading;
 using Service = BitFab.KW1281Test.Kwp2000.DiagnosticService;
 
 namespace BitFab.KW1281Test.Cluster
 {
-    class BoschRB8Cluster : ICluster
+    class BoschRBxCluster : ICluster
     {
         public void UnlockForEepromReadWrite()
         {
@@ -17,9 +19,9 @@ namespace BitFab.KW1281Test.Cluster
         {
             uint address = optionalAddress ?? 0x10400;
             uint length = optionalLength ?? 0x400;
-            string filename = optionalFileName ?? $"RB8_${address:X6}_eeprom.bin";
+            string filename = optionalFileName ?? $"RBx_${address:X6}_mem.bin";
 
-            _kwp2000.DumpEeprom(address, length, filename);
+            _kwp2000.DumpMem(address, length, filename);
 
             return filename;
         }
@@ -48,7 +50,7 @@ namespace BitFab.KW1281Test.Cluster
                     (seedBytes[1] << 16) |
                     (seedBytes[2] << 8) |
                     seedBytes[3]);
-                var key = CalcRB8Key(seed);
+                var key = CalcRBxKey(seed);
 
                 try
                 {
@@ -76,7 +78,49 @@ namespace BitFab.KW1281Test.Cluster
             return false;
         }
 
-        static uint CalcRB8Key(uint seed)
+        /// <summary>
+        /// Toggle an Audi A4 RB4 cluster between Adapted mode (6) and New mode (4).
+        /// Cluster should already be logged in and unlocked for EEPROM read/write.
+        /// </summary>
+        public void ToggleRB4Mode()
+        {
+            _kwp2000.StartDiagnosticSession(0x84, 0x14);
+
+            Thread.Sleep(350);
+
+            byte[] bytes = _kwp2000.ReadMemoryByAddress(0x010450, 2);
+            if (bytes[0] != (byte)'A' && bytes[1] != (byte)'U')
+            {
+                Log.WriteLine("Cluster is not an Audi cluster!");
+            }
+            else
+            {
+                try
+                {
+                    bytes = _kwp2000.ReadMemoryByAddress(0x010000, 0x10);
+                    Log.WriteLine("Cluster is in New mode (4).");
+                }
+                catch (NegativeResponseException)
+                {
+                    Log.WriteLine("Cluster is in Adapted mode (6).");
+                }
+
+                Log.WriteLine("Toggling cluster mode...");
+
+                foreach (var address in new uint[] { 0x01044F, 0x01052F, 0x01062F })
+                {
+                    bytes = _kwp2000.ReadMemoryByAddress(address, 1);
+                    bytes[0] ^= 0x12;
+                    _kwp2000.WriteMemoryByAddress(address, 1, bytes);
+                }
+            }
+
+            Log.WriteLine("Resetting cluster...");
+
+            _kwp2000.EcuReset(0x01);
+        }
+
+        static uint CalcRBxKey(uint seed)
         {
             uint key = 0x03249272 + (seed ^ 0xf8253947);
             return key;
@@ -84,7 +128,7 @@ namespace BitFab.KW1281Test.Cluster
 
         private readonly KW2000Dialog _kwp2000;
 
-        public BoschRB8Cluster(KW2000Dialog kwp2000)
+        public BoschRBxCluster(KW2000Dialog kwp2000)
         {
             _kwp2000 = kwp2000;
         }

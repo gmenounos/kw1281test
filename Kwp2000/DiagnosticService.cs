@@ -11,6 +11,7 @@
         startRoutineByLocalIdentifier = 0x31,
         requestDownload = 0x34,
         transferData = 0x36,
+        writeMemoryByAddress = 0x3D,
         testerPresent = 0x3E,
         startCommunication = 0x81,
         stopCommunicatiom = 0x82,
