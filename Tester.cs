@@ -170,10 +170,22 @@ namespace BitFab.KW1281Test
 
         public void ClearFaultCodes()
         {
-            var succeeded = _kwp1281.ClearFaultCodes(_controllerAddress);
-            if (succeeded)
+            var faultCodes = _kwp1281.ClearFaultCodes(_controllerAddress);
+
+            if (faultCodes != null)
             {
-                Log.WriteLine("Fault codes cleared.");
+                if (faultCodes.Count == 0)
+                {
+                    Log.WriteLine("Fault codes cleared.");
+                }
+                else
+                {
+                    Log.WriteLine("Fault codes:");
+                    foreach (var faultCode in faultCodes)
+                    {
+                        Log.WriteLine($"    {faultCode}");
+                    }
+                }
             }
             else
             {

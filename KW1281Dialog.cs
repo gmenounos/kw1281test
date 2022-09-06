@@ -66,8 +66,8 @@ namespace BitFab.KW1281Test
         /// Clear all of the controllers fault codes.
         /// </summary>
         /// <param name="controllerAddress"></param>
-        /// <returns>True if successful.</returns>
-        bool ClearFaultCodes(int controllerAddress);
+        /// <returns>Any remaining fault codes.</returns>
+        List<FaultCode>? ClearFaultCodes(int controllerAddress);
 
         /// <summary>
         /// Set the controller's software coding and workshop code.
@@ -510,7 +510,7 @@ namespace BitFab.KW1281Test
             return faultCodes;
         }
 
-        public bool ClearFaultCodes(int controllerAddress)
+        public List<FaultCode>? ClearFaultCodes(int controllerAddress)
         {
             Log.WriteLine($"Sending ClearFaultCodes block");
             SendBlock(new List<byte>
@@ -519,26 +519,22 @@ namespace BitFab.KW1281Test
             });
 
             var blocks = ReceiveBlocks();
-            if (blocks.Count == 1)
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
+
+            var faultCodes = new List<FaultCode>();
+            foreach (var block in blocks)
             {
-                var block = blocks[0];
-                if (block is NakBlock)
+                if (block is not FaultCodesBlock)
                 {
-                    return false;
+                    Log.WriteLine($"Expected FaultCodesBlock but got {block.GetType()}");
+                    return null;
                 }
-                else if (block is AckBlock)
-                {
-                    return true;
-                }
-                else
-                {
-                    throw new InvalidOperationException($"ClearFaultCodes returned {block.GetType()} block instead of ACK/NAK");
-                }
+
+                var faultCodesBlock = (FaultCodesBlock)block;
+                faultCodes.AddRange(faultCodesBlock.FaultCodes);
             }
-            else
-            {
-                throw new InvalidOperationException($"ClearFaultCodes returned {blocks.Count} blocks instead of 1");
-            }
+
+            return faultCodes;
         }
 
         public bool SetSoftwareCoding(int controllerAddress, int softwareCoding, int workshopCode)
