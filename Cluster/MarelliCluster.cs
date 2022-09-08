@@ -54,7 +54,13 @@ namespace BitFab.KW1281Test.Cluster
             byte entryH; // High byte of code entry point
             byte regBlockH; // High byte of register block
 
-            if (_ecuInfo.Contains("1C0920901"))
+            if (_ecuInfo.Contains("M73 D0"))    // Audi TT
+            {
+                entryH = 0x00; // $0000
+                regBlockH = (byte)((address == 0x3800) ? 0x20 : 0x08);
+                count ??= (ushort)((address == 0x3800) ? 0x800 : 0x400);
+            }
+            else if (_ecuInfo.Contains("1C0920901"))
             {
                 // Tested:
                 // Beetle 1C0920901C M73 V07
@@ -66,8 +72,8 @@ namespace BitFab.KW1281Test.Cluster
             else if (
                 _ecuInfo.Contains("1C0920921") || // Beetle 1C0920951A
                 _ecuInfo.Contains("1C0920951") || // Beetle 1C0920921G
-                _ecuInfo.Contains("8N2920930") || // Audi TT 8N2920980A
-                _ecuInfo.Contains("8N2920980"))    // Audi TT 8N2920930C)
+                _ecuInfo.Contains("8N2920930") || // Audi TT 8N2920930C M73 D56
+                _ecuInfo.Contains("8N2920980"))   // Audi TT 8N2920980A
             {
                 // Tested:
                 // Beetle 1C0920921G M73 V08
@@ -118,6 +124,7 @@ namespace BitFab.KW1281Test.Cluster
             // Now we write a small memory dump program to the 68HC12 processor
 
             Log.WriteLine("Writing memory dump program to cluster microcontroller");
+            Log.WriteLine($"(Entry: ${entryH:X2}00, RegBlock: ${regBlockH:X2}00, Start: ${address:X4}, Count: ${count:X4})");
 
             var startH = (byte)(address / 256);
             var startL = (byte)(address % 256);
@@ -135,13 +142,13 @@ namespace BitFab.KW1281Test.Cluster
 
                 // Set baud rate to 9600
                 0xC7,                           // clrb
-                0x7B, regBlockH, 0xC8,          // stab $xxC8   ; SC1BDH
+                0x7B, regBlockH, 0xC8,          // stab SC1BDH
                 0xC6, 0x34,                     // ldab #$34
-                0x7B, regBlockH, 0xC9,          // stab $xxC9   ; SC1BDL
+                0x7B, regBlockH, 0xC9,          // stab SC1BDL
 
                 // Enable transmit, disable UART interrupts
                 0xC6, 0x08,                     // ldab #$08
-                0x7B, regBlockH, 0xCB,          // stab $xxCB   ; SC1CR2
+                0x7B, regBlockH, 0xCB,          // stab SC1CR2
 
                 0xCE, startH, startL,           // ldx #start
                 // SendLoop:
@@ -151,23 +158,23 @@ namespace BitFab.KW1281Test.Cluster
                 0x26, 0xF7,                     // bne SendLoop
                 // Poison the watchdog to force a reboot
                 0xCC, 0x11, 0x11,               // ldd #$1111
-                0x7B, regBlockH, 0x17,          // stab $xx17   ; COPRST
-                0x7A, regBlockH, 0x17,          // staa $xx17   ; COPRST
+                0x7B, regBlockH, 0x17,          // stab COPRST
+                0x7A, regBlockH, 0x17,          // staa COPRST
                 0x3D,                           // rts
 
                 // SendByte:
-                0xF6, regBlockH, 0xCC,          // ldab $xxCC   ; SC1SR1
-                0x7A, regBlockH, 0xCF,          // staa $xxCF   ; SC1DRL
+                0xF6, regBlockH, 0xCC,          // ldab SC1SR1
+                0x7A, regBlockH, 0xCF,          // staa SC1DRL
                 // TxBusy:
                 0x07, 0x06,                     // bsr FeedWatchdog
                 // Loop until TC (Transmit Complete) bit is set
-                0x1F, regBlockH, 0xCC, 0x40, 0xF9,   // brclr $xxCC,$40,TxBusy   ; SC1SR1
+                0x1F, regBlockH, 0xCC, 0x40, 0xF9,   // brclr SC1SR1,$40,TxBusy
                 0x3D,                           // rts
 
                 // FeedWatchdog:
                 0xCC, 0x55, 0xAA,               // ldd #$55AA
-                0x7B, regBlockH, 0x17,          // stab $xx17   ; COPRST
-                0x7A, regBlockH, 0x17,          // staa $xx17   ; COPRST
+                0x7B, regBlockH, 0x17,          // stab COPRST
+                0x7A, regBlockH, 0x17,          // staa COPRST
                 0x3D,                           // rts
             };
             if (!WriteMarelliBlockAndReadAck(program))
