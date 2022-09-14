@@ -225,7 +225,7 @@ namespace BitFab.KW1281Test.Cluster
                 if (unlockResponse[0].IsAck)
                 {
                     Log.WriteLine(
-                        $"Unlock code for software version {softwareVersion} is{Utils.Dump(unlockCode)}");
+                        $"Unlock code for software version '{softwareVersion}' is{Utils.Dump(unlockCode)}");
                     if (unlockCodes.Length > 1)
                     {
                         Log.WriteLine("Please report this to the program maintainer.");
@@ -367,11 +367,11 @@ namespace BitFab.KW1281Test.Cluster
                 case "VBKX00MH 01.00":
                     return ToArray(0x3A, 0x39, 0x31, 0x43);
 
-                case "V599HLA $91 $00": // 7D0920841A V18
-                case "V599LLA $91 $00": // 7D0920801B V18
-                case "V599LLA $00 $01": // 1J0920800L V59
-                case "V599MLA $00 $01": // 7D0920821D V22
-                case "V599LLA $00 $03": // 1J0920900J V60
+                case "V599HLA  00.91": // 7D0920841A V18
+                case "V599LLA  00.91": // 7D0920801B V18
+                case "V599LLA  01.00": // 1J0920800L V59
+                case "V599MLA  01.00": // 7D0920821D V22
+                case "V599LLA  03.00": // 1J0920900J V60
                     return ToArray(0x38, 0x3F, 0x40, 0x35);
 
                 case "VAT500MH 01.10": // 1J0920925D V06
@@ -382,7 +382,7 @@ namespace BitFab.KW1281Test.Cluster
                 case "VMMJ08MH 09.00": // 1J5920826L V75
                     return ToArray(0x3E, 0x47, 0x3D, 0x48);
 
-                case "V798MLA $00 $01": // 7D0920800F V01, 1J0919951C V55
+                case "V798MLA 01.00": // 7D0920800F V01, 1J0919951C V55
                     return ToArray(0x02, 0x03, 0x05, 0x09);
 
                 case "SS5501LM 01.00": // 1M0920802D V05
