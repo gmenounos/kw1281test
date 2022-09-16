@@ -148,5 +148,48 @@ namespace BitFab.KW1281Test
 
             return bytes;
         }
+
+        /// <summary>
+        /// Rotate a byte right.
+        /// </summary>
+        public static (byte result, bool carry) RightRotate(
+            byte value, bool carry)
+        {
+            var newCarry = (value & 0x01) != 0;
+            if (carry)
+            {
+                return ((byte)((value >> 1) | 0x80), newCarry);
+            }
+            else
+            {
+                return ((byte)(value >> 1), newCarry);
+            }
+        }
+
+        /// <summary>
+        /// Left-Rotate a value.
+        /// </summary>
+        public static (byte result, bool carry) LeftRotate(
+            byte value, bool carry)
+        {
+            var newCarry = (value & 0x80) != 0;
+            if (carry)
+            {
+                return ((byte)((value << 1) | 0x01), newCarry);
+            }
+            else
+            {
+                return ((byte)(value << 1), newCarry);
+            }
+        }
+
+        public static (byte result, bool carry) SubtractWithCarry(
+            byte minuend, byte subtrahend, bool carry)
+        {
+            int result = minuend - subtrahend - (carry ? 0 : 1);
+            carry = !(result < 0);
+
+            return ((byte)result, carry);
+        }
     }
 }

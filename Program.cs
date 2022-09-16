@@ -317,6 +317,10 @@ namespace BitFab.KW1281Test
                     tester.FindLogins(login!.Value, ecuInfo.WorkshopCode);
                     break;
 
+                case "getclusterid":
+                    tester.GetClusterId();
+                    break;
+
                 case "groupread":
                     tester.GroupRead(groupNumber);
                     break;

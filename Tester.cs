@@ -1,12 +1,10 @@
 ﻿using BitFab.KW1281Test.Cluster;
 using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
-using BitFab.KW1281Test.Kwp2000;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -433,6 +431,47 @@ namespace BitFab.KW1281Test
             cluster.DumpEeprom(address, length, dumpFileName);
 
             return dumpFileName;
+        }
+
+        /// <summary>
+        /// Connects to the cluster and gets its unique ID. This is normally done by the radio in
+        /// order to detect if its been moved to a different vehicle.
+        /// </summary>
+        public void GetClusterId()
+        {
+#if false
+            if (_controllerAddress != 0x3F)
+            {
+                Log.WriteLine("Only supported for special cluster address $3F");
+                return;
+            }
+#endif
+
+            _kwp1281.SendBlock(new List<byte>
+            {
+                (byte)BlockTitle.SecurityAccessMode1,
+
+                // The radio would send 4 random values for obfuscation, but the cluster ignores
+                // them so we'll just send 0's.
+                0x00, 0x00, 0x00, 0x00 // Challenge
+            });
+
+            var block = _kwp1281.ReceiveBlocks().FirstOrDefault(b => !b.IsAckNak);
+
+            if (block == null)
+            {
+                Log.WriteLine("No response received from cluster.");
+            }
+            else if (block.Title != (byte)BlockTitle.SecurityAccessMode2)
+            {
+                Log.WriteLine(
+                    $"Unexpected response received from cluster. Block title: ${block.Title:X2}");
+            }
+            else
+            {
+                (byte id1, byte id2) = DecodeClusterId(block.Body[0], block.Body[1], block.Body[2], block.Body[3]);
+                Log.WriteLine($"Cluster Id: ${id1:X2} ${id2:X2}");
+            }
         }
 
         public void GetSkc()
@@ -948,6 +987,47 @@ namespace BitFab.KW1281Test
             cluster.DumpMem(dumpFileName, startAddress, length);
 
             Log.WriteLine($"Saved memory dump to {dumpFileName}");
+        }
+
+        private static (byte, byte) DecodeClusterId(byte b1, byte b2, byte b3, byte b4)
+        {
+            // For obfuscation, the cluster adds the values below, so we need to subtract them:
+            bool carry = true;
+            (b1, carry) = Utils.SubtractWithCarry(b1, 0xE7, carry);
+            (b2, carry) = Utils.SubtractWithCarry(b2, 0xBD, carry);
+            (b3, carry) = Utils.SubtractWithCarry(b3, 0x18, carry);
+            (b4, carry) = Utils.SubtractWithCarry(b4, 0x00, carry);
+
+            b1 ^= b3;
+            b2 ^= b4;
+
+            // Count the number of 0 bits in b1 and b2
+
+            byte zeroCount = 0;
+            for (int i = 0; i < 8; i++)
+            {
+                if (((b1 >> i) & 1) == 0)
+                {
+                    zeroCount++;
+                }
+                if (((b2 >> i) & 1) == 0)
+                {
+                    zeroCount++;
+                }
+            }
+
+            // Right-rotate b3 and b4 zeroCount times:
+            for (int i = 0; i < zeroCount; i++)
+            {
+                carry = (b4 & 1) != 0;
+                (b3, carry) = Utils.RightRotate(b3, carry);
+                (b4, carry) = Utils.RightRotate(b4, carry);
+            }
+
+            b1 ^= b3;
+            b2 ^= b4;
+
+            return (b1, b2);
         }
     }
 }

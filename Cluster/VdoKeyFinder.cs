@@ -67,8 +67,8 @@ namespace BitFab.KW1281Test.Cluster
                 y = x << 1;
 
                 bool carry = true;
-                (work[1], carry) = SubtractWithCarry(work[1], obfu[y], carry);
-                (work[2], carry) = SubtractWithCarry(work[2], obfu[y + 1], carry);
+                (work[1], carry) = Utils.SubtractWithCarry(work[1], obfu[y], carry);
+                (work[2], carry) = Utils.SubtractWithCarry(work[2], obfu[y + 1], carry);
             }
 
             Scramble(work);
@@ -107,28 +107,11 @@ namespace BitFab.KW1281Test.Cluster
             while (count != 0)
             {
                 bool carry = (buf[0] & 0x01) != 0;
-                (buf[3], carry) = RightRotate(buf[3], carry);
-                (buf[2], carry) = RightRotate(buf[2], carry);
-                (buf[1], carry) = RightRotate(buf[1], carry);
-                (buf[0], carry) = RightRotate(buf[0], carry);
+                (buf[3], carry) = Utils.RightRotate(buf[3], carry);
+                (buf[2], carry) = Utils.RightRotate(buf[2], carry);
+                (buf[1], carry) = Utils.RightRotate(buf[1], carry);
+                (buf[0], carry) = Utils.RightRotate(buf[0], carry);
                 count--;
-            }
-        }
-
-        /// <summary>
-        /// Rotate a byte right.
-        /// </summary>
-        private static (byte result, bool carry) RightRotate(
-            byte value, bool carry)
-        {
-            var newCarry = (value & 0x01) != 0;
-            if (carry)
-            {
-                return ((byte)((value >> 1) | 0x80), newCarry);
-            }
-            else
-            {
-                return ((byte)(value >> 1), newCarry);
             }
         }
 
@@ -138,8 +121,8 @@ namespace BitFab.KW1281Test.Cluster
             while (count != 0)
             {
                 bool carry = (key[2] & 0x80) != 0;
-                (key[1], carry) = LeftRotate(key[1], carry);
-                (key[2], carry) = LeftRotate(key[2], carry);
+                (key[1], carry) = Utils.LeftRotate(key[1], carry);
+                (key[2], carry) = Utils.LeftRotate(key[2], carry);
                 count--;
             }
         }
@@ -153,37 +136,11 @@ namespace BitFab.KW1281Test.Cluster
             while (count != 0)
             {
                 bool carry = (value & 0x80) != 0;
-                (value, carry) = LeftRotate(value, carry);
+                (value, carry) = Utils.LeftRotate(value, carry);
                 count--;
             }
 
             return value;
-        }
-
-        /// <summary>
-        /// Left-Rotate a value.
-        /// </summary>
-        private static (byte result, bool carry) LeftRotate(
-            byte value, bool carry)
-        {
-            var newCarry = (value & 0x80) != 0;
-            if (carry)
-            {
-                return ((byte)((value << 1) | 0x01), newCarry);
-            }
-            else
-            {
-                return ((byte)(value << 1), newCarry);
-            }
-        }
-
-        private static (byte result, bool carry) SubtractWithCarry(
-            byte minuend, byte subtrahend, bool carry)
-        {
-            int result = minuend - subtrahend - (carry ? 0 : 1);
-            carry = !(result < 0);
-
-            return ((byte)result, carry);
         }
     }
 }

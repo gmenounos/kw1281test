@@ -409,6 +409,7 @@ namespace BitFab.KW1281Test
                 BlockTitle.AdaptationResponse => new AdaptationResponseBlock(blockBytes),
                 BlockTitle.GroupReadResponse => new GroupReadResponseBlock(blockBytes),
                 BlockTitle.RawDataReadResponse => new RawDataReadResponseBlock(blockBytes),
+                BlockTitle.SecurityAccessMode2 => new SecurityAccessMode2Block(blockBytes),
                 _ => new UnknownBlock(blockBytes),
             };
         }
