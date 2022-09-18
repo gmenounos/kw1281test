@@ -398,13 +398,14 @@ namespace BitFab.KW1281Test.Cluster
 
         private static string SoftwareVersionToString(List<byte> versionBytes)
         {
-            if (versionBytes.Count != 10)
+            if (versionBytes.Count < 9 || versionBytes.Count > 10)
             {
                 return Utils.DumpMixedContent(versionBytes);
             }
 
-            var asciiPart = Encoding.ASCII.GetString(versionBytes.Take(8).ToArray());
-            return $"{asciiPart} {versionBytes[9]:X2}.{versionBytes[8]:X2}";
+
+            var asciiPart = Encoding.ASCII.GetString(versionBytes.ToArray()[0..^2]);
+            return $"{asciiPart} {versionBytes[^1]:X2}.{versionBytes[^2]:X2}";
         }
 
         private static byte[][] ToArray(byte v1, byte v2, byte v3, byte v4)

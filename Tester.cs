@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
+using static BitFab.KW1281Test.Interface.FT;
 
 namespace BitFab.KW1281Test
 {
@@ -489,22 +490,36 @@ namespace BitFab.KW1281Test
                     {
                         var family = partNumberMatch.Groups[1].Value;
 
-                        switch (partNumberMatch.Groups[2].Value)
+                        string dumpFileName;
+                        ushort startAddress;
+                        byte[] buf;
+                        short? skc;
+                        if (partNumberMatch.Groups[2].Value == "19") // Non-CAN
                         {
-                            case "19": // Non-CAN
-                                Log.WriteLine($"Cluster is non-Immo so there is no SKC.");
-                                return;
-                            case "20": // CAN
-                                break;
-                            default:
-                                Log.WriteLine($"Unknown cluster: {ecuInfo.Text}");
-                                return;
+                            startAddress = 0x1FA;
+                            dumpFileName = DumpClusterEeprom(startAddress, length: 6, filename: null);
+                            buf = File.ReadAllBytes(dumpFileName);
+                            skc = Utils.GetBcd(buf, 0);
+                            short skc2 = Utils.GetBcd(buf, 2);
+                            short skc3 = Utils.GetBcd(buf, 4);
+                            if (skc != skc2 || skc != skc3)
+                            {
+                                Log.WriteLine($"Warning: redundant SKCs do not match: {skc:D5} {skc2:D5} {skc3:D5}");
+                            }
+                        }
+                        else if (partNumberMatch.Groups[2].Value == "20") // CAN
+                        {
+                            startAddress = 0x90;
+                            dumpFileName = DumpClusterEeprom(startAddress, length: 0x7C, filename: null);
+                            buf = File.ReadAllBytes(dumpFileName);
+                            skc = cluster.GetSkc(buf, startAddress);
+                        }
+                        else
+                        {
+                            Log.WriteLine($"Unknown cluster: {ecuInfo.Text}");
+                            return;
                         }
 
-                        const int startAddress = 0x90;
-                        var dumpFileName = DumpClusterEeprom(startAddress, length: 0x7C, filename: null);
-                        var buf = File.ReadAllBytes(dumpFileName);
-                        var skc = cluster.GetSkc(buf, startAddress);
                         if (skc.HasValue)
                         {
                             Log.WriteLine($"SKC: {skc:D5}");
