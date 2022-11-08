@@ -25,7 +25,8 @@ namespace BitFab.KW1281Test.Cluster
 
         private ushort GetDefaultAddress()
         {
-            if (_ecuInfo.Contains("1C0920901"))
+            if (_ecuInfo.Contains("1C0920901") ||
+                _ecuInfo.Contains("1C0920905"))
             {
                 return 3072; // $0C00
             }
@@ -60,7 +61,9 @@ namespace BitFab.KW1281Test.Cluster
                 regBlockH = (byte)((address == 0x3800) ? 0x20 : 0x08);
                 count ??= (ushort)((address == 0x3800) ? 0x800 : 0x400);
             }
-            else if (_ecuInfo.Contains("1C0920901"))
+            else if (
+                _ecuInfo.Contains("1C0920901") ||
+                _ecuInfo.Contains("1C0920905")) // Beetle 1C0920905F M73 V03
             {
                 // Tested:
                 // Beetle 1C0920901C M73 V07
