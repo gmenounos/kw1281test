@@ -288,7 +288,7 @@ namespace BitFab.KW1281Test.Cluster
         /// <param name="bytes">A portion of a VDO cluster EEPROM dump.</param>
         /// <param name="startAddress">The start address of bytes within the EEPROM.</param>
         /// <returns>The SKC or null if the SKC could not be determined.</returns>
-        public short? GetSkc(byte[] bytes, int startAddress)
+        public ushort? GetSkc(byte[] bytes, int startAddress)
         {
             string text = Encoding.ASCII.GetString(bytes);
 
@@ -304,7 +304,7 @@ namespace BitFab.KW1281Test.Cluster
                 return null;
             }
 
-            short skc;
+            ushort skc;
             var index = immoMatch.Index + startAddress;
 
             switch (index)

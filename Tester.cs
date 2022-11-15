@@ -493,15 +493,15 @@ namespace BitFab.KW1281Test
                         string dumpFileName;
                         ushort startAddress;
                         byte[] buf;
-                        short? skc;
+                        ushort? skc;
                         if (partNumberMatch.Groups[2].Value == "19") // Non-CAN
                         {
                             startAddress = 0x1FA;
                             dumpFileName = DumpClusterEeprom(startAddress, length: 6, filename: null);
                             buf = File.ReadAllBytes(dumpFileName);
                             skc = Utils.GetBcd(buf, 0);
-                            short skc2 = Utils.GetBcd(buf, 2);
-                            short skc3 = Utils.GetBcd(buf, 4);
+                            ushort skc2 = Utils.GetBcd(buf, 2);
+                            ushort skc3 = Utils.GetBcd(buf, 4);
                             if (skc != skc2 || skc != skc3)
                             {
                                 Log.WriteLine($"Warning: redundant SKCs do not match: {skc:D5} {skc2:D5} {skc3:D5}");

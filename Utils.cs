@@ -100,27 +100,27 @@ namespace BitFab.KW1281Test
         /// <summary>
         /// Little-Endian
         /// </summary>
-        public static short GetShort(byte[] buf, int offset)
+        public static ushort GetShort(byte[] buf, int offset)
         {
-            return (short)(buf[offset] + buf[offset + 1] * 256);
+            return (ushort)(buf[offset] + buf[offset + 1] * 256);
         }
 
         /// <summary>
         /// Big-Endian version of GetShort
         /// </summary>
-        public static short GetShortBE(byte[] buf, int offset)
+        public static ushort GetShortBE(byte[] buf, int offset)
         {
-            return (short)(buf[offset] * 256 + buf[offset + 1]);
+            return (ushort)(buf[offset] * 256 + buf[offset + 1]);
         }
 
         /// <summary>
         /// Little-Endian Binary Coded Decimal
         /// </summary>
-        public static short GetBcd(byte[] buf, int offset)
+        public static ushort GetBcd(byte[] buf, int offset)
         {
             var binary = GetShort(buf, offset);
 
-            short bcd = (short)
+            ushort bcd = (ushort)
                 (
                     (binary >> 12) * 1000 +
                     ((binary >> 8) & 0x0F) * 100 +
