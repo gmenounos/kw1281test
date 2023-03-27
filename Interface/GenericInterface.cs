@@ -5,6 +5,9 @@ namespace BitFab.KW1281Test.Interface
 {
     class GenericInterface : IInterface
     {
+        // default time out in seconds
+        public uint _defaultTimeOut = 8;
+    
         public GenericInterface(string portName, int baudRate)
         {
             _port = new SerialPort(portName)

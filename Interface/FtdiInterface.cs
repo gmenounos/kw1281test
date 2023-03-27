@@ -4,11 +4,12 @@ using System.Runtime.InteropServices;
 
 namespace BitFab.KW1281Test.Interface
 {
-    class FtdiInterface : IInterface
+    class FtdiInterface : IInterface 
     {
         private FT _ft;
         private IntPtr _handle = IntPtr.Zero;
         private readonly byte[] _buf = new byte[1];
+        public uint _defaultTimeOut = 8;
 
         public FtdiInterface(string serialNumber, int baudRate)
         {
