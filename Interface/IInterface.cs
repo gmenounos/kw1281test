@@ -4,6 +4,11 @@ namespace BitFab.KW1281Test.Interface
 {
     public interface IInterface : IDisposable
     {
+
+        /// default time out in seconds
+        uint _defaultTimeOut = 8;
+
+        
         /// <summary>
         /// Read a byte from the interface.
         /// </summary>

@@ -16,8 +16,8 @@ namespace BitFab.KW1281Test.Interface
                 Handshake = Handshake.None,
                 RtsEnable = false,
                 DtrEnable = true,
-                ReadTimeout = (int)TimeSpan.FromSeconds(2).TotalMilliseconds,
-                WriteTimeout = (int)TimeSpan.FromSeconds(2).TotalMilliseconds
+                ReadTimeout = (int)TimeSpan.FromSeconds(_defaultTimeOut).TotalMilliseconds, //changed to reference _defaultTimeOut
+                WriteTimeout = (int)TimeSpan.FromSeconds(_defaultTimeOut).TotalMilliseconds //changed to reference _defaultTimeOut
             };
 
             _port.Open();
