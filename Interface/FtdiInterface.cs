@@ -4,11 +4,12 @@ using System.Runtime.InteropServices;
 
 namespace BitFab.KW1281Test.Interface
 {
-    class FtdiInterface : IInterface
+    class FtdiInterface : IInterface 
     {
         private FT _ft;
         private IntPtr _handle = IntPtr.Zero;
         private readonly byte[] _buf = new byte[1];
+        public uint _defaultTimeOut = 8;
 
         public FtdiInterface(string serialNumber, int baudRate)
         {
@@ -38,8 +39,8 @@ namespace BitFab.KW1281Test.Interface
 
             status = _ft.SetTimeouts(
                 _handle,
-                (uint)TimeSpan.FromSeconds(2).TotalMilliseconds,
-                (uint)TimeSpan.FromSeconds(2).TotalMilliseconds);
+                (uint)TimeSpan.FromSeconds(_defaultTimeOut).TotalMilliseconds,  //changed to reference _defaultTimeOut
+                (uint)TimeSpan.FromSeconds(_defaultTimeOut).TotalMilliseconds);   //changed to reference _defaultTimeOut
             FT.AssertOk(status);
 
             // Should allow faster response times for small packets
