@@ -99,7 +99,10 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
 ```
 
 ##### Credits
-Protocol Info: https://www.blafusel.de/obd/obd2_kw1281.html  
-VW Radio Reverse Engineering Info: https://github.com/mnaberez/vwradio  
-6502bench SourceGen: https://6502bench.com/
-EDC15 flashing info and seed/key algorithm: https://github.com/fjvva/ecu-tool
+- Protocol Info: https://www.blafusel.de/obd/obd2_kw1281.html  
+- VW Radio Reverse Engineering Info: https://github.com/mnaberez/vwradio  
+- 6502bench SourceGen: https://6502bench.com/
+- EDC15 flashing info and seed/key algorithm: https://github.com/fjvva/ecu-tool
+- Contributions
+    - [IJskonijn](https://github.com/IJskonijn)
+    - [jpadie](https://github.com/jpadie)
