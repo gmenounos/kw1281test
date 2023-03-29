@@ -25,16 +25,11 @@ namespace BitFab.KW1281Test.Cluster
 
         private ushort GetDefaultAddress()
         {
-            if (_ecuInfo.Contains("1C0920901") ||
-                _ecuInfo.Contains("1C0920905"))
+            if (IsImmo2())
             {
                 return 3072; // $0C00
             }
-            else if (
-                _ecuInfo.Contains("1C0920921") ||
-                _ecuInfo.Contains("1C0920951") ||
-                _ecuInfo.Contains("8N2920930") ||
-                _ecuInfo.Contains("8N2920980"))
+            else if (IsImmo3())
             {
                 return 14336; // $3800
             }
@@ -61,29 +56,14 @@ namespace BitFab.KW1281Test.Cluster
                 regBlockH = (byte)((address == 0x3800) ? 0x20 : 0x08);
                 count ??= (ushort)((address == 0x3800) ? 0x800 : 0x400);
             }
-            else if (
-                _ecuInfo.Contains("1C0920901") ||
-                _ecuInfo.Contains("1C0920905")) // Beetle 1C0920905F M73 V03
+            else if (IsImmo2())
             {
-                // Tested:
-                // Beetle 1C0920901C M73 V07
-
                 entryH = 0x02; // $0200
                 regBlockH = 0x08; // $0800
                 count ??= 1024; // $0400
             }
-            else if (
-                _ecuInfo.Contains("1C0920921") || // Beetle 1C0920951A
-                _ecuInfo.Contains("1C0920951") || // Beetle 1C0920921G
-                _ecuInfo.Contains("8N2920930") || // Audi TT 8N2920930C M73 D56
-                _ecuInfo.Contains("8N2920980"))   // Audi TT 8N2920980A
+            else if (IsImmo3())
             {
-                // Tested:
-                // Beetle 1C0920921G M73 V08
-                // Beetle 1C0920951A M73 V02
-                // Audi TT 8N2920930C M73 D55
-                // Audi TT 8N2920980A M73 D14
-
                 entryH = 0x18; // $1800
                 regBlockH = 0x20; // $2000
                 count ??= 2048; // $0800
@@ -240,6 +220,23 @@ namespace BitFab.KW1281Test.Cluster
             }
 
             return true;
+        }
+
+        private bool IsImmo2()
+        {
+            return
+                _ecuInfo.Contains("1C0920901") ||   // Beetle 1C0920901C M73 V07
+                _ecuInfo.Contains("1C0920905");     // Beetle 1C0920905F M73 V03
+        }
+
+        private bool IsImmo3()
+        {
+            return
+                _ecuInfo.Contains("1C0920921") ||   // Beetle 1C0920921G M73 V08
+                _ecuInfo.Contains("1C0920941") ||   // Beetle 1C0920941LX M73 V03
+                _ecuInfo.Contains("1C0920951") ||   // Beetle 1C0920951A M73 V02
+                _ecuInfo.Contains("8N2920930") ||   // Audi TT 8N2920930C M73 D55
+                _ecuInfo.Contains("8N2920980");     // Audi TT 8N2920980A M73 D14
         }
 
         private readonly IKW1281Dialog _kwp1281;
