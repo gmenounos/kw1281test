@@ -225,6 +225,7 @@ namespace BitFab.KW1281Test.Cluster
         private bool IsImmo2()
         {
             return
+                _ecuInfo.Contains("1C0920806") ||   // Beetle 1C0920806G M73 V03
                 _ecuInfo.Contains("1C0920901") ||   // Beetle 1C0920901C M73 V07
                 _ecuInfo.Contains("1C0920905");     // Beetle 1C0920905F M73 V03
         }
