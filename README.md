@@ -92,7 +92,7 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
         SetSoftwareCoding CODING WORKSHOP
             CODING = Software coding in decimal (e.g. 4361) or hex (e.g. $1109)
             WORKSHOP = Workshop code in decimal (e.g. 4361) or hex (e.g. $1109)
-        ToogleRB4Mode
+        ToggleRB4Mode
         WriteEeprom ADDRESS VALUE
             ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
             VALUE = Value in decimal (e.g. 138) or hex (e.g. $8A)
