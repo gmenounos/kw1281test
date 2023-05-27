@@ -92,7 +92,8 @@ namespace BitFab.KW1281Test
 
             if (protocolVersion >= 2000)
             {
-                ReadComplement(controllerAddress);
+                ReadComplement(
+                    Utils.AdjustParity(controllerAddress, evenParity));
             }
 
             return protocolVersion;
@@ -152,21 +153,17 @@ namespace BitFab.KW1281Test
                 maxTick += ticksPerBit;
             }
 
-            bool parity = !evenParity; // XORed with each bit to calculate parity bit
+            b = Utils.AdjustParity(b, evenParity);
 
             var startTick = maxTick = Stopwatch.GetTimestamp();
             BitBang(false); // Start bit
 
-            for (int i = 0; i < 7; i++)
+            for (int i = 0; i < 8; i++)
             {
                 bool bit = (b & 1) == 1;
-                parity ^= bit;
-                b >>= 1;
-
                 BitBang(bit);
+                b >>= 1;
             }
-
-            BitBang(parity);
 
             BitBang(true); // Stop bit
 

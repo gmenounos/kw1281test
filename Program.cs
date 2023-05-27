@@ -100,7 +100,8 @@ namespace BitFab.KW1281Test
             else if (string.Compare(command, "DumpMarelliMem", ignoreCase: true) == 0 ||
                      string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 ||
                      string.Compare(command, "DumpMem", ignoreCase: true) == 0 ||
-                     string.Compare(command, "DumpRBxMem", ignoreCase: true) == 0)
+                     string.Compare(command, "DumpRBxMem", ignoreCase: true) == 0 ||
+                     string.Compare(command, "DumpRBxMemOdd", ignoreCase: true) == 0)
             {
                 if (args.Length < 6)
                 {
@@ -236,6 +237,11 @@ namespace BitFab.KW1281Test
             {
                 case "dumprbxmem":
                     tester.DumpRBxMem(address, length, _filename);
+                    tester.EndCommunication();
+                    return;
+
+                case "dumprbxmemodd":
+                    tester.DumpRBxMem(address, length, _filename, evenParityWakeup: false);
                     tester.EndCommunication();
                     return;
 

@@ -415,7 +415,9 @@ namespace BitFab.KW1281Test
         /// Dumps the memory of a Bosch RB4/RB8 cluster to a file.
         /// </summary>
         /// <returns>The dump file name or null if the EEPROM was not dumped.</returns>
-        public string? DumpRBxMem(uint address, uint length, string? filename)
+        public string? DumpRBxMem(
+            uint address, uint length, string? filename,
+            bool evenParityWakeup = true)
         {
             if (_controllerAddress != (int)ControllerAddress.Cluster)
             {
@@ -423,7 +425,7 @@ namespace BitFab.KW1281Test
                 return null;
             }
 
-            var kwp2000 = Kwp2000Wakeup(evenParityWakeup: true);
+            var kwp2000 = Kwp2000Wakeup(evenParityWakeup);
 
             var dumpFileName = filename ?? $"RBx_${address:X6}_mem.bin";
 

@@ -191,5 +191,26 @@ namespace BitFab.KW1281Test
 
             return ((byte)result, carry);
         }
+
+        public static byte AdjustParity(
+            byte b, bool evenParity)
+        {
+            bool parity = !evenParity; // XORed with each bit to calculate parity bit
+
+            for (int i = 0; i < 7; i++)
+            {
+                bool bit = ((b >> i) & 1) == 1;
+                parity ^= bit;
+            }
+
+            if (parity)
+            {
+                return (byte)(b | 0x80);
+            }
+            else
+            {
+                return (byte)(b & 0x7F);
+            }
+        }
     }
 }
