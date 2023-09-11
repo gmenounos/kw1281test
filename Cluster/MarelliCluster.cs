@@ -88,6 +88,8 @@ namespace BitFab.KW1281Test.Cluster
                 return Array.Empty<byte>();
             }
 
+            Log.WriteLine($"entryH: 0x{entryH:X2}, regBlockH: 0x{regBlockH:X2}, count: 0x{count:X4}");
+
             Log.WriteLine("Sending block 0x6C");
             _kwp1281.SendBlock(new List<byte> { 0x6C });
 
@@ -227,7 +229,8 @@ namespace BitFab.KW1281Test.Cluster
             return
                 _ecuInfo.Contains("1C0920806") ||   // Beetle 1C0920806G M73 V03
                 _ecuInfo.Contains("1C0920901") ||   // Beetle 1C0920901C M73 V07
-                _ecuInfo.Contains("1C0920905");     // Beetle 1C0920905F M73 V03
+                _ecuInfo.Contains("1C0920905") ||   // Beetle 1C0920905F M73 V03
+                _ecuInfo.Contains("1C0920906");     // Beetle 1C0920906A M73 V03
         }
 
         private bool IsImmo3()

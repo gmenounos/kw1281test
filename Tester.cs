@@ -411,6 +411,40 @@ namespace BitFab.KW1281Test
             DumpClusterMem(address, length, filename);
         }
 
+        public void DumpRam(uint startAddr, uint length, string? filename)
+        {
+            UnlockControllerForEepromReadWrite();
+
+            const int maxReadLength = 8;
+            bool succeeded = true;
+            string dumpFileName = filename ?? $"ram_${startAddr:X4}.bin";
+
+            using (var fs = File.Create(dumpFileName, maxReadLength, FileOptions.WriteThrough))
+            {
+                for (uint addr = startAddr; addr < (startAddr + length); addr += maxReadLength)
+                {
+                    var readLength = (byte)Math.Min(startAddr + length - addr, maxReadLength);
+                    var blockBytes = _kwp1281.ReadRam((ushort)addr, (byte)readLength);
+                    if (blockBytes == null)
+                    {
+                        blockBytes = Enumerable.Repeat((byte)0, readLength).ToList();
+                        succeeded = false;
+                    }
+                    fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
+                    fs.Flush();
+                }
+            }
+
+            if (!succeeded)
+            {
+                Log.WriteLine();
+                Log.WriteLine("**********************************************************************");
+                Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
+                Log.WriteLine("**********************************************************************");
+                Log.WriteLine();
+            }
+        }
+
         /// <summary>
         /// Dumps the memory of a Bosch RB4/RB8 cluster to a file.
         /// </summary>

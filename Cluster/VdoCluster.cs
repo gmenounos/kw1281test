@@ -347,25 +347,25 @@ namespace BitFab.KW1281Test.Cluster
         {
             switch(softwareVersion)
             {
-                case "MPV501MH 01.00": // 7M3920820H V57
-                    return ToArray(0x38, 0x47, 0x34, 0x3A);
+                case "VAT500MH 01.10": // 1J0920925D V06
+                case "VAT500LL 01.20": // 1J0920905L V01
+                case "VAT500MH 01.20": // 1J5920925C V09
+                    return ToArray(0x01, 0x04, 0x3D, 0x35);
 
-                case "VWK501MH 00.92": // 3B0920827C V06
-                case "VWK501MH 01.10":
-                    return ToArray(0x39, 0x34, 0x34, 0x40);
+                case "V798MLA 01.00": // 7D0920800F V01, 1J0919951C V55
+                    return ToArray(0x02, 0x03, 0x05, 0x09);
+
+                case "$00 $00 $13 $01": // 8D0919880M  B5-KOMBIINSTR. VDO D02
+                    return ToArray(0x09, 0x06, 0x05, 0x02);
+
+                case "VQMJ06LM 09.00": // 6Q0920903   KOMBI+WEGFAHRSP VDO V02
+                    return ToArray(0x35, 0x3D, 0x47, 0x3E);
 
                 case "VWK501LL 00.88": // 1J0920906L V58
                 case "VWK501MH 00.88":
                 case "VWK501LL 01.00":
                 case "VWK501MH 01.00":
                     return ToArray(0x36, 0x3D, 0x3E, 0x47);
-
-                case "VWK503LL 09.00":
-                case "VWK503MH 09.00": // 1J0920927 V02
-                    return ToArray(0x3E, 0x35, 0x3D, 0x3A);
-
-                case "VBKX00MH 01.00":
-                    return ToArray(0x3A, 0x39, 0x31, 0x43);
 
                 case "V599HLA  00.91": // 7D0920841A V18
                 case "V599LLA  00.91": // 7D0920801B V18
@@ -374,22 +374,28 @@ namespace BitFab.KW1281Test.Cluster
                 case "V599LLA  03.00": // 1J0920900J V60
                     return ToArray(0x38, 0x3F, 0x40, 0x35);
 
-                case "VAT500MH 01.10": // 1J0920925D V06
-                case "VAT500LL 01.20": // 1J0920905L V01
-                case "VAT500MH 01.20": // 1J5920925C V09
-                    return ToArray(0x01, 0x04, 0x3D, 0x35);
+                case "MPV501MH 01.00": // 7M3920820H V57
+                    return ToArray(0x38, 0x47, 0x34, 0x3A);
 
-                case "VMMJ08MH 09.00": // 1J5920826L V75
-                    return ToArray(0x3E, 0x47, 0x3D, 0x48);
+                case "VWK501MH 00.92": // 3B0920827C V06
+                case "VWK501MH 01.10":
+                    return ToArray(0x39, 0x34, 0x34, 0x40);
 
-                case "V798MLA 01.00": // 7D0920800F V01, 1J0919951C V55
-                    return ToArray(0x02, 0x03, 0x05, 0x09);
+                case "VBKX00MH 01.00":
+                    return ToArray(0x3A, 0x39, 0x31, 0x43);
 
                 case "SS5501LM 01.00": // 1M0920802D V05
                     return ToArray(0x3C, 0x34, 0x47, 0x35);
 
-                case "$00 $00 $13 $01": // 8D0919880M  B5-KOMBIINSTR. VDO D02
-                    return ToArray(0x09, 0x06, 0x05, 0x02);
+                case "VWK503LL 09.00":
+                case "VWK503MH 09.00": // 1J0920927 V02
+                    return ToArray(0x3E, 0x35, 0x3D, 0x3A);
+
+                case "VMMJ08MH 09.00": // 1J5920826L V75
+                    return ToArray(0x3E, 0x47, 0x3D, 0x48);
+
+                case "VSQX01LM 01.10": // 6Q0920900  KOMBI+WEGFAHRSP VDO V18
+                    return ToArray(0x43, 0x43, 0x3D, 0x37);
 
                 default:
                     return _clusterUnlockCodes;

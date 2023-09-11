@@ -100,6 +100,7 @@ namespace BitFab.KW1281Test
             else if (string.Compare(command, "DumpMarelliMem", ignoreCase: true) == 0 ||
                      string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 ||
                      string.Compare(command, "DumpMem", ignoreCase: true) == 0 ||
+                     string.Compare(command, "DumpRam", ignoreCase: true) == 0 ||
                      string.Compare(command, "DumpRBxMem", ignoreCase: true) == 0 ||
                      string.Compare(command, "DumpRBxMemOdd", ignoreCase: true) == 0)
             {
@@ -319,6 +320,10 @@ namespace BitFab.KW1281Test
                     tester.DumpMem(address, length, _filename);
                     break;
 
+                case "dumpram":
+                    tester.DumpRam(address, length, _filename);
+                    break;
+
                 case "findlogins":
                     tester.FindLogins(login!.Value, ecuInfo.WorkshopCode);
                     break;
@@ -442,6 +447,10 @@ namespace BitFab.KW1281Test
             LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
             FILENAME = Optional filename
         DumpMem START LENGTH [FILENAME]
+            START = Start address in decimal (e.g. 8192) or hex (e.g. $2000)
+            LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)
+            FILENAME = Optional filename
+        DumpRam START LENGTH [FILENAME]
             START = Start address in decimal (e.g. 8192) or hex (e.g. $2000)
             LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)
             FILENAME = Optional filename
