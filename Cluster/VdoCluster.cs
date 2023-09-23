@@ -347,6 +347,9 @@ namespace BitFab.KW1281Test.Cluster
         {
             switch(softwareVersion)
             {
+                case "VT5P07MH 09.00": // 7H5920872L VDO V03
+                    return ToArray(0x00, 0x07, 0x43, 0x35);
+
                 case "VAT500MH 01.10": // 1J0920925D V06
                 case "VAT500LL 01.20": // 1J0920905L V01
                 case "VAT500MH 01.20": // 1J5920925C V09

@@ -1,6 +1,7 @@
 ﻿using BitFab.KW1281Test.Interface;
 using System;
 using System.Diagnostics;
+using System.Runtime;
 using System.Threading;
 
 namespace BitFab.KW1281Test
@@ -65,7 +66,7 @@ namespace BitFab.KW1281Test
                 }
             }
 
-            if (noGC)
+            if (GCSettings.LatencyMode == GCLatencyMode.NoGCRegion)
             {
                 GC.EndNoGCRegion();
             }
