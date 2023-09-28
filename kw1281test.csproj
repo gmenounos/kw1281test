@@ -5,9 +5,9 @@
     <TargetFramework>net7.0</TargetFramework>
     <RootNamespace>BitFab.KW1281Test</RootNamespace>
     <LangVersion>latest</LangVersion>
-    <AssemblyVersion>0.84.0.0</AssemblyVersion>
-    <FileVersion>0.84.0.0</FileVersion>
-    <Version>0.84-beta</Version>
+    <AssemblyVersion>0.85.0.0</AssemblyVersion>
+    <FileVersion>0.85.0.0</FileVersion>
+    <Version>0.85-beta</Version>
     <Copyright>Copyright © 2023 Greg Menounos</Copyright>
     <DebugType>embedded</DebugType>
     <DebugSymbols>true</DebugSymbols>
@@ -24,8 +24,11 @@
 
   <ItemGroup>
     <Compile Remove="GitHub\**" />
+    <Compile Remove="Tests\**" />
     <EmbeddedResource Remove="GitHub\**" />
+    <EmbeddedResource Remove="Tests\**" />
     <None Remove="GitHub\**" />
+    <None Remove="Tests\**" />
   </ItemGroup>
 
   <ItemGroup>

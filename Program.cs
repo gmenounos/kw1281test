@@ -7,8 +7,11 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading;
+
+[assembly: InternalsVisibleTo("BitFab.KW1281Test.Tests")]
 
 namespace BitFab.KW1281Test
 {

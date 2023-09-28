@@ -519,18 +519,14 @@ namespace BitFab.KW1281Test
                 if (ecuInfo.Text.Contains("VDO"))
                 {
                     var cluster = new VdoCluster(_kwp1281);
-                    var partNumberMatch = Regex.Match(
-                        ecuInfo.Text,
-                        "\\b(\\d[a-zA-Z])\\d9(\\d{2})\\d{3}[a-zA-Z]{0,2}\\b");
-                    if (partNumberMatch.Success)
+                    string[] partNumberGroups = FindAndParsePartNumber(ecuInfo.Text);
+                    if (partNumberGroups.Length == 4)
                     {
-                        var family = partNumberMatch.Groups[1].Value;
-
                         string dumpFileName;
                         ushort startAddress;
                         byte[] buf;
                         ushort? skc;
-                        if (partNumberMatch.Groups[2].Value == "19") // Non-CAN
+                        if (partNumberGroups[1] == "919") // Non-CAN
                         {
                             startAddress = 0x1FA;
                             dumpFileName = DumpClusterEeprom(startAddress, length: 6, filename: null);
@@ -543,7 +539,7 @@ namespace BitFab.KW1281Test
                                 Log.WriteLine($"Warning: redundant SKCs do not match: {skc:D5} {skc2:D5} {skc3:D5}");
                             }
                         }
-                        else if (partNumberMatch.Groups[2].Value == "20") // CAN
+                        else if (partNumberGroups[1] == "920") // CAN
                         {
                             startAddress = 0x90;
                             dumpFileName = DumpClusterEeprom(startAddress, length: 0x7C, filename: null);
@@ -567,7 +563,7 @@ namespace BitFab.KW1281Test
                     }
                     else
                     {
-                        Console.WriteLine($"ECU Info: {ecuInfo.Text}");
+                        Console.WriteLine($"Unknown cluster: {ecuInfo.Text}");
                     }
                 }
                 else if (ecuInfo.Text.Contains("RB4"))
@@ -652,6 +648,32 @@ namespace BitFab.KW1281Test
             else
             {
                 Log.WriteLine("Only supported for clusters (address 17) and ECUs (address 1)");
+            }
+        }
+
+        /// <summary>
+        /// Takes the info returned when connecting to the ECU, finds the ECU part number and
+        /// splits into its components. For example, if the ECU info is this:
+        ///     "1J5920926CX   KOMBI+WEGFAHRSP VDO V01"
+        /// Then the part number would be identified as "1J5920926CX", which would be split into
+        /// its 4 components: "1J5", "920", "926", "CX"
+        /// </summary>
+        /// <param name="ecuInfo"></param>
+        /// <returns>A 4-element string array if the part number was found, otherwise an empty
+        /// string array.</returns>
+        internal static string[] FindAndParsePartNumber(string ecuInfo)
+        {
+            var match = Regex.Match(
+                ecuInfo,
+                "\\b(\\d[a-zA-Z][0-9a-zA-Z])(9\\d{2})(\\d{3})([a-zA-Z]{0,2})\\b");
+
+            if (match.Success)
+            {
+                return (match.Groups as IReadOnlyList<Group>).Skip(1).Select(g => g.Value).ToArray();
+            }
+            else
+            {
+                return Array.Empty<string>();
             }
         }
 
