@@ -544,7 +544,7 @@ namespace BitFab.KW1281Test
                             startAddress = 0x90;
                             dumpFileName = DumpClusterEeprom(startAddress, length: 0x7C, filename: null);
                             buf = File.ReadAllBytes(dumpFileName);
-                            skc = cluster.GetSkc(buf, startAddress);
+                            skc = VdoCluster.GetSkc(buf, startAddress);
                         }
                         else
                         {

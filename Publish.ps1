@@ -3,7 +3,7 @@ dotnet publish kw1281test.csproj /p:PublishProfile=Mac
 # dotnet publish kw1281test.csproj /p:PublishProfile=LinuxArm
 dotnet publish kw1281test.csproj /p:PublishProfile=Linux-x64
 
-$PublishSourceDir = 'C:\Users\gmeno\src\kw1281test\bin\Release\net7.0\publish'
+$PublishSourceDir = 'C:\Users\gmeno\src\kw1281test\bin\Release\net8.0\publish'
 $GitHubDir = 'C:\Users\gmeno\src\kw1281test\GitHub'
 
 Remove-Item -Path $GitHubDir\*.*

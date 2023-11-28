@@ -2,12 +2,12 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>BitFab.KW1281Test</RootNamespace>
     <LangVersion>latest</LangVersion>
-    <AssemblyVersion>0.85.0.0</AssemblyVersion>
-    <FileVersion>0.85.0.0</FileVersion>
-    <Version>0.85-beta</Version>
+    <AssemblyVersion>0.86.0.0</AssemblyVersion>
+    <FileVersion>0.86.0.0</FileVersion>
+    <Version>0.86-beta</Version>
     <Copyright>Copyright © 2023 Greg Menounos</Copyright>
     <DebugType>embedded</DebugType>
     <DebugSymbols>true</DebugSymbols>
@@ -20,6 +20,7 @@
     <PublishTrimmed>true</PublishTrimmed>
     <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
     <Nullable>enable</Nullable>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -36,7 +37,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.IO.Ports" Version="7.0.0" />
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
   </ItemGroup>
 
 </Project>
