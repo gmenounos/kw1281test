@@ -243,6 +243,98 @@ namespace BitFab.KW1281Test.Cluster
                 _ecuInfo.Contains("8N2920980");     // Audi TT 8N2920980A M73 D14
         }
 
+        /// <summary>
+        /// Search for the SKC using the 2 methods described here:
+        /// https://github.com/gmenounos/kw1281test/issues/50#issuecomment-1770255129
+        /// </summary>
+        public static ushort? GetSkc(byte[] buf)
+        {
+            // If the EEPROM contains a 14-digit Immobilizer ID then the SKC should be immediately prior to that
+            var immoIdOffset = FindImmobilizerId(buf);
+            if (immoIdOffset is >= 2)
+            {
+                return Utils.GetShortBE(buf, immoIdOffset.Value-2);
+            }
+
+            // Otherwise search for 00,01,0F or 00,02,0F or 00,03,0F or 00,04,0F and the SKC should be immediately prior
+            var keyCountOffset = FindKeyCount(buf);
+            if (keyCountOffset is >= 2)
+            {
+                return Utils.GetShortBE(buf, keyCountOffset.Value-2);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Search the buffer for a 14 byte long string of uppercase letters and numbers beginning with VWZ or AUZ
+        /// </summary>
+        private static int? FindImmobilizerId(IReadOnlyList<byte> buf)
+        {
+            for (var i = 0; i < buf.Count - 14; i++)
+            {
+                if (!(buf[i] == 'V' && buf[i + 1] == 'W') &&
+                    !(buf[i] == 'A' && buf[i + 1] == 'U'))
+                {
+                    continue;
+                }
+
+                if (buf[i + 2] != 'Z')
+                {
+                    continue;
+                }
+
+                var isValid = true;
+                for (var j = 3; j < 14; j++)
+                {
+                    var b = buf[i + j];
+                    if (b is >= (byte)'0' and <= (byte)'9' or >= (byte)'A' and <= (byte)'Z')
+                    {
+                        continue;
+                    }
+
+                    isValid = false;
+                    break;
+                }
+
+                if (isValid)
+                {
+                    return i;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Search the buffer for the 3 byte sequence 00,01,0F or 00,02,0F or 00,03,0F or 00,04,0F
+        /// (2nd digit is probably the number of keys)
+        /// </summary>
+        private static int? FindKeyCount(IReadOnlyList<byte> buf)
+        {
+            for (var i = 0; i < buf.Count - 3; i++)
+            {
+                if (buf[i] != 0)
+                {
+                    continue;
+                }
+
+                if (buf[i + 1] != 1 && buf[i + 1] != 2 && buf[i + 1] != 3 && buf[i + 1] != 4)
+                {
+                    continue;
+                }
+
+                if (buf[i + 2] != 0x0F)
+                {
+                    continue;
+                }
+
+                return i;
+            }
+
+            return null;
+        }
+        
         private readonly IKW1281Dialog _kwp1281;
         private readonly string _ecuInfo;
 

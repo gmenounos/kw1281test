@@ -24,4 +24,16 @@
     <ProjectReference Include="..\kw1281test.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Cluster\06032.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Cluster\AUZ_03997.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Cluster\VWZ_02755.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

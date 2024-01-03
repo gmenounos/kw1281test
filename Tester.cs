@@ -601,19 +601,14 @@ namespace BitFab.KW1281Test
                     string dumpFileName = cluster.DumpEeprom(
                         address: null, length: null, dumpFileName: null);
                     byte[] buf = File.ReadAllBytes(dumpFileName);
-                    if (buf.Length == 0x400)
+                    ushort? skc = MarelliCluster.GetSkc(buf);
+                    if (skc.HasValue)
                     {
-                        var skc = Utils.GetShortBE(buf, 0x313);
-                        Log.WriteLine($"SKC: {skc:D5}");
-                    }
-                    else if (buf.Length == 0x800)
-                    {
-                        var skc = Utils.GetShortBE(buf, 0x348);
                         Log.WriteLine($"SKC: {skc:D5}");
                     }
                     else
                     {
-                        Console.WriteLine($"Unsupported cluster: {ecuInfo.Text}");
+                        Console.WriteLine($"Unable to determine SKC for cluster: {ecuInfo.Text}");
                     }
                 }
                 else if (ecuInfo.Text.Contains("BOO"))

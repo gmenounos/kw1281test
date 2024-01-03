@@ -331,12 +331,12 @@ namespace BitFab.KW1281Test
 
             blockBytes.Insert(0, blockLength);
 
-            Thread.Sleep(1);
+            Thread.Sleep(TimeInterval.R6);
 
             foreach (var b in blockBytes)
             {
                 WriteByteAndReadAck(b);
-                Thread.Sleep(1);
+                Thread.Sleep(TimeInterval.R6);
             }
 
             KwpCommon.WriteByte(0x03); // Block end, does not get ACK'd
@@ -379,7 +379,7 @@ namespace BitFab.KW1281Test
             var blockTitle = ReadAndAckByte();
             blockBytes.Add(blockTitle);
 
-            for (int i = 0; i < blockLength - 3; i++)
+            for (var i = 0; i < blockLength - 3; i++)
             {
                 var b = ReadAndAckByte();
                 blockBytes.Add(b);
@@ -390,7 +390,7 @@ namespace BitFab.KW1281Test
             if (blockEnd != 0x03)
             {
                 throw new InvalidOperationException(
-                    $"Received block end ${blockEnd:X2} but expected $03");
+                    $"Received block end ${blockEnd:X2} but expected $03. Block bytes: {Utils.Dump(blockBytes)}");
             }
 
             return (BlockTitle)blockTitle switch
@@ -440,7 +440,7 @@ namespace BitFab.KW1281Test
         private byte ReadAndAckByte()
         {
             var b = KwpCommon.ReadByte();
-            Thread.Sleep(1);
+            Thread.Sleep(TimeInterval.R6);
             var complement = (byte)~b;
             KwpCommon.WriteByte(complement);
             return b;
@@ -779,6 +779,15 @@ namespace BitFab.KW1281Test
             }
             Log.Write(message, LogDest.Console);
             Log.WriteLine(message, LogDest.File);
+        }
+
+        private static class TimeInterval
+        {
+            /// <summary>
+            /// Time to wait in milliseconds after receiving a byte from the ECU before sending the next byte.
+            /// Valid range: 1-50ms (according to SAE J2818)
+            /// </summary>
+            public const int R6 = 2;
         }
 
         public IKwpCommon KwpCommon { get; }

@@ -1,7 +1,6 @@
-using BitFab.KW1281Test;
 using FluentAssertions;
 
-namespace Tests
+namespace BitFab.KW1281Test.Tests
 {
     [TestClass]
     public class TesterTests

@@ -106,3 +106,4 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
 - Contributions
     - [IJskonijn](https://github.com/IJskonijn)
     - [jpadie](https://github.com/jpadie)
+    - [kerekt](https://github.com/kerekt)
