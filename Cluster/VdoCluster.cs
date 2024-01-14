@@ -402,6 +402,9 @@ namespace BitFab.KW1281Test.Cluster
 
                 case "VSQX01LM 01.10": // 6Q0920900  KOMBI+WEGFAHRSP VDO V18
                     return [[0x43, 0x43, 0x3D, 0x37]];
+                
+                case "KPQMLA` $01": // 6Y1920860G KOMBIINSTRUMENT VDO V12
+                    return [[0x47, 0x3B, 0x31, 0x3F]];
 
                 default:
                     return _clusterUnlockCodes;
