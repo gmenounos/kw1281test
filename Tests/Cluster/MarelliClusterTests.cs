@@ -7,29 +7,17 @@ namespace BitFab.KW1281Test.Tests.Cluster;
 public class MarelliClusterTests
 {
     [TestMethod]
-    public void GetSkc_ImmoIdStartsWithVWZ_ReturnsSkc()
+    [DataRow("VWZ_02755.bin", 02755)]    // ImmoId starts with "VWZ"
+    [DataRow("AUZ_03997.bin", 03997)]    // ImmoId starts with "AUZ"
+    [DataRow("06032.bin", 06032)]        // No ImmoId but key count pattern
+    public void GetSkc_ReturnsCorrectSkc(
+        string fileName, int expectedSkc)
     {
-        var eeprom = File.ReadAllBytes("Cluster/VWZ_02755.bin");
+        var eeprom = File.ReadAllBytes($"Cluster/{fileName}");
         var skc = MarelliCluster.GetSkc(eeprom);
-        skc.Should().Be(2755);
+        skc.Should().Be((ushort?)expectedSkc);
     }
     
-    [TestMethod]
-    public void GetSkc_ImmoIdStartsWithAUZ_ReturnsSkc()
-    {
-        var eeprom = File.ReadAllBytes("Cluster/AUZ_03997.bin");
-        var skc = MarelliCluster.GetSkc(eeprom);
-        skc.Should().Be(3997);
-    }
-
-    [TestMethod]
-    public void GetSkc_NoImmoIdButKeyCountPattern_ReturnsSkc()
-    {
-        var eeprom = File.ReadAllBytes("Cluster/06032.bin");
-        var skc = MarelliCluster.GetSkc(eeprom);
-        skc.Should().Be(6032);
-    }
-
     [TestMethod]
     public void GetSkc_NoImmoIdAndNoKeyCountPattern_ReturnsNull()
     {

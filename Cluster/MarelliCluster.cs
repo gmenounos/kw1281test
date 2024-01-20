@@ -224,25 +224,28 @@ namespace BitFab.KW1281Test.Cluster
             return true;
         }
 
-        private bool IsImmo2()
-        {
-            return
-                _ecuInfo.Contains("1C0920806") || // Beetle 1C0920806G M73 V03
-                _ecuInfo.Contains("1C0920901") || // Beetle 1C0920901C M73 V07
-                _ecuInfo.Contains("1C0920905") || // Beetle 1C0920905F M73 V03
-                _ecuInfo.Contains("1C0920906") || // Beetle 1C0920906A M73 V03
-                _ecuInfo.Contains("8N1920930");   // Audi TT 8N1920930B M73 D23
-        }
+        private readonly string[] _immo2Ecus =
+        [
+            "1C0920806",    // Beetle 1C0920806G M73 V03
+            "1C0920901",    // Beetle 1C0920901C M73 V07
+            "1C0920905",    // Beetle 1C0920905F M73 V03
+            "1C0920906",    // Beetle 1C0920906A M73 V03
+            "8N1920930",    // Audi TT 8N1920930B M73 D23
+        ];
+        
+        private bool IsImmo2() => _immo2Ecus.Any(model => _ecuInfo.Contains(model));
 
-        private bool IsImmo3()
-        {
-            return
-                _ecuInfo.Contains("1C0920921") ||   // Beetle 1C0920921G M73 V08
-                _ecuInfo.Contains("1C0920941") ||   // Beetle 1C0920941LX M73 V03
-                _ecuInfo.Contains("1C0920951") ||   // Beetle 1C0920951A M73 V02
-                _ecuInfo.Contains("8N2920930") ||   // Audi TT 8N2920930C M73 D55
-                _ecuInfo.Contains("8N2920980");     // Audi TT 8N2920980A M73 D14
-        }
+        private readonly string[] _immo3Ecus =
+        [
+            "1C0920921",    // Beetle 1C0920921G M73 V08
+            "1C0920941",    // Beetle 1C0920941LX M73 V03
+            "1C0920951",    // Beetle 1C0920951A M73 V02
+            "8N1920980",    // Audi TT 8N1920980E M73 D14
+            "8N2920930",    // Audi TT 8N2920930C M73 D55
+            "8N2920980",    // Audi TT 8N2920980A M73 D14
+        ];
+        
+        private bool IsImmo3() => _immo3Ecus.Any(model => _ecuInfo.Contains(model));
 
         /// <summary>
         /// Search for the SKC using the 2 methods described here:
