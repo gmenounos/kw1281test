@@ -343,7 +343,8 @@ namespace BitFab.KW1281Test
             }
         }
 
-        public string DumpEdc15Eeprom(string? filename)
+        public string ReadWriteEdc15Eeprom(
+            string? filename, List<KeyValuePair<ushort, byte>>? addressValuePairs = null)
         {
             _kwp1281.EndCommunication();
 
@@ -363,7 +364,7 @@ namespace BitFab.KW1281Test
 
             var dumpFileName = filename ?? $"EDC15_EEPROM.bin";
 
-            edc15.DumpEeprom(dumpFileName);
+            edc15.ReadWriteEeprom(dumpFileName, addressValuePairs);
 
             return dumpFileName;
         }
@@ -632,14 +633,16 @@ namespace BitFab.KW1281Test
             else if (_controllerAddress == (int)ControllerAddress.Ecu)
             {
                 var ecuInfo = Kwp1281Wakeup();
-                var dumpFileName = DumpEdc15Eeprom(filename: null);
+                var dumpFileName = ReadWriteEdc15Eeprom(filename: null);
                 var buf = File.ReadAllBytes(dumpFileName);
                 var skc = Utils.GetShort(buf, 0x012E);
-                var immo1 = buf[0x1B0];
-                var immo2 = buf[0x1DE];
+                const ushort immo1Addr = 0x1B0;
+                var immo1 = buf[immo1Addr];
+                const ushort immo2Addr = 0x1DE;
+                var immo2 = buf[immo2Addr];
                 var immoStatus = immo1 == 0x60 && immo2 == 0x60 ? "Off" : "On";
                 Log.WriteLine($"SKC: {skc:D5}");
-                Log.WriteLine($"Immo is {immoStatus} (${immo1:X2}, ${immo2:X2})");
+                Log.WriteLine($"Immo is {immoStatus} (${immo1Addr:X3}=${immo1:X2}, ${immo2Addr:X3}=${immo2:X2})");
             }
             else
             {

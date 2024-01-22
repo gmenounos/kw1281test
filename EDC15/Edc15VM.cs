@@ -10,8 +10,12 @@ namespace BitFab.KW1281Test.EDC15
 {
     public class Edc15VM
     {
-        public void DumpEeprom(string filename)
+        public void ReadWriteEeprom(
+            string filename,
+            List<KeyValuePair<ushort, byte>>? addressValuePairs = null)
         {
+            addressValuePairs ??= [];
+            
             var kwp2000 = new KW2000Dialog(_kwpCommon, (byte)_controllerAddress);
 
             var resp = kwp2000.SendReceive(DiagnosticService.startDiagnosticSession, new byte[] { 0x89 });
@@ -97,6 +101,37 @@ namespace BitFab.KW1281Test.EDC15
 
             resp = kwp2000.ReceiveMessage();
 
+            // Now write any supplied values
+            foreach (var addressValuePair in addressValuePairs)
+            {
+                var service = (DiagnosticService)(
+                    addressValuePair.Key > 0xFF
+                        ? 0xA8  // Write 1 byte to EEPROM (Page 1)
+                        : 0xA7); // Write 1 byte to EEPROM (Page 0)
+                
+                kwp2000.SendMessage(
+                    service, Array.Empty<byte>(),
+                    excludeAddresses: true);
+                resp = kwp2000.ReceiveMessage();
+                if (!resp.IsPositiveResponse(DiagnosticService.transferData))
+                {
+                    throw new InvalidOperationException($"Write EEPROM failed.");
+                }
+
+                var address = (byte)(addressValuePair.Key & 0xFF);
+                var value = addressValuePair.Value;
+
+                _kwpCommon.WriteByte(address);
+                _kwpCommon.WriteByte(value);
+                Log.WriteLine($"Sent: {address:X2} {value:X2}");
+                
+                resp = kwp2000.ReceiveMessage();
+                if (!resp.IsPositiveResponse(DiagnosticService.transferData))
+                {
+                    throw new InvalidOperationException($"Write EEPROM failed.");
+                }
+            }
+            
             // Custom loader command to reboot the ECU to return it to normal operation.
             kwp2000.SendMessage(
                     (DiagnosticService)0xA2, Array.Empty<byte>(),

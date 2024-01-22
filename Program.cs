@@ -3,9 +3,11 @@
 using BitFab.KW1281Test.Interface;
 using BitFab.KW1281Test.Logging;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
@@ -87,6 +89,7 @@ namespace BitFab.KW1281Test
             ushort channelValue = 0;
             ushort? login = null;
             byte groupNumber = 0;
+            var addressValuePairs = new List<KeyValuePair<ushort, byte>>();
 
             if (string.Compare(command, "ReadEeprom", ignoreCase: true) == 0 ||
                 string.Compare(command, "ReadRAM", ignoreCase: true) == 0 ||
@@ -175,6 +178,25 @@ namespace BitFab.KW1281Test
                 if (args.Length > 4)
                 {
                     _filename = args[4];
+                }
+            }
+            else if (string.Compare(command, "WriteEdc15Eeprom", ignoreCase: true) == 0)
+            {
+                // WriteEdc15Eeprom ADDRESS1 VALUE1 [ADDRESS2 VALUE2 ... ADDRESSn VALUEn]
+
+                if (args.Length < 6)
+                {
+                    ShowUsage();
+                    return;
+                }
+
+                var dateString = DateTime.Now.ToString("s").Replace(':', '-');
+                _filename = $"EDC15_EEPROM_{dateString}.bin";
+                
+                if (!ParseAddressesAndValues(args.Skip(4).ToList(), out addressValuePairs))
+                {
+                    ShowUsage();
+                    return;
                 }
             }
             else if (string.Compare(command, "AdaptationRead", ignoreCase: true) == 0)
@@ -308,7 +330,7 @@ namespace BitFab.KW1281Test
                     break;
 
                 case "dumpedc15eeprom":
-                    tester.DumpEdc15Eeprom(_filename);
+                    tester.ReadWriteEdc15Eeprom(_filename);
                     break;
 
                 case "dumpeeprom":
@@ -379,6 +401,10 @@ namespace BitFab.KW1281Test
                     tester.SetSoftwareCoding(softwareCoding, workshopCode);
                     break;
 
+                case "writeedc15eeprom":
+                    tester.ReadWriteEdc15Eeprom(_filename, addressValuePairs);
+                    break;
+                
                 case "writeeeprom":
                     tester.WriteEeprom(address, value);
                     break;
@@ -389,6 +415,67 @@ namespace BitFab.KW1281Test
             }
 
             tester.EndCommunication();
+        }
+
+        /// <summary>
+        /// Accept a series of string values in the format:
+        /// ADDRESS1 VALUE1 [ADDRESS2 VALUE2 ... ADDRESSn VALUEn]
+        ///     ADDRESS = EEPROM address in decimal (0-511) or hex ($00-$1FF)
+        ///     VALUE = Value to be stored at address in decimal (0-255) or hex ($00-$FF)
+        /// </summary>
+        internal static bool ParseAddressesAndValues(
+            List<string> addressesAndValues,
+            out List<KeyValuePair<ushort, byte>> addressValuePairs)
+        {
+            addressValuePairs = [];
+
+            if (addressesAndValues.Count % 2 != 0)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < addressesAndValues.Count; i += 2)
+            {
+                uint address;
+                var valueToParse = addressesAndValues[i];
+                try
+                {
+                    address = Utils.ParseUint(valueToParse);
+                }
+                catch (Exception)
+                {
+                    Log.WriteLine($"Invalid address (bad format): {valueToParse}.");
+                    return false;
+                }
+
+                if (address > 0x1FF)
+                {
+                    Log.WriteLine($"Invalid address (too large): {valueToParse}.");
+                    return false;
+                }
+
+                uint value;
+                valueToParse = addressesAndValues[i + 1];
+                try
+                {
+                    value = Utils.ParseUint(valueToParse);
+                }
+                catch (Exception)
+                {
+                    Log.WriteLine($"Invalid value (bad format): {valueToParse}.");
+                    return false;
+                }
+
+                if (value > 0xFF)
+                {
+                    Log.WriteLine($"Invalid value (too large): {valueToParse}.");
+                    return false;
+                }
+
+                addressValuePairs.Add(new KeyValuePair<ushort, byte>((ushort)address, (byte)value));
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -485,6 +572,9 @@ namespace BitFab.KW1281Test
             CODING = Software coding in decimal (e.g. 4361) or hex (e.g. $1109)
             WORKSHOP = Workshop code in decimal (e.g. 4361) or hex (e.g. $1109)
         ToggleRB4Mode
+        WriteEdc15Eeprom ADDRESS1 VALUE1 [ADDRESS2 VALUE2 ... ADDRESSn VALUEn]
+            ADDRESS = EEPROM address in decimal (0-511) or hex ($00-$1FF)
+            VALUE = Value to be stored at address in decimal (0-255) or hex ($00-$FF)
         WriteEeprom ADDRESS VALUE
             ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
             VALUE = Value in decimal (e.g. 138) or hex (e.g. $8A)");

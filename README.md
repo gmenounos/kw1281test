@@ -93,6 +93,9 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
             CODING = Software coding in decimal (e.g. 4361) or hex (e.g. $1109)
             WORKSHOP = Workshop code in decimal (e.g. 4361) or hex (e.g. $1109)
         ToggleRB4Mode
+        WriteEdc15Eeprom ADDRESS1 VALUE1 [ADDRESS2 VALUE2 ... ADDRESSn VALUEn]
+            ADDRESS = EEPROM address in decimal (0-511) or hex ($00-$1FF)
+            VALUE = Value to be stored at address in decimal (0-255) or hex ($00-$FF)
         WriteEeprom ADDRESS VALUE
             ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
             VALUE = Value in decimal (e.g. 138) or hex (e.g. $8A)
