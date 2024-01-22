@@ -1,14 +1,12 @@
-﻿using System;
-using System.IO.Ports;
+﻿using System.IO.Ports;
 
 namespace BitFab.KW1281Test.Interface
 {
     class GenericInterface : IInterface
     {
-        private readonly TimeSpan DefaultTimeOut = TimeSpan.FromSeconds(8);
-
         public GenericInterface(string portName, int baudRate)
         {
+            var timeout = ((IInterface)this).DefaultTimeoutMilliseconds;
             _port = new SerialPort(portName)
             {
                 BaudRate = baudRate,
@@ -18,8 +16,8 @@ namespace BitFab.KW1281Test.Interface
                 Handshake = Handshake.None,
                 RtsEnable = false,
                 DtrEnable = true,
-                ReadTimeout = (int)DefaultTimeOut.TotalMilliseconds,
-                WriteTimeout = (int)DefaultTimeOut.TotalMilliseconds
+                ReadTimeout = timeout,
+                WriteTimeout = timeout
             };
 
             _port.Open();
@@ -66,6 +64,18 @@ namespace BitFab.KW1281Test.Interface
         public void SetRts(bool on)
         {
             _port.RtsEnable = on;
+        }
+
+        public int ReadTimeout
+        {
+            get => _port.ReadTimeout;
+            set => _port.ReadTimeout = value;
+        }
+
+        public int WriteTimeout
+        {
+            get => _port.WriteTimeout;
+            set => _port.WriteTimeout = value;
         }
 
         private readonly SerialPort _port;

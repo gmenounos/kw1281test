@@ -4,10 +4,8 @@ using System.Runtime.InteropServices;
 
 namespace BitFab.KW1281Test.Interface
 {
-    class FtdiInterface : IInterface 
+    internal class FtdiInterface : IInterface 
     {
-        private readonly TimeSpan DefaultTimeOut = TimeSpan.FromSeconds(8);
-
         private readonly FT _ft;
         private IntPtr _handle = IntPtr.Zero;
         private readonly byte[] _buf = new byte[1];
@@ -38,11 +36,8 @@ namespace BitFab.KW1281Test.Interface
             SetRts(false);
             SetDtr(true);
 
-            status = _ft.SetTimeouts(
-                _handle,
-                (uint)DefaultTimeOut.TotalMilliseconds,
-                (uint)DefaultTimeOut.TotalMilliseconds);
-            FT.AssertOk(status);
+            _readTimeout = _writeTimeout = ((IInterface)this).DefaultTimeoutMilliseconds;
+            ReadTimeout = _readTimeout; // Also sets the write timeout
 
             // Should allow faster response times for small packets
             status = _ft.SetLatencyTimer(_handle, 2);
@@ -143,6 +138,39 @@ namespace BitFab.KW1281Test.Interface
                 status = _ft.ClrRts(_handle);
             }
             FT.AssertOk(status);
+        }
+
+        private int _readTimeout;
+        
+        public int ReadTimeout
+        {
+            get => _readTimeout;
+
+            set
+            {
+                var status = _ft.SetTimeouts(
+                    _handle,
+                    (uint)value,
+                    (uint)WriteTimeout);
+                FT.AssertOk(status);
+                _readTimeout = value;
+            }
+        }
+
+        private int _writeTimeout;
+        
+        public int WriteTimeout
+        {
+            get => _writeTimeout;
+            set
+            {
+                var status = _ft.SetTimeouts(
+                    _handle,
+                    (uint)ReadTimeout,
+                    (uint)value);
+                FT.AssertOk(status);
+                _writeTimeout = value;
+            }
         }
     }
 

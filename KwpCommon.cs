@@ -36,40 +36,57 @@ namespace BitFab.KW1281Test
                 Log.WriteLine("Warning: Unable to disable GC so timing may be compromised.");
             }
 
-            byte syncByte = 0;
-            const int maxTries = 3;
-            for (int i = 1; i <= maxTries; i++)
+            var protocolVersion = 0;
+            Interface.ReadTimeout = (int)TimeSpan.FromSeconds(2).TotalMilliseconds;
+            try
             {
-                Thread.Sleep(300);
-
-                BitBang5Baud(controllerAddress, evenParity);
-
-                // Throw away anything that might be in the receive buffer
-                Interface.ClearReceiveBuffer();
-
-                Log.WriteLine("Reading sync byte");
-                try
+                const int maxTries = 3;
+                for (var i = 1; i <= maxTries; i++)
                 {
-                    syncByte = Interface.ReadByte();
-                    break;
-                }
-                catch (TimeoutException)
-                {
-                    if (i < maxTries)
+                    try
                     {
-                        Log.WriteLine("Retrying wakeup message...");
+                        protocolVersion = WakeUpNoRetry(controllerAddress, evenParity);
+                        break;
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        throw new InvalidOperationException("Controller did not wake up.");
+                        Log.WriteLine(ex.Message);
+
+                        if (i < maxTries)
+                        {
+                            Log.WriteLine("Retrying wakeup message...");
+                            Thread.Sleep(TimeSpan.FromSeconds(1));
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException("Controller did not wake up.");
+                        }
                     }
                 }
             }
-
-            if (GCSettings.LatencyMode == GCLatencyMode.NoGCRegion)
+            finally
             {
-                GC.EndNoGCRegion();
+                if (GCSettings.LatencyMode == GCLatencyMode.NoGCRegion)
+                {
+                    GC.EndNoGCRegion();
+                }
+                Interface.ReadTimeout = Interface.DefaultTimeoutMilliseconds;
             }
+
+            return protocolVersion;
+        }
+
+        private int WakeUpNoRetry(byte controllerAddress, bool evenParity)
+        {
+            Thread.Sleep(300);
+
+            BitBang5Baud(controllerAddress, evenParity);
+
+            // Throw away anything that might be in the receive buffer
+            Interface.ClearReceiveBuffer();
+
+            Log.WriteLine("Reading sync byte");
+            var syncByte = Interface.ReadByte();
 
             if (syncByte != 0x55)
             {
@@ -81,15 +98,23 @@ namespace BitFab.KW1281Test
             Log.WriteLine($"Keyword Lsb ${keywordLsb:X2}");
 
             var keywordMsb = ReadByte();
+            
             Log.WriteLine($"Keyword Msb ${keywordMsb:X2}");
-
-            Thread.Sleep(25);
-
-            var complement = (byte)~keywordMsb;
-            WriteByte(complement);
 
             var protocolVersion = ((keywordMsb & 0x7F) << 7) + (keywordLsb & 0x7F);
             Log.WriteLine($"Protocol is KW {protocolVersion} (8N1)");
+
+            if (protocolVersion >= 2000)
+            {
+                BusyWait.Delay(25); // The EDC15 ECU needs a longer delay before writing the keywordMsb complement
+            }
+            else
+            {
+                BusyWait.Delay(10); // Supposed to be 25 but communicating with the UART takes a few ms
+            }
+
+            var complement = (byte)~keywordMsb;
+            WriteByte(complement);
 
             if (protocolVersion >= 2000)
             {
@@ -99,7 +124,7 @@ namespace BitFab.KW1281Test
 
             return protocolVersion;
         }
-
+        
         public byte ReadByte()
         {
             return Interface.ReadByte();
@@ -132,31 +157,10 @@ namespace BitFab.KW1281Test
         private void BitBang5Baud(byte b, bool evenParity)
         {
             const int bitsPerSec = 5;
-            long ticksPerSecond = Stopwatch.Frequency;
-            long ticksPerBit = ticksPerSecond / bitsPerSec;
-
-            long maxTick;
-
-            // Delay the appropriate amount and then set/clear the TxD line
-            void BitBang(bool bit)
-            {
-                while (Stopwatch.GetTimestamp() < maxTick)
-                    ;
-                if (bit)
-                {
-                    Interface.SetBreak(false);
-                }
-                else
-                {
-                    Interface.SetBreak(true);
-                }
-
-                maxTick += ticksPerBit;
-            }
+            const long msPerBit = 1000 / bitsPerSec - 3;
 
             b = Utils.AdjustParity(b, evenParity);
 
-            var startTick = maxTick = Stopwatch.GetTimestamp();
             BitBang(false); // Start bit
 
             for (int i = 0; i < 8; i++)
@@ -168,13 +172,15 @@ namespace BitFab.KW1281Test
 
             BitBang(true); // Stop bit
 
-            // Wait for end of stop bit
-            long stopTick;
-            while ((stopTick = Stopwatch.GetTimestamp()) < maxTick)
-                ;
+            BusyWait.Delay(msPerBit);
+            return;
 
-            Log.WriteLine(
-                $"Wakeup duration: {(double)(stopTick - startTick) / ticksPerSecond} seconds");
+            // Delay the appropriate amount and then set/clear the TxD line
+            void BitBang(bool bit)
+            {
+                BusyWait.Delay(msPerBit);
+                Interface.SetBreak(!bit);
+            }
         }
 
         /// <summary>

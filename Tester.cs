@@ -631,6 +631,7 @@ namespace BitFab.KW1281Test
             }
             else if (_controllerAddress == (int)ControllerAddress.Ecu)
             {
+                var ecuInfo = Kwp1281Wakeup();
                 var dumpFileName = DumpEdc15Eeprom(filename: null);
                 var buf = File.ReadAllBytes(dumpFileName);
                 var skc = Utils.GetShort(buf, 0x012E);

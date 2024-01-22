@@ -4,6 +4,8 @@ namespace BitFab.KW1281Test.Interface
 {
     public interface IInterface : IDisposable
     {
+        int DefaultTimeoutMilliseconds => (int)TimeSpan.FromSeconds(8).TotalMilliseconds;
+
         /// <summary>
         /// Read a byte from the interface.
         /// </summary>
@@ -24,5 +26,9 @@ namespace BitFab.KW1281Test.Interface
         void SetDtr(bool on);
 
         void SetRts(bool on);
+        
+        int ReadTimeout { get; set; }
+        
+        int WriteTimeout { get; set; }
     }
 }
