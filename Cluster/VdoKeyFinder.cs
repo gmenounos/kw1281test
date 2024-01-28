@@ -14,13 +14,26 @@ namespace BitFab.KW1281Test.Cluster
                 throw new InvalidOperationException(
                     $"Unexpected seed length: {seed.Length} (Expected 10)");
             }
-            if (seed[8] != 0x01 || seed[9] != 0x00)
+
+            byte[] obfu;
+            switch (seed[8])
             {
-                Log.WriteLine(
-                    $"Unexpected seed suffix: ${seed[8]:X2} ${seed[9]:X2}, (Expected $01 $00)");
+                case 0x01 when seed[9] == 0x00:
+                    obfu = [0x55, 0x16, 0xa8, 0x94];
+                    break;
+                case 0x03 when seed[9] == 0x00:
+                    obfu = [0x98, 0xe1, 0x56, 0x5f];
+                    break;
+                default:
+                    Log.WriteLine(
+                        $"Unexpected seed suffix: ${seed[8]:X2} ${seed[9]:X2}");
+                    obfu = [0x55, 0x16, 0xa8, 0x94]; // Try something
+                    break;
             }
 
-            var key = CalculateKey(new byte[] { seed[1], seed[3], seed[5], seed[7] });
+            var key = CalculateKey(
+                [seed[1], seed[3], seed[5], seed[7]],
+                obfu);
 
             return new byte[] { 0x07, key[0], key[1], 0x00, key[2], 0x00, key[3], 0x00 };
         }
@@ -28,11 +41,9 @@ namespace BitFab.KW1281Test.Cluster
         /// <summary>
         /// Takes a 4-byte seed and calculates a 4-byte key.
         /// </summary>
-        private static byte[] CalculateKey(byte[] seed)
+        private static byte[] CalculateKey(byte[] seed, byte[] obfu)
         {
             var work = new byte[] { 0x07, seed[0], seed[1], seed[2], seed[3], 0x00, 0x00 };
-
-            var obfu = new byte[] { 0x55, 0x16, 0xa8, 0x94 };
 
             Scramble(work);
 

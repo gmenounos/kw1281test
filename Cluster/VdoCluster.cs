@@ -169,6 +169,7 @@ namespace BitFab.KW1281Test.Cluster
                         succeeded = false;
                         blockBytes.AddRange(
                             Enumerable.Repeat((byte)0, readLength - blockBytes.Count));
+                        Log.WriteLine($"{readLength - blockBytes.Count} missing");
                     }
                     fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
                     fs.Flush();
@@ -360,6 +361,9 @@ namespace BitFab.KW1281Test.Cluster
 
                 case "$00 $00 $13 $01": // 8D0919880M  B5-KOMBIINSTR. VDO D02
                     return [[0x09, 0x06, 0x05, 0x02]];
+                
+                case "VSQX01LM 01.00": // 6Q0920800  KOMBI+WEGFAHRSP VDO V11
+                    return [[0x31, 0x39, 0x34, 0x46]];
 
                 case "VCLM09MH $00 $09": // 3BD920848E KOMBI+WEGFAHRSP VDO V03
                     return [[0x32, 0x31, 0x36, 0x31]];
