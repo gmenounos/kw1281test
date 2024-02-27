@@ -367,6 +367,9 @@ namespace BitFab.KW1281Test.Cluster
 
                 case "VCLM09MH $00 $09": // 3BD920848E KOMBI+WEGFAHRSP VDO V03
                     return [[0x32, 0x31, 0x36, 0x31]];
+                
+                case "VQMJ07HH 08.40": // 6Y0920843L  KOMBIINSTRUMENT VDO V04
+                    return [[0x34, 0x3F, 0x43, 0x39]];
 
                 case "VQMJ06LM 09.00": // 6Q0920903   KOMBI+WEGFAHRSP VDO V02
                     return [[0x35, 0x3D, 0x47, 0x3E]];

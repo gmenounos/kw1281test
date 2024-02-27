@@ -22,6 +22,7 @@ namespace BitFab.KW1281Test.Cluster
                     obfu = [0x55, 0x16, 0xa8, 0x94];
                     break;
                 case 0x03 when seed[9] == 0x00:
+                case 0x09 when seed[9] == 0x00:
                     obfu = [0x98, 0xe1, 0x56, 0x5f];
                     break;
                 default:
@@ -35,7 +36,7 @@ namespace BitFab.KW1281Test.Cluster
                 [seed[1], seed[3], seed[5], seed[7]],
                 obfu);
 
-            return new byte[] { 0x07, key[0], key[1], 0x00, key[2], 0x00, key[3], 0x00 };
+            return new byte[] { 0x07, key[0], key[1], 0x00, key[2], 0x00, key[3], 0x00, 0x00 };
         }
 
         /// <summary>
