@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 
 namespace BitFab.KW1281Test.Cluster
 {
-    class VdoCluster : ICluster
+    internal class VdoCluster : ICluster
     {
         public void UnlockForEepromReadWrite()
         {
@@ -38,9 +38,9 @@ namespace BitFab.KW1281Test.Cluster
         public string DumpEeprom(
             uint? optionalAddress, uint? optionalLength, string? optionalFileName)
         {
-            uint address = optionalAddress ?? 0;
-            uint length = optionalLength ?? 0x800;
-            string filename = optionalFileName ?? $"VDO_${address:X6}_eeprom.bin";
+            var address = optionalAddress ?? 0;
+            var length = optionalLength ?? 0x800;
+            var filename = optionalFileName ?? $"VDO_${address:X6}_eeprom.bin";
 
             DumpEeprom((ushort)address, (ushort)length, maxReadLength: 16, filename);
 
@@ -67,7 +67,7 @@ namespace BitFab.KW1281Test.Cluster
                 var blocks = SendCustom([0x84, variation]);
                 foreach (var block in blocks.Where(b => !b.IsAckNak))
                 {
-                    if (variation == 0x00 || variation == 0x03)
+                    if (variation is 0x00 or 0x03)
                     {
                         Log.WriteLine($"{variation:X2}: {DumpMixedContent(block)}");
                     }
@@ -160,7 +160,7 @@ namespace BitFab.KW1281Test.Cluster
             bool succeeded = true;
             using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
             {
-                for (uint addr = startAddress; addr < startAddress + length; addr += blockSize)
+                for (var addr = startAddress; addr < startAddress + length; addr += blockSize)
                 {
                     var readLength = (byte)Math.Min(startAddress + length - addr, blockSize);
                     var blockBytes = CustomReadMemory(addr, readLength);
@@ -186,7 +186,7 @@ namespace BitFab.KW1281Test.Cluster
             }
         }
 
-        public List<Block> SendCustom(List<byte> blockCustomBytes)
+        private List<Block> SendCustom(List<byte> blockCustomBytes)
         {
             if (blockCustomBytes[0] > 0x80 && !_additionalCustomCommandsUnlocked)
             {
@@ -243,6 +243,8 @@ namespace BitFab.KW1281Test.Cluster
             return unlocked;
         }
 
+        private const int MaxAccessLevel = 7;
+
         public void SeedKeyAuthenticate()
         {
             // Perform Seed/Key authentication
@@ -250,37 +252,44 @@ namespace BitFab.KW1281Test.Cluster
             var response = SendCustom([0x96, 0x01]);
 
             var responseBlocks = response.Where(b => !b.IsAckNak).ToList();
-            if (responseBlocks.Count == 1 && responseBlocks[0] is CustomBlock customBlock)
+            if (responseBlocks is [CustomBlock customBlock])
             {
                 Log.WriteLine($"Block: {Utils.Dump(customBlock.Body)}");
 
-                var keyBytes = VdoKeyFinder.FindKey(customBlock.Body.ToArray());
+                var keyBytes = VdoKeyFinder.FindKey(customBlock.Body.ToArray(), MaxAccessLevel);
 
                 Log.WriteLine("Sending Custom \"Key response\" block");
 
                 var keyResponse = new List<byte> { 0x96, 0x02 };
                 keyResponse.AddRange(keyBytes);
 
-                response = SendCustom(keyResponse);
+                _ = SendCustom(keyResponse);
             }
         }
 
         public bool RequiresSeedKey()
         {
-            Log.WriteLine("Sending Custom \"Need Seed/Key?\" block");
+            var accessLevel = GetAccessLevel();
+            return accessLevel != MaxAccessLevel;
+        }
+
+        private int? GetAccessLevel()
+        {
+            Log.WriteLine("Sending Custom \"Get Access Level\" block");
             var response = SendCustom([0x96, 0x04]);
             var responseBlocks = response.Where(b => !b.IsAckNak).ToList();
-            if (responseBlocks.Count == 1 && responseBlocks[0] is CustomBlock)
+            if (responseBlocks is [CustomBlock])
             {
-                // Custom 0x04 means need to do Seed/Key
-                // Custom 0x07 means unlocked
-                if (responseBlocks[0].Body.First() == 0x07)
-                {
-                    return false;
-                }
+                int accessLevel = responseBlocks[0].Body.First(); 
+                Log.WriteLine($"Access level is {accessLevel}.");
+               
+                return accessLevel;
             }
-
-            return true;
+            else
+            {
+                Log.WriteLine("Access level is unknown.");
+                return null;
+            }
         }
 
         /// <summary>
@@ -415,8 +424,8 @@ namespace BitFab.KW1281Test.Cluster
                     return [[0x47, 0x3B, 0x31, 0x3F]];
 
                 default:
-                    return _clusterUnlockCodes;
-            };
+                    return ClusterUnlockCodes;
+            }
         }
 
         private static string SoftwareVersionToString(List<byte> versionBytes)
@@ -426,12 +435,11 @@ namespace BitFab.KW1281Test.Cluster
                 return Utils.DumpMixedContent(versionBytes);
             }
 
-
             var asciiPart = Encoding.ASCII.GetString(versionBytes.ToArray()[0..^2]);
             return $"{asciiPart} {versionBytes[^1]:X2}.{versionBytes[^2]:X2}";
         }
 
-        private static readonly byte[][] _clusterUnlockCodes =
+        private static readonly byte[][] ClusterUnlockCodes =
         [
             [0x37, 0x39, 0x3C, 0x47],
             [0x3A, 0x39, 0x31, 0x43],

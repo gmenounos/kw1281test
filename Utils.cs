@@ -53,7 +53,7 @@ namespace BitFab.KW1281Test
             var sb = new StringBuilder();
             foreach (var b in content)
             {
-                if (b >= 32 && b <= 126)
+                if (b is >= 32 and <= 126)
                 {
                     if (mode == 'X')
                     {
@@ -81,7 +81,7 @@ namespace BitFab.KW1281Test
         {
             uint number;
 
-            if (numberString.StartsWith("$"))
+            if (numberString.StartsWith('$'))
             {
                 number = uint.Parse(numberString[1..], NumberStyles.HexNumber);
             }
