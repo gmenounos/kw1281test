@@ -346,15 +346,31 @@ namespace BitFab.KW1281Test
         {
             var blocks = new List<Block>();
 
-            while (true)
+            try
             {
-                var block = ReceiveBlock();
-                blocks.Add(block); // TODO: Maybe don't add the block if it's an Ack
-                if (block is AckBlock || block is NakBlock)
+                while (true)
                 {
-                    break;
+                    var block = ReceiveBlock();
+                    blocks.Add(block); // TODO: Maybe don't add the block if it's an Ack
+                    if (block is AckBlock || block is NakBlock)
+                    {
+                        break;
+                    }
+                    SendAckBlock();
                 }
-                SendAckBlock();
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"Error receiving blocks: {ex.Message}");
+                if (blocks.Count > 0)
+                {
+                    Log.WriteLine("Blocks received:");
+                    foreach (var block in blocks)
+                    {
+                        Log.WriteLine($"Block: {Utils.DumpBytes(block.Bytes)}");
+                    }
+                }
+                throw;
             }
 
             return blocks;
@@ -370,48 +386,62 @@ namespace BitFab.KW1281Test
         {
             var blockBytes = new List<byte>();
 
-            var blockLength = ReadAndAckByte();
-            blockBytes.Add(blockLength);
-
-            var blockCounter = ReadBlockCounter();
-            blockBytes.Add(blockCounter);
-
-            var blockTitle = ReadAndAckByte();
-            blockBytes.Add(blockTitle);
-
-            for (var i = 0; i < blockLength - 3; i++)
+            try
             {
-                var b = ReadAndAckByte();
-                blockBytes.Add(b);
+                var blockLength = ReadAndAckByte();
+                blockBytes.Add(blockLength);
+
+                var blockCounter = ReadBlockCounter();
+                blockBytes.Add(blockCounter);
+
+                var blockTitle = ReadAndAckByte();
+                blockBytes.Add(blockTitle);
+
+                for (var i = 0; i < blockLength - 3; i++)
+                {
+                    var b = ReadAndAckByte();
+                    blockBytes.Add(b);
+                }
+
+                var blockEnd = KwpCommon.ReadByte();
+                blockBytes.Add(blockEnd);
+                if (blockEnd != 0x03)
+                {
+                    throw new InvalidOperationException(
+                        $"Received block end ${blockEnd:X2} but expected $03. Block bytes: {Utils.Dump(blockBytes)}");
+                }
+
+                return (BlockTitle)blockTitle switch
+                {
+                    BlockTitle.ACK => new AckBlock(blockBytes),
+                    BlockTitle.GroupReadResponseWithText => new GroupReadResponseWithTextBlock(blockBytes),
+                    BlockTitle.ActuatorTestResponse => new ActuatorTestResponseBlock(blockBytes),
+                    BlockTitle.AsciiData =>
+                        blockBytes[3] == 0x00 ? new CodingWscBlock(blockBytes) : new AsciiDataBlock(blockBytes),
+                    BlockTitle.Custom => new CustomBlock(blockBytes),
+                    BlockTitle.NAK => new NakBlock(blockBytes),
+                    BlockTitle.ReadEepromResponse => new ReadEepromResponseBlock(blockBytes),
+                    BlockTitle.FaultCodesResponse => new FaultCodesBlock(blockBytes),
+                    BlockTitle.ReadRomEepromResponse => new ReadRomEepromResponse(blockBytes),
+                    BlockTitle.WriteEepromResponse => new WriteEepromResponseBlock(blockBytes),
+                    BlockTitle.AdaptationResponse => new AdaptationResponseBlock(blockBytes),
+                    BlockTitle.GroupReadResponse => new GroupReadResponseBlock(blockBytes),
+                    BlockTitle.RawDataReadResponse => new RawDataReadResponseBlock(blockBytes),
+                    BlockTitle.SecurityAccessMode2 => new SecurityAccessMode2Block(blockBytes),
+                    _ => new UnknownBlock(blockBytes),
+                };
             }
-
-            var blockEnd = KwpCommon.ReadByte();
-            blockBytes.Add(blockEnd);
-            if (blockEnd != 0x03)
+            catch (Exception ex)
             {
-                throw new InvalidOperationException(
-                    $"Received block end ${blockEnd:X2} but expected $03. Block bytes: {Utils.Dump(blockBytes)}");
+                Log.WriteLine($"Error receiving block: {ex.Message}");
+                Log.WriteLine($"Partial block: {Utils.DumpBytes(blockBytes)}");
+                if (ex is TimeoutException)
+                {
+                    Log.WriteLine($"Read timeout: {KwpCommon.Interface.ReadTimeout}");
+                    Log.WriteLine($"Write timeout: {KwpCommon.Interface.WriteTimeout}");
+                }
+                throw;
             }
-
-            return (BlockTitle)blockTitle switch
-            {
-                BlockTitle.ACK => new AckBlock(blockBytes),
-                BlockTitle.GroupReadResponseWithText => new GroupReadResponseWithTextBlock(blockBytes),
-                BlockTitle.ActuatorTestResponse => new ActuatorTestResponseBlock(blockBytes),
-                BlockTitle.AsciiData =>
-                    blockBytes[3] == 0x00 ? new CodingWscBlock(blockBytes) : new AsciiDataBlock(blockBytes),
-                BlockTitle.Custom => new CustomBlock(blockBytes),
-                BlockTitle.NAK => new NakBlock(blockBytes),
-                BlockTitle.ReadEepromResponse => new ReadEepromResponseBlock(blockBytes),
-                BlockTitle.FaultCodesResponse => new FaultCodesBlock(blockBytes),
-                BlockTitle.ReadRomEepromResponse => new ReadRomEepromResponse(blockBytes),
-                BlockTitle.WriteEepromResponse => new WriteEepromResponseBlock(blockBytes),
-                BlockTitle.AdaptationResponse => new AdaptationResponseBlock(blockBytes),
-                BlockTitle.GroupReadResponse => new GroupReadResponseBlock(blockBytes),
-                BlockTitle.RawDataReadResponse => new RawDataReadResponseBlock(blockBytes),
-                BlockTitle.SecurityAccessMode2 => new SecurityAccessMode2Block(blockBytes),
-                _ => new UnknownBlock(blockBytes),
-            };
         }
 
         private void SendAckBlock()
