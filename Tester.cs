@@ -108,17 +108,6 @@ namespace BitFab.KW1281Test
             {
                 _kwp1281.Login(login.Value, workshopCode);
             }
-
-            if (!_kwp1281.AdaptationRead(channel))
-            {
-                return;
-            }
-
-            if (channel != 0 && !_kwp1281.AdaptationTest(channel, channelValue))
-            {
-                return;
-            }
-
             _kwp1281.AdaptationSave(channel, channelValue, workshopCode);
         }
 
