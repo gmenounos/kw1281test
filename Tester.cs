@@ -7,7 +7,8 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
-using static BitFab.KW1281Test.Interface.FT;
+using BitFab.KW1281Test.Blocks;
+using Parity = System.IO.Ports.Parity;
 
 namespace BitFab.KW1281Test
 {
@@ -506,7 +507,31 @@ namespace BitFab.KW1281Test
             if (_controllerAddress == (int)ControllerAddress.Cluster)
             {
                 var ecuInfo = Kwp1281Wakeup();
-                if (ecuInfo.Text.Contains("VDO"))
+                if (ecuInfo.Text.Contains("4B0920") ||
+                    ecuInfo.Text.Contains("4Z7920"))
+                {
+                    Log.WriteLine($"Cluster is Audi C5");
+
+                    var cluster = new AudiC5Cluster(_kwp1281);
+                    
+                    cluster.UnlockForEepromReadWrite();
+                    var dumpFileName = cluster.DumpEeprom(0, 0x800, "AudiC5.bin");
+                    
+                    var buf = File.ReadAllBytes(dumpFileName);
+                    
+                    var skc = Utils.GetShort(buf, 0x7E2);
+                    var skc2 = Utils.GetShort(buf, 0x7E4);
+                    var skc3 = Utils.GetShort(buf, 0x7E6);
+                    if (skc != skc2 || skc != skc3)
+                    {
+                        Log.WriteLine($"Warning: redundant SKCs do not match: {skc:D5} {skc2:D5} {skc3:D5}");
+                    }
+                    else
+                    {
+                        Log.WriteLine($"SKC: {skc:D5}");
+                    }
+                }
+                else if (ecuInfo.Text.Contains("VDO"))
                 {
                     var cluster = new VdoCluster(_kwp1281);
                     string[] partNumberGroups = FindAndParsePartNumber(ecuInfo.Text);

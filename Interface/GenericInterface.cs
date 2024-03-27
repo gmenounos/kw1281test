@@ -56,6 +56,11 @@ namespace BitFab.KW1281Test.Interface
             _port.BaudRate = baudRate;
         }
 
+        public void SetParity(Parity parity)
+        {
+            _port.Parity = parity;
+        }
+
         public void SetDtr(bool on)
         {
             _port.DtrEnable = on;

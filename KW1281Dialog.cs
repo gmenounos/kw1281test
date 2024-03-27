@@ -81,6 +81,7 @@ namespace BitFab.KW1281Test
         bool GroupRead(byte groupNumber, bool useBasicSetting = false);
 
         public IKwpCommon KwpCommon { get; }
+        Block ReceiveBlock();
     }
 
     internal class KW1281Dialog : IKW1281Dialog
@@ -382,7 +383,7 @@ namespace BitFab.KW1281Test
             KwpCommon.ReadComplement(b);
         }
 
-        private Block ReceiveBlock()
+        public Block ReceiveBlock()
         {
             var blockBytes = new List<byte>();
 

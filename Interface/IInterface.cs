@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO.Ports;
 
 namespace BitFab.KW1281Test.Interface
 {
@@ -22,6 +23,8 @@ namespace BitFab.KW1281Test.Interface
         void ClearReceiveBuffer();
 
         void SetBaudRate(int baudRate);
+
+        void SetParity(Parity parity);
 
         void SetDtr(bool on);
 

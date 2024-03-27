@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO.Ports;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -109,6 +110,26 @@ namespace BitFab.KW1281Test.Interface
         public void SetBaudRate(int baudRate)
         {
             var status = _ft.SetBaudRate(_handle, (uint)baudRate);
+            FT.AssertOk(status);
+        }
+
+        public void SetParity(Parity parity)
+        {
+            var ftParity = parity switch
+            {
+                Parity.None => FT.Parity.None,
+                Parity.Even => FT.Parity.Even,
+                Parity.Odd => FT.Parity.Odd,
+                Parity.Mark => FT.Parity.Mark,
+                Parity.Space => FT.Parity.Space,
+                _ => throw new ArgumentException($"Unsupported parity: {parity}", nameof(parity))
+            };
+
+            var status = _ft.SetDataCharacteristics(
+                _handle,
+                FT.Bits.Eight,
+                FT.StopBits.One, 
+                ftParity);
             FT.AssertOk(status);
         }
 
