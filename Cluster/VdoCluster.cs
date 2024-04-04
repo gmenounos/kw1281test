@@ -12,7 +12,8 @@ namespace BitFab.KW1281Test.Cluster
     {
         public void UnlockForEepromReadWrite()
         {
-            if (!Unlock())
+            var (isUnlocked, softwareVersion) = Unlock();
+            if (!isUnlocked)
             {
                 Log.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
             }
@@ -24,7 +25,7 @@ namespace BitFab.KW1281Test.Cluster
                 return;
             }
 
-            SeedKeyAuthenticate();
+            SeedKeyAuthenticate(softwareVersion);
             if (RequiresSeedKey())
             {
                 Log.WriteLine("Failed to unlock cluster.");
@@ -199,13 +200,13 @@ namespace BitFab.KW1281Test.Cluster
             return _kwp1281.ReceiveBlocks();
         }
 
-        public bool Unlock()
+        public (bool succeeded, string? softwareVersion) Unlock()
         {
             var versionBlocks = CustomReadSoftwareVersion();
             if (versionBlocks.Count == 0)
             {
                 Log.WriteLine("Cluster did not return software version.");
-                return false;
+                return (succeeded: false, softwareVersion: null);
             }
 
             // Now we need to send an unlock code that is unique to each ROM version
@@ -240,12 +241,16 @@ namespace BitFab.KW1281Test.Cluster
                         $"Received non-ACK/NAK ${unlockResponse[0].Title:X2} from unlock request.");
                 }
             }
-            return unlocked;
+            return (unlocked, softwareVersion);
         }
 
         private const int MaxAccessLevel = 7;
 
-        public void SeedKeyAuthenticate()
+        /// <summary>
+        /// Tries to perform seed/key authentication with cluster.
+        /// </summary>
+        /// <param name="softwareVersion">Software version string like "VQMJ07LM 09.00"</param>
+        public void SeedKeyAuthenticate(string? softwareVersion)
         {
             // Perform Seed/Key authentication
             Log.WriteLine("Sending Custom \"Seed request\" block");
@@ -256,7 +261,8 @@ namespace BitFab.KW1281Test.Cluster
             {
                 Log.WriteLine($"Block: {Utils.Dump(customBlock.Body)}");
 
-                var keyBytes = VdoKeyFinder.FindKey(customBlock.Body.ToArray(), MaxAccessLevel);
+                var keyBytes = VdoKeyFinder.FindKey(
+                    customBlock.Body.ToArray(), MaxAccessLevel, softwareVersion);
 
                 Log.WriteLine("Sending Custom \"Key response\" block");
 

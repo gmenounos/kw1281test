@@ -957,7 +957,8 @@ namespace BitFab.KW1281Test
                 case ControllerAddress.Cluster:
                     // TODO:UnlockCluster() is only needed for EEPROM read, not memory read
                     var cluster = new VdoCluster(_kwp1281);
-                    if (!cluster.Unlock())
+                    var (isUnlocked, softwareVersion) = cluster.Unlock();
+                    if (!isUnlocked)
                     {
                         Log.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
                     }
@@ -969,7 +970,7 @@ namespace BitFab.KW1281Test
                         return;
                     }
 
-                    cluster.SeedKeyAuthenticate();
+                    cluster.SeedKeyAuthenticate(softwareVersion);
                     if (cluster.RequiresSeedKey())
                     {
                         Log.WriteLine("Failed to unlock cluster.");
@@ -1064,7 +1065,12 @@ namespace BitFab.KW1281Test
             }
             else
             {
-                cluster.SeedKeyAuthenticate();
+                var (isUnlocked, softwareVersion) = cluster.Unlock();
+                if (!isUnlocked)
+                {
+                    Log.WriteLine("Unknown cluster software version. Memory access will likely fail.");
+                }
+                cluster.SeedKeyAuthenticate(softwareVersion);
             }
 
             var dumpFileName = filename ?? $"cluster_mem_${startAddress:X6}.bin";

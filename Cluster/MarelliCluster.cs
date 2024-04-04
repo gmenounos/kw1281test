@@ -240,6 +240,7 @@ namespace BitFab.KW1281Test.Cluster
             "1C0920921",    // Beetle 1C0920921G M73 V08
             "1C0920941",    // Beetle 1C0920941LX M73 V03
             "1C0920951",    // Beetle 1C0920951A M73 V02
+            "8N1919880",    // Audi TT 8N1919880E M73 D26 (actually Immo2 but has the larger EEPROM)
             "8N1920980",    // Audi TT 8N1920980E M73 D14
             "8N2920930",    // Audi TT 8N2920930C M73 D55
             "8N2920980",    // Audi TT 8N2920980A M73 D14

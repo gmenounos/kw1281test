@@ -7,9 +7,11 @@ namespace BitFab.KW1281Test.Cluster
     public static class VdoKeyFinder
     {
         /// <summary>
-        /// Takes a 10-byte seed block and desired access level and generates an 8-byte key block.
+        /// Takes a 10-byte seed block, desired access level and optional cluster software version and generates an
+        /// 8-byte key block.
         /// </summary>
-        public static byte[] FindKey(byte[] seed, int accessLevel)
+        public static byte[] FindKey(
+            byte[] seed, int accessLevel, string? softwareVersion)
         {
             if (seed.Length != 10)
             {
@@ -22,6 +24,9 @@ namespace BitFab.KW1281Test.Cluster
             {
                 case 0x01 when seed[9] == 0x00:
                     secret = VWK501Secrets[accessLevel];
+                    break;
+                case 0x09 when seed[9] == 0x00 && (softwareVersion ?? "").StartsWith("VQMJ07"):
+                    secret = VQMJ07Secrets[accessLevel];
                     break;
                 case 0x03 when seed[9] == 0x00:
                 case 0x09 when seed[9] == 0x00:
@@ -40,7 +45,7 @@ namespace BitFab.KW1281Test.Cluster
                 [seed[1], seed[3], seed[5], seed[7]],
                 secret);
 
-            return [(byte)accessLevel, key[0], key[1], 0x00, key[2], 0x00, key[3], 0x00, 0x00];
+            return [(byte)accessLevel, key[0], key[1], 0x00, key[2], 0x00, key[3], 0x00];
         }
 
         /// <summary>
@@ -72,7 +77,22 @@ namespace BitFab.KW1281Test.Cluster
             [0xac, 0xfc, 0x5e, 0x6c],
             [0x98, 0xe1, 0x56, 0x5f]    // AccessLevel 7
         ];
-        
+
+        /// <summary>
+        /// Table of secrets, one for each access level.
+        /// </summary>
+        private static readonly byte[][] VQMJ07Secrets =
+        [
+            [0xa7, 0xd2, 0xe9, 0x8d],  // AccessLevel 0
+            [0xe6, 0xfa, 0x9e, 0xba],
+            [0x63, 0x92, 0xe3, 0x08],
+            [0x55, 0x3e, 0x68, 0x24],
+            [0x03, 0x2a, 0x70, 0xdc],
+            [0xe7, 0xb4, 0x71, 0x86],
+            [0x4f, 0x58, 0xcd, 0x81],
+            [0xfd, 0x8e, 0x31, 0x96]    // AccessLevel 7
+        ];
+
         /// <summary>
         /// Takes a 4-byte seed and calculates a 4-byte key.
         /// </summary>
