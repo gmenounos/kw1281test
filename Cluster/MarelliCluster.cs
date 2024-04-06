@@ -18,18 +18,18 @@ namespace BitFab.KW1281Test.Cluster
             address ??= GetDefaultAddress();
             dumpFileName ??= $"marelli_mem_${address:X4}.bin";
 
-            DumpMem(dumpFileName, (ushort)address, (ushort?)length);
+            _ = DumpMem(dumpFileName, (ushort)address, (ushort?)length);
 
             return dumpFileName;
         }
 
         private ushort GetDefaultAddress()
         {
-            if (IsImmo2())
+            if (HasSmallEeprom())
             {
                 return 3072; // $0C00
             }
-            else if (IsImmo3())
+            else if (HasLargeEeprom())
             {
                 return 14336; // $3800
             }
@@ -56,13 +56,13 @@ namespace BitFab.KW1281Test.Cluster
                 regBlockH = (byte)((address == 0x3800) ? 0x20 : 0x08);
                 count ??= (ushort)((address == 0x3800) ? 0x800 : 0x400);
             }
-            else if (IsImmo2())
+            else if (HasSmallEeprom())
             {
                 entryH = 0x02; // $0200
                 regBlockH = 0x08; // $0800
                 count ??= 1024; // $0400
             }
-            else if (IsImmo3())
+            else if (HasLargeEeprom())
             {
                 entryH = 0x18; // $1800
                 regBlockH = 0x20; // $2000
@@ -224,29 +224,30 @@ namespace BitFab.KW1281Test.Cluster
             return true;
         }
 
-        private readonly string[] _immo2Ecus =
+        private readonly string[] _smallEepromEcus =
         [
             "1C0920806",    // Beetle 1C0920806G M73 V03
             "1C0920901",    // Beetle 1C0920901C M73 V07
             "1C0920905",    // Beetle 1C0920905F M73 V03
             "1C0920906",    // Beetle 1C0920906A M73 V03
+            "8N1919880E KOMBI+WEGFAHRS. M73 D23",   // Audi TT
             "8N1920930",    // Audi TT 8N1920930B M73 D23
         ];
         
-        private bool IsImmo2() => _immo2Ecus.Any(model => _ecuInfo.Contains(model));
+        private bool HasSmallEeprom() => _smallEepromEcus.Any(model => _ecuInfo.Contains(model));
 
-        private readonly string[] _immo3Ecus =
+        private readonly string[] _largeEepromEcus =
         [
             "1C0920921",    // Beetle 1C0920921G M73 V08
             "1C0920941",    // Beetle 1C0920941LX M73 V03
             "1C0920951",    // Beetle 1C0920951A M73 V02
-            "8N1919880",    // Audi TT 8N1919880E M73 D26 (actually Immo2 but has the larger EEPROM)
+            "8N1919880E KOMBI+WEGFAHRS. M73 D26",    // Audi TT
             "8N1920980",    // Audi TT 8N1920980E M73 D14
             "8N2920930",    // Audi TT 8N2920930C M73 D55
             "8N2920980",    // Audi TT 8N2920980A M73 D14
         ];
         
-        private bool IsImmo3() => _immo3Ecus.Any(model => _ecuInfo.Contains(model));
+        private bool HasLargeEeprom() => _largeEepromEcus.Any(model => _ecuInfo.Contains(model));
 
         /// <summary>
         /// Search for the SKC using the 2 methods described here:
