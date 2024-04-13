@@ -87,6 +87,7 @@ namespace BitFab.KW1281Test
 
             Log.WriteLine("Reading sync byte");
             var syncByte = Interface.ReadByte();
+            Log.WriteLine("Reading sync byte done");
 
             if (syncByte != 0x55)
             {
@@ -98,7 +99,7 @@ namespace BitFab.KW1281Test
             Log.WriteLine($"Keyword Lsb ${keywordLsb:X2}");
 
             var keywordMsb = ReadByte();
-            
+
             Log.WriteLine($"Keyword Msb ${keywordMsb:X2}");
 
             var protocolVersion = ((keywordMsb & 0x7F) << 7) + (keywordLsb & 0x7F);
@@ -124,7 +125,7 @@ namespace BitFab.KW1281Test
 
             return protocolVersion;
         }
-        
+
         public byte ReadByte()
         {
             return Interface.ReadByte();
