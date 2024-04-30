@@ -226,6 +226,7 @@ namespace BitFab.KW1281Test.Cluster
 
         private readonly string[] _smallEepromEcus =
         [
+            "1C0920800",    // Beetle 1C0920800C M73 V07
             "1C0920806",    // Beetle 1C0920806G M73 V03
             "1C0920901",    // Beetle 1C0920901C M73 V07
             "1C0920905",    // Beetle 1C0920905F M73 V03
