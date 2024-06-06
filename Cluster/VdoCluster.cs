@@ -286,9 +286,9 @@ namespace BitFab.KW1281Test.Cluster
             var responseBlocks = response.Where(b => !b.IsAckNak).ToList();
             if (responseBlocks is [CustomBlock])
             {
-                int accessLevel = responseBlocks[0].Body.First(); 
+                int accessLevel = responseBlocks[0].Body.First();
                 Log.WriteLine($"Access level is {accessLevel}.");
-               
+
                 return accessLevel;
             }
             else
@@ -371,18 +371,21 @@ namespace BitFab.KW1281Test.Cluster
                 case "VAT500MH 01.20": // 1J5920925C V09
                     return [[0x01, 0x04, 0x3D, 0x35]];
 
+                case "$01 $00 $14 $01": // 1J0919860B  A4-KOMBIINSTR. VDO V15
+                    return [[0x01, 0x08, 0x05, 0x02]];
+
                 case "V798MLA 01.00": // 7D0920800F V01, 1J0919951C V55
                     return [[0x02, 0x03, 0x05, 0x09]];
 
                 case "$00 $00 $13 $01": // 8D0919880M  B5-KOMBIINSTR. VDO D02
                     return [[0x09, 0x06, 0x05, 0x02]];
-                
+
                 case "VSQX01LM 01.00": // 6Q0920800  KOMBI+WEGFAHRSP VDO V11
                     return [[0x31, 0x39, 0x34, 0x46]];
 
                 case "VCLM09MH $00 $09": // 3BD920848E KOMBI+WEGFAHRSP VDO V03
                     return [[0x32, 0x31, 0x36, 0x31]];
-                
+
                 case "VQMJ07HH 08.40": // 6Y0920843L  KOMBIINSTRUMENT VDO V04
                 case "VQMJ07LM 09.00": // 6Q0920804Q  KOMBIINSTRUMENT VDO V06
                     return [[0x34, 0x3F, 0x43, 0x39]];
@@ -425,7 +428,7 @@ namespace BitFab.KW1281Test.Cluster
 
                 case "VSQX01LM 01.10": // 6Q0920900  KOMBI+WEGFAHRSP VDO V18
                     return [[0x43, 0x43, 0x3D, 0x37]];
-                
+
                 case "KPQMLA` $01": // 6Y1920860G KOMBIINSTRUMENT VDO V12
                     return [[0x47, 0x3B, 0x31, 0x3F]];
 

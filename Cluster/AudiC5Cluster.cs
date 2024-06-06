@@ -45,7 +45,7 @@ internal class AudiC5Cluster : ICluster
         {
             throw new InvalidOperationException("Unable to login to cluster");
         }
-        
+
         var @interface = _kw1281Dialog.KwpCommon.Interface;
         @interface.SetBaudRate(19200);
         @interface.SetParity(Parity.Even);
@@ -59,7 +59,7 @@ internal class AudiC5Cluster : ICluster
         ArgumentNullException.ThrowIfNull(address);
         ArgumentNullException.ThrowIfNull(length);
         ArgumentNullException.ThrowIfNull(dumpFileName);
-        
+
         WriteBlock([Constants.Hello]);
 
         var blockBytes = ReadBlock();
@@ -81,7 +81,7 @@ internal class AudiC5Cluster : ICluster
         foreach (var password in passwords)
         {
             Log.WriteLine("Sending login request");
-            
+
             blockBytes = [Constants.Login, 0x9D];
             blockBytes.AddRange(Encoding.ASCII.GetBytes(password));
             WriteBlock(blockBytes);
@@ -99,7 +99,7 @@ internal class AudiC5Cluster : ICluster
                 Log.WriteLine($"Warning: Expected block of type ${Constants.Ack:X2}");
             }
         }
-        
+
         if (!succeeded)
         {
             throw new InvalidOperationException("Unable to login to cluster");
@@ -111,9 +111,9 @@ internal class AudiC5Cluster : ICluster
 
         Log.WriteLine($"Dumping EEPROM to {dumpFileName}");
         DumpEeprom(address.Value, length.Value, maxReadLength: 0x10, dumpFileName);
-        
+
         _kw1281Dialog.SetDisconnected();
-        
+
         return dumpFileName;
     }
 
@@ -121,7 +121,7 @@ internal class AudiC5Cluster : ICluster
         uint startAddr, uint length, byte maxReadLength, string fileName)
     {
         using var fs = File.Create(fileName, bufferSize: maxReadLength, FileOptions.WriteThrough);
-        
+
         var succeeded = true;
         for (var addr = startAddr; addr < startAddr + length; addr += maxReadLength)
         {
@@ -134,11 +134,11 @@ internal class AudiC5Cluster : ICluster
                 blockBytes.AddRange(
                     Enumerable.Repeat((byte)0, readLength - blockBytes.Count));
             }
-            
+
             fs.Write(blockBytes.ToArray(), offset: 0, blockBytes.Count);
             fs.Flush();
         }
-        
+
         if (!succeeded)
         {
             Log.WriteLine();
@@ -209,7 +209,7 @@ internal class AudiC5Cluster : ICluster
     {
         var blockBytes = new List<byte>();
         byte checksum = 0x00;
-        
+
         try
         {
             var header = ReadByte();
@@ -259,7 +259,7 @@ internal class AudiC5Cluster : ICluster
     }
 
     private readonly IKW1281Dialog _kw1281Dialog;
-    
+
     public AudiC5Cluster(IKW1281Dialog kw1281Dialog)
     {
         _kw1281Dialog = kw1281Dialog;

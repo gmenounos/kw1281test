@@ -40,7 +40,7 @@ namespace BitFab.KW1281Test.Cluster
             }
 
             Log.WriteLine($"Access level {accessLevel} secret: {Utils.DumpBytes(secret)}");
-            
+
             var key = CalculateKey(
                 [seed[1], seed[3], seed[5], seed[7]],
                 secret);
@@ -62,7 +62,7 @@ namespace BitFab.KW1281Test.Cluster
             [0x4b, 0xd0, 0x7f, 0xad],
             [0x55, 0x16, 0xa8, 0x94]    // AccessLevel 7
         ];
-        
+
         /// <summary>
         /// Table of secrets, one for each access level.
         /// </summary>
@@ -100,12 +100,12 @@ namespace BitFab.KW1281Test.Cluster
             IReadOnlyList<byte> seed,
             IReadOnlyList<byte> secret)
         {
-            var work = new byte[] { 0x07, seed[0], seed[1], seed[2], seed[3], 0x00, 0x00 };
+            var work = new byte[] { seed[0], seed[1], seed[2], seed[3], 0x00, 0x00 };
             var secretBuf = secret.ToArray();
 
             Scramble(work);
 
-            var y = work[1] & 0x07;
+            var y = work[0] & 0x07;
             var temp = y + 1;
 
             var a = LeftRotate(0x01, y);
@@ -122,36 +122,36 @@ namespace BitFab.KW1281Test.Cluster
 
             for (var x = 0; x < 2; x++)
             {
+                work[4] = work[0];
+                work[0] ^= work[2];
+
                 work[5] = work[1];
                 work[1] ^= work[3];
 
-                work[6] = work[2];
-                work[2] ^= work[4];
-
-                work[4] = work[6];
                 work[3] = work[5];
+                work[2] = work[4];
 
-                LeftRotateSecondAndThirdBytes(work, (byte)(work[3] & 0x07));
+                LeftRotateFirstTwoBytes(work, work[2] & 0x07);
 
                 y = x << 1;
 
                 var carry = true;
-                (work[1], carry) = Utils.SubtractWithCarry(work[1], secretBuf[y], carry);
-                (work[2], _) = Utils.SubtractWithCarry(work[2], secretBuf[y + 1], carry);
+                (work[0], carry) = Utils.SubtractWithCarry(work[0], secretBuf[y], carry);
+                (work[1], _) = Utils.SubtractWithCarry(work[1], secretBuf[y + 1], carry);
             }
 
             Scramble(work);
 
-            return [work[1], work[2], work[3], work[4]];
+            return [work[0], work[1], work[2], work[3]];
         }
 
-        private static void Scramble(byte[] key)
+        private static void Scramble(byte[] work)
         {
-            key[5] = key[1];
-            key[1] = key[2];
-            key[2] = key[4];
-            key[4] = key[3];
-            key[3] = key[5];
+            work[4] = work[0];
+            work[0] = work[1];
+            work[1] = work[3];
+            work[3] = work[2];
+            work[2] = work[4];
         }
 
         private static byte SetOrClearBits(
@@ -184,14 +184,14 @@ namespace BitFab.KW1281Test.Cluster
             }
         }
 
-        private static void LeftRotateSecondAndThirdBytes(
-            byte[] key, int count)
+        private static void LeftRotateFirstTwoBytes(
+            byte[] work, int count)
         {
-            while (count != 0)
+            while (count > 0)
             {
-                var carry = (key[2] & 0x80) != 0;
-                (key[1], carry) = Utils.LeftRotate(key[1], carry);
-                (key[2], _) = Utils.LeftRotate(key[2], carry);
+                var carry = (work[1] & 0x80) != 0;
+                (work[0], carry) = Utils.LeftRotate(work[0], carry);
+                (work[1], _) = Utils.LeftRotate(work[1], carry);
                 count--;
             }
         }

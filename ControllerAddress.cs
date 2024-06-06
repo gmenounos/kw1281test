@@ -9,6 +9,7 @@
         CentralElectric = 0x09,
         Cluster = 0x17,
         CanGateway = 0x19,
+        Immobilizer = 0x25,
         CentralLocking = 0x35,
         Navigation = 0x37,
         CCM = 0x46,

@@ -504,21 +504,24 @@ namespace BitFab.KW1281Test
 
         public void GetSkc()
         {
-            if (_controllerAddress == (int)ControllerAddress.Cluster)
+            if (_controllerAddress is (int)ControllerAddress.Cluster or (int)ControllerAddress.Immobilizer)
             {
                 var ecuInfo = Kwp1281Wakeup();
                 if (ecuInfo.Text.Contains("4B0920") ||
-                    ecuInfo.Text.Contains("4Z7920"))
+                    ecuInfo.Text.Contains("4Z7920") ||
+                    ecuInfo.Text.Contains("8Z0920"))
                 {
-                    Log.WriteLine($"Cluster is Audi C5");
+                    var family = ecuInfo.Text.StartsWith('4') ? "C5" : "A2";
+
+                    Log.WriteLine($"Cluster is Audi {family}");
 
                     var cluster = new AudiC5Cluster(_kwp1281);
-                    
+
                     cluster.UnlockForEepromReadWrite();
-                    var dumpFileName = cluster.DumpEeprom(0, 0x800, "AudiC5.bin");
-                    
+                    var dumpFileName = cluster.DumpEeprom(0, 0x800, $"Audi{family}.bin");
+
                     var buf = File.ReadAllBytes(dumpFileName);
-                    
+
                     var skc = Utils.GetShort(buf, 0x7E2);
                     var skc2 = Utils.GetShort(buf, 0x7E4);
                     var skc3 = Utils.GetShort(buf, 0x7E6);
