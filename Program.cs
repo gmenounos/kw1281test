@@ -71,7 +71,7 @@ namespace BitFab.KW1281Test
                 // This seems to increase the accuracy of our timing loops
                 Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.RealTime;
             }
-            catch(Win32Exception)
+            catch (Win32Exception)
             {
                 // Ignore if we don't have permission to increase our priority
             }
@@ -192,7 +192,7 @@ namespace BitFab.KW1281Test
 
                 var dateString = DateTime.Now.ToString("s").Replace(':', '-');
                 _filename = $"EDC15_EEPROM_{dateString}.bin";
-                
+
                 if (!ParseAddressesAndValues(args.Skip(4).ToList(), out addressValuePairs))
                 {
                     ShowUsage();
@@ -258,7 +258,7 @@ namespace BitFab.KW1281Test
 
             using var @interface = OpenPort(portName, baudRate);
             var tester = new Tester(@interface, controllerAddress);
-            
+
             switch (command.ToLower())
             {
                 case "dumprbxmem":
@@ -404,7 +404,7 @@ namespace BitFab.KW1281Test
                 case "writeedc15eeprom":
                     tester.ReadWriteEdc15Eeprom(_filename, addressValuePairs);
                     break;
-                
+
                 case "writeeeprom":
                     tester.WriteEeprom(address, value);
                     break;
@@ -494,9 +494,16 @@ namespace BitFab.KW1281Test
                 Log.WriteLine($"Opening FTDI serial port {portName}");
                 return new FtdiInterface(portName, baudRate);
             }
+#if Linux 
+            else if (Regex.IsMatch(portName.ToUpper(), @"/DEV/"))
+            {
+                Log.WriteLine($"Opening Linux serial port {portName}");
+                return new LinuxInterface(portName, baudRate);
+            }
+#endif
             else
             {
-                Log.WriteLine($"Opening serial port {portName}");
+                Log.WriteLine($"Opening Generic serial port {portName}");
                 return new GenericInterface(portName, baudRate);
             }
         }
