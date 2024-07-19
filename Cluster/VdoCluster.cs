@@ -399,6 +399,9 @@ namespace BitFab.KW1281Test.Cluster
                 case "VWK501MH 01.00":
                     return [[0x36, 0x3D, 0x3E, 0x47]];
 
+                case "VQMJ09HH $10 $05": // 6QE920827C KOMBIINSTRUMENT VDO V06
+                    return [[0x37, 0x42, 0x47, 0x43]];
+
                 case "V599HLA  00.91": // 7D0920841A V18
                 case "V599LLA  00.91": // 7D0920801B V18
                 case "V599LLA  01.00": // 1J0920800L V59
@@ -698,6 +701,7 @@ namespace BitFab.KW1281Test.Cluster
             [0x00, 0x00, 0x03, 0x02],
             [0x00, 0x00, 0x00, 0x00],
             [0x32, 0x31, 0x36, 0x31],
+            [0x37, 0x42, 0x47, 0x43],
         ];
 
         private static string DumpMixedContent(Block block)

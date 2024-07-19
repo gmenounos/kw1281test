@@ -216,9 +216,15 @@ namespace BitFab.KW1281Test
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 (byte)(seg << 4)
             };
-            // Log.WriteLine($"SEND {Utils.Dump(block)}");
+            Log.WriteLine($"SEND {Utils.Dump(block)}");
             SendBlock(block);
             var blocks = ReceiveBlocks();
+#if true
+            foreach (var b in blocks)
+            {
+                Log.WriteLine($"Received:{Utils.Dump(b.Bytes)}");
+            }
+#endif
 
             if (blocks.Count == 1 && blocks[0] is NakBlock)
             {

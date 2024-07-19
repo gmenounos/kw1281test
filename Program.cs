@@ -404,7 +404,7 @@ namespace BitFab.KW1281Test
                 case "writeedc15eeprom":
                     tester.ReadWriteEdc15Eeprom(_filename, addressValuePairs);
                     break;
-                
+
                 case "writeeeprom":
                     tester.WriteEeprom(address, value);
                     break;

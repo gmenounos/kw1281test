@@ -211,21 +211,21 @@ namespace BitFab.KW1281Test
                 return;
             }
 
-            _kwp1281.Login(19283, 222);
+            UnlockControllerForEepromReadWrite();
 
             var dumpFileName = filename ?? "ccm_rom_dump.bin";
             const byte blockSize = 8;
 
             Log.WriteLine($"Saving CCM ROM to {dumpFileName}");
 
-            bool succeeded = true;
+            var succeeded = true;
             using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
             {
-                for (int seg = 0; seg < 16; seg++)
+                for (var seg = 0; seg < 16; seg++)
                 {
-                    for (int msb = 0; msb < 16; msb++)
+                    for (var msb = 0; msb < 16; msb++)
                     {
-                        for (int lsb = 0; lsb < 256; lsb += blockSize)
+                        for (var lsb = 0; lsb < 256; lsb += blockSize)
                         {
                             var blockBytes = _kwp1281.ReadCcmRom((byte)seg, (byte)msb, (byte)lsb, blockSize);
                             if (blockBytes == null)
@@ -700,13 +700,20 @@ namespace BitFab.KW1281Test
 
         public void LoadEeprom(uint address, string filename)
         {
-            if (_controllerAddress != (int)ControllerAddress.Cluster)
+            switch (_controllerAddress)
             {
-                Log.WriteLine("Only supported for cluster");
-                return;
+                case (int)ControllerAddress.Cluster:
+                    LoadClusterEeprom((ushort)address, filename);
+                    break;
+                case (int)ControllerAddress.CCM:
+                case (int)ControllerAddress.CentralElectric:
+                case (int)ControllerAddress.CentralLocking:
+                    LoadCcmEeprom((ushort)address, filename);
+                    break;
+                default:
+                    Log.WriteLine("Only supported for cluster, CCM, Central Locking and Central Electric");
+                    break;
             }
-
-            LoadClusterEeprom((ushort)address, filename);
         }
 
         public void MapEeprom(string? filename)
@@ -901,7 +908,7 @@ namespace BitFab.KW1281Test
 
         private void MapCcmEeprom(string? filename)
         {
-            _kwp1281.Login(19283, 222);
+            UnlockControllerForEepromReadWrite();
 
             var bytes = new List<byte>();
             const byte blockSize = 1;
@@ -936,7 +943,7 @@ namespace BitFab.KW1281Test
             var dumpFileName = filename ?? $"ccm_eeprom_${startAddress:X4}.bin";
 
             Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
-            DumpEeprom(startAddress, length, maxReadLength: 12, dumpFileName);
+            DumpEeprom(startAddress, length, maxReadLength: 8, dumpFileName);
             Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
         }
 
@@ -1037,6 +1044,25 @@ namespace BitFab.KW1281Test
             {
                 Log.WriteLine("EEPROM write failed. You should probably try again.");
             }
+        }
+
+        private void LoadCcmEeprom(ushort address, string filename)
+        {
+            _ = _kwp1281.ReadIdent();
+
+            UnlockControllerForEepromReadWrite();
+
+            if (!File.Exists(filename))
+            {
+                Log.WriteLine($"File {filename} does not exist.");
+                return;
+            }
+
+            Log.WriteLine($"Reading {filename}");
+            var bytes = File.ReadAllBytes(filename);
+
+            Log.WriteLine("Writing to cluster...");
+            WriteEeprom(address, bytes, 8);
         }
 
         private void LoadClusterEeprom(ushort address, string filename)
