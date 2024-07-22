@@ -19,13 +19,17 @@ namespace BitFab.KW1281Test.Cluster
                     $"Unexpected seed length: {seed.Length} (Expected 10)");
             }
 
+            softwareVersion ??= "";
+
             byte[] secret;
             switch (seed[8])
             {
                 case 0x01 when seed[9] == 0x00:
                     secret = VWK501Secrets[accessLevel];
                     break;
-                case 0x09 when seed[9] == 0x00 && (softwareVersion ?? "").StartsWith("VQMJ07"):
+                case 0x09 when seed[9] == 0x00 &&
+                               (softwareVersion.StartsWith("VQMJ07") ||
+                                softwareVersion.StartsWith("VQMJ09")):
                     secret = VQMJ07Secrets[accessLevel];
                     break;
                 case 0x03 when seed[9] == 0x00:
