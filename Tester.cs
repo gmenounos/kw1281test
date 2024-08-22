@@ -509,9 +509,15 @@ namespace BitFab.KW1281Test
                 var ecuInfo = Kwp1281Wakeup();
                 if (ecuInfo.Text.Contains("4B0920") ||
                     ecuInfo.Text.Contains("4Z7920") ||
+                    ecuInfo.Text.Contains("8D0920") ||
                     ecuInfo.Text.Contains("8Z0920"))
                 {
-                    var family = ecuInfo.Text.StartsWith('4') ? "C5" : "A2";
+                    var family = ecuInfo.Text[..2] switch
+                    {
+                        "8D" => "A4",
+                        "8Z" => "A2",
+                        _ => "C5"
+                    };
 
                     Log.WriteLine($"Cluster is Audi {family}");
 
