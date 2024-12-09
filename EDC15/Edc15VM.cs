@@ -245,7 +245,7 @@ namespace BitFab.KW1281Test.EDC15
             loaderLength = (loaderLength + 7) / 8 * 8; // Round up to a multiple of 8 bytes
             var buf = new byte[loaderLength];
 
-            resourceStream.Read(buf, 0, (int)resourceStream.Length);
+            resourceStream.ReadExactly(buf, 0, (int)resourceStream.Length);
 
             // In order for this loader to be executed by the ECU, the checksum of all the bytes
             // must be EFCD8631.
