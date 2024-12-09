@@ -7,11 +7,13 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading;
+using BitFab.KW1281Test.EDC15;
 
 [assembly: InternalsVisibleTo("BitFab.KW1281Test.Tests")]
 
@@ -330,7 +332,10 @@ namespace BitFab.KW1281Test
                     break;
 
                 case "dumpedc15eeprom":
-                    tester.ReadWriteEdc15Eeprom(_filename);
+                {
+                    var eeprom = tester.ReadWriteEdc15Eeprom(_filename);
+                    Edc15VM.DisplayEepromInfo(eeprom);
+                }
                     break;
 
                 case "dumpeeprom":

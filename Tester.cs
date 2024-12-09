@@ -7,8 +7,6 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
-using BitFab.KW1281Test.Blocks;
-using Parity = System.IO.Ports.Parity;
 
 namespace BitFab.KW1281Test
 {
@@ -333,7 +331,7 @@ namespace BitFab.KW1281Test
             }
         }
 
-        public string ReadWriteEdc15Eeprom(
+        public byte[] ReadWriteEdc15Eeprom(
             string? filename, List<KeyValuePair<ushort, byte>>? addressValuePairs = null)
         {
             _kwp1281.EndCommunication();
@@ -348,15 +346,13 @@ namespace BitFab.KW1281Test
                 throw new InvalidOperationException(
                     $"Unable to wake up ECU in KW2000 mode. KW version: {kwpVersion}");
             }
-            Console.WriteLine($"KW Version: {kwpVersion}");
+            Log.WriteLine($"KW Version: {kwpVersion}");
 
             var edc15 = new Edc15VM(_kwpCommon, _controllerAddress);
 
             var dumpFileName = filename ?? $"EDC15_EEPROM.bin";
 
-            edc15.ReadWriteEeprom(dumpFileName, addressValuePairs);
-
-            return dumpFileName;
+            return edc15.ReadWriteEeprom(dumpFileName, addressValuePairs);
         }
 
         public void DumpEeprom(uint address, uint length, string? filename)
@@ -587,7 +583,7 @@ namespace BitFab.KW1281Test
                     }
                     else
                     {
-                        Console.WriteLine($"Unknown cluster: {ecuInfo.Text}");
+                        Log.WriteLine($"Unknown cluster: {ecuInfo.Text}");
                     }
                 }
                 else if (ecuInfo.Text.Contains("RB4"))
@@ -632,7 +628,7 @@ namespace BitFab.KW1281Test
                     }
                     else
                     {
-                        Console.WriteLine($"Unable to determine SKC for cluster: {ecuInfo.Text}");
+                        Log.WriteLine($"Unable to determine SKC for cluster: {ecuInfo.Text}");
                     }
                 }
                 else if (ecuInfo.Text.Contains("BOO"))
@@ -650,22 +646,14 @@ namespace BitFab.KW1281Test
                 }
                 else
                 {
-                    Console.WriteLine($"Unsupported cluster: {ecuInfo.Text}");
+                    Log.WriteLine($"Unsupported cluster: {ecuInfo.Text}");
                 }
             }
             else if (_controllerAddress == (int)ControllerAddress.Ecu)
             {
                 var ecuInfo = Kwp1281Wakeup();
-                var dumpFileName = ReadWriteEdc15Eeprom(filename: null);
-                var buf = File.ReadAllBytes(dumpFileName);
-                var skc = Utils.GetShort(buf, 0x012E);
-                const ushort immo1Addr = 0x1B0;
-                var immo1 = buf[immo1Addr];
-                const ushort immo2Addr = 0x1DE;
-                var immo2 = buf[immo2Addr];
-                var immoStatus = immo1 == 0x60 && immo2 == 0x60 ? "Off" : "On";
-                Log.WriteLine($"SKC: {skc:D5}");
-                Log.WriteLine($"Immo is {immoStatus} (${immo1Addr:X3}=${immo1:X2}, ${immo2Addr:X3}=${immo2:X2})");
+                var eeprom = ReadWriteEdc15Eeprom(filename: null);
+                Edc15VM.DisplayEepromInfo(eeprom);
             }
             else
             {

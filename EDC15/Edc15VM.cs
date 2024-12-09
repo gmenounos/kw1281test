@@ -10,26 +10,26 @@ namespace BitFab.KW1281Test.EDC15
 {
     public class Edc15VM
     {
-        public void ReadWriteEeprom(
+        public byte[] ReadWriteEeprom(
             string filename,
             List<KeyValuePair<ushort, byte>>? addressValuePairs = null)
         {
             addressValuePairs ??= [];
-            
+
             var kwp2000 = new KW2000Dialog(_kwpCommon, (byte)_controllerAddress);
 
-            var resp = kwp2000.SendReceive(DiagnosticService.startDiagnosticSession, new byte[] { 0x89 });
+            _ = kwp2000.SendReceive(DiagnosticService.startDiagnosticSession, [0x89]);
 
-            resp = kwp2000.SendReceive(DiagnosticService.startDiagnosticSession, new byte[] { 0x85 });
+            _ = kwp2000.SendReceive(DiagnosticService.startDiagnosticSession, [0x85]);
 
             const byte accMod = 0x41;
-            resp = kwp2000.SendReceive(DiagnosticService.securityAccess, new byte[] { accMod });
+            var resp = kwp2000.SendReceive(DiagnosticService.securityAccess, [accMod]);
 
             // ECU normally doesn't require seed/key authentication the first time it wakes up in
             // KWP2000 mode so sending an empty key is sufficient.
             var buf = new List<byte> { accMod + 1 };
 
-            if (!Enumerable.SequenceEqual(resp.Body, new byte[] { accMod, 0x00, 0x00 }))
+            if (!resp.Body.SequenceEqual(new byte[] { accMod, 0x00, 0x00 }))
             {
                 // Normally we'll only get here if we wake up the ECU and it's already in KWP2000 mode,
                 // which can happen if a previous download attempt did not complete. In that case we
@@ -39,18 +39,17 @@ namespace BitFab.KW1281Test.EDC15
 
                 buf.AddRange(keyBuf);
             }
-            resp = kwp2000.SendReceive(DiagnosticService.securityAccess, buf.ToArray());
+            _ = kwp2000.SendReceive(DiagnosticService.securityAccess, buf.ToArray());
 
             var loader = Edc15VM.GetLoader();
             var len = loader.Length;
 
             // Ask the ECU to accept our loader and store it in RAM
-            resp = kwp2000.SendReceive(DiagnosticService.requestDownload, new byte[]
-            {
+            _ = kwp2000.SendReceive(DiagnosticService.requestDownload, [
                 0x40, 0xE0, 0x00, // Load address 0x40E000
                 0x00, // Not compressed, not encrypted
                 (byte)(len >> 16), (byte)(len >> 8), (byte)(len & 0xFF) // Length
-            },
+                ],
             excludeAddresses: true);
 
             // Break the loader into blocks and send each one
@@ -67,20 +66,20 @@ namespace BitFab.KW1281Test.EDC15
                     break;
                 }
 
-                resp = kwp2000.SendReceive(
+                _ = kwp2000.SendReceive(
                     DiagnosticService.transferData, blockBytes.Take(readCount).ToArray(),
                     excludeAddresses: true);
             }
 
             // Ask the ECU to execute our loader
             kwp2000.SendMessage(
-                DiagnosticService.startRoutineByLocalIdentifier, new byte[] { 0x02 },
+                DiagnosticService.startRoutineByLocalIdentifier, [0x02],
                 excludeAddresses: true);
-            resp = kwp2000.ReceiveMessage();
+            _ = kwp2000.ReceiveMessage();
 
             // Custom loader command to send all 512 bytes of the EEPROM
             kwp2000.SendMessage(
-                (DiagnosticService)0xA6, Array.Empty<byte>(),
+                (DiagnosticService)0xA6, [],
                 excludeAddresses: true);
             resp = kwp2000.ReceiveMessage();
             if (!resp.IsPositiveResponse(DiagnosticService.transferData))
@@ -88,18 +87,16 @@ namespace BitFab.KW1281Test.EDC15
                 throw new InvalidOperationException($"Dump EEPROM failed.");
             }
 
-            var eeprom = new List<byte>();
-            byte b;
-            for (int i = 0; i < 512; i++)
+            var eeprom = new byte[512];
+            for (var i = 0; i < 512; i++)
             {
-                b = _kwpCommon.Interface.ReadByte();
-                eeprom.Add(b);
+                eeprom[i] = _kwpCommon.Interface.ReadByte();
             }
 
-            File.WriteAllBytes(filename, eeprom.ToArray());
+            File.WriteAllBytes(filename, eeprom);
             Log.WriteLine($"Saved EEPROM to {filename}");
 
-            resp = kwp2000.ReceiveMessage();
+            _ = kwp2000.ReceiveMessage();
 
             // Now write any supplied values
             foreach (var addressValuePair in addressValuePairs)
@@ -108,9 +105,9 @@ namespace BitFab.KW1281Test.EDC15
                     addressValuePair.Key > 0xFF
                         ? 0xA8  // Write 1 byte to EEPROM (Page 1)
                         : 0xA7); // Write 1 byte to EEPROM (Page 0)
-                
+
                 kwp2000.SendMessage(
-                    service, Array.Empty<byte>(),
+                    service, [],
                     excludeAddresses: true);
                 resp = kwp2000.ReceiveMessage();
                 if (!resp.IsPositiveResponse(DiagnosticService.transferData))
@@ -124,25 +121,57 @@ namespace BitFab.KW1281Test.EDC15
                 _kwpCommon.WriteByte(address);
                 _kwpCommon.WriteByte(value);
                 Log.WriteLine($"Sent: {address:X2} {value:X2}");
-                
+
                 resp = kwp2000.ReceiveMessage();
                 if (!resp.IsPositiveResponse(DiagnosticService.transferData))
                 {
                     throw new InvalidOperationException($"Write EEPROM failed.");
                 }
             }
-            
+
             // Custom loader command to reboot the ECU to return it to normal operation.
             kwp2000.SendMessage(
-                    (DiagnosticService)0xA2, Array.Empty<byte>(),
+                    (DiagnosticService)0xA2, [],
                 excludeAddresses: true);
-            resp = kwp2000.ReceiveMessage();
+            _ = kwp2000.ReceiveMessage();
 
-            b = _kwpCommon.Interface.ReadByte();
+            var b = _kwpCommon.Interface.ReadByte();
             if (b == 0x55)
             {
                 Log.WriteLine($"Reboot successful!");
             }
+
+            return eeprom;
+        }
+
+        public static void DisplayEepromInfo(ReadOnlySpan<byte> eeprom)
+        {
+            var skc = Utils.GetShort(eeprom, 0x12E);
+            Log.WriteLine($"SKC: {skc:D5}");
+
+            double odometerKm =
+                eeprom[0x1BF] +
+                (eeprom[0x1C0] << 8) +
+                (eeprom[0x1C1] << 16) +
+                ((eeprom[0x1C2] & 0x3F) << 24);
+            odometerKm /= 100.0;
+            Log.WriteLine($"Odometer: {odometerKm} km");
+
+            var vin = Utils.DumpAscii(eeprom.Slice(0x140, 17).ToArray());
+            Log.WriteLine($"VIN: {vin}");
+
+            var immoNumber = Utils.DumpAscii(eeprom.Slice(0x131, 14).ToArray());
+            Log.WriteLine($"Immo Number: {immoNumber}");
+
+            var immoId = Utils.DumpBytes(eeprom.Slice(0x126, 7).ToArray());
+            Log.WriteLine($"Immo Id: {immoId}");
+
+            const ushort immo1Addr = 0x1B0;
+            var immo1 = eeprom[immo1Addr];
+            const ushort immo2Addr = 0x1DE;
+            var immo2 = eeprom[immo2Addr];
+            var immoStatus = immo1 == 0x60 && immo2 == 0x60 ? "Off" : "On";
+            Log.WriteLine($"Immo is {immoStatus} (${immo1Addr:X3}=${immo1:X2}, ${immo2Addr:X3}=${immo2:X2})");
         }
 
         /// <summary>
@@ -151,32 +180,28 @@ namespace BitFab.KW1281Test.EDC15
         /// </summary>
         private static byte[] LVL41Auth(long key, long key3, byte[] buf)
         {
-            long key1;
-            long key2;
-            //long Key3 = 0x3800000;
-            long tempstring;
-            tempstring = buf[0];
+            // long Key3 = 0x3800000;
+            long tempstring = buf[0];
             tempstring <<= 8;
-            long keyread1 = tempstring + buf[1];
+            var keyread1 = tempstring + buf[1];
             tempstring = buf[2];
             tempstring <<= 8;
-            long keyread2 = tempstring + buf[3];
-            //Process the algorithm 
-            key2 = key;
+            var keyread2 = tempstring + buf[3];
+            // Process the algorithm
+            var key2 = key;
             key2 &= 0xFFFF;
             key >>= 16;
-            key1 = key;
+            var key1 = key;
             for (byte counter = 0; counter < 5; counter++)
             {
-                long temp1;
-                long keyTemp = keyread1;
+                var keyTemp = keyread1;
                 keyTemp &= 0x8000;
                 keyread1 <<= 1;
-                temp1 = keyTemp & 0x0FFFF;
+                var temp1 = keyTemp & 0x0FFFF;
                 if (temp1 == 0)
                 {
-                    long temp2 = keyread2 & 0xFFFF;
-                    long temp3 = keyTemp & 0xFFFF0000;
+                    var temp2 = keyread2 & 0xFFFF;
+                    var temp3 = keyTemp & 0xFFFF0000;
                     keyTemp = temp2 + temp3;
                     keyread1 &= 0xFFFE;
                     temp2 = keyTemp & 0xFFFF;
@@ -188,13 +213,11 @@ namespace BitFab.KW1281Test.EDC15
                 }
                 else
                 {
-                    long temp2;
-                    long temp3;
                     keyTemp = keyread2 + keyread2;
                     keyread1 &= 0xFFFE;
-                    temp2 = keyTemp & 0xFF;
+                    var temp2 = keyTemp & 0xFF;
                     temp2 |= 1;
-                    temp3 = key3 & 0xFFFFFF00;
+                    var temp3 = key3 & 0xFFFFFF00;
                     key3 = temp2 + temp3;
                     key3 &= 0xFFFF00FF;
                     key3 |= keyTemp;
@@ -212,7 +235,7 @@ namespace BitFab.KW1281Test.EDC15
                     keyread1 = keyTemp;
                 }
             }
-            //Done with the key generation 
+            //Done with the key generation
             keyread2 &= 0xFFFF; // Clean first and second word from garbage
             keyread1 &= 0xFFFF;
 
@@ -278,13 +301,13 @@ namespace BitFab.KW1281Test.EDC15
             var paddingH = (ushort)(0xDF9B ^ r6);
             var paddingL = (ushort)(r1 - 0xAB85);
 
-            return new[]
-            {
+            return
+            [
                 (byte)(paddingL & 0xFF),
                 (byte)(paddingL >> 8),
                 (byte)(paddingH & 0xFF),
-                (byte)(paddingH >> 8),
-            };
+                (byte)(paddingH >> 8)
+            ];
         }
 
         /// <summary>

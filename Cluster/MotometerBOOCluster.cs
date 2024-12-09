@@ -131,7 +131,7 @@ namespace BitFab.KW1281Test.Cluster
         {
             Log.WriteLine("Sending 0x43 block");
 
-            _kwp1281.SendBlock(new List<byte> { 0x43 });
+            _kwp1281.SendBlock([0x43]);
             var blocks = _kwp1281.ReceiveBlocks().Where(b => !b.IsAckNak).ToList();
             foreach (var block in blocks)
             {

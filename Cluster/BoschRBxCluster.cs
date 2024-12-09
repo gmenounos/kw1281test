@@ -39,7 +39,7 @@ namespace BitFab.KW1281Test.Cluster
             const int maxTries = 16;
             for (var i = 0; i < maxTries; i++)
             {
-                responseMsg = _kwp2000.SendReceive(Service.securityAccess, new byte[] { accessMode });
+                responseMsg = _kwp2000.SendReceive(Service.securityAccess, [accessMode]);
                 if (responseMsg.Body[0] != accessMode)
                 {
                     throw new InvalidOperationException($"Received unexpected accessMode: {responseMsg.Body[0]:X2}");

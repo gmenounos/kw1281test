@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
@@ -100,7 +101,7 @@ namespace BitFab.KW1281Test
         /// <summary>
         /// Little-Endian
         /// </summary>
-        public static ushort GetShort(byte[] buf, int offset)
+        public static ushort GetShort(ReadOnlySpan<byte> buf, int offset)
         {
             return (ushort)(buf[offset] + buf[offset + 1] * 256);
         }
