@@ -2,7 +2,7 @@
 
 namespace BitFab.KW1281Test.Interface
 {
-    class GenericInterface : IInterface
+    internal class GenericInterface : IInterface
     {
         public GenericInterface(string portName, int baudRate)
         {
