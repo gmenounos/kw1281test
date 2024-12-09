@@ -11,7 +11,7 @@ namespace BitFab.KW1281Test.Cluster
         /// 8-byte key block.
         /// </summary>
         public static byte[] FindKey(
-            byte[] seed, int accessLevel, string? softwareVersion)
+            byte[] seed, int accessLevel)
         {
             if (seed.Length != 10)
             {
@@ -19,22 +19,20 @@ namespace BitFab.KW1281Test.Cluster
                     $"Unexpected seed length: {seed.Length} (Expected 10)");
             }
 
-            softwareVersion ??= "";
-
             byte[] secret;
             switch (seed[8])
             {
                 case 0x01 when seed[9] == 0x00:
                     secret = VWK501Secrets[accessLevel];
                     break;
-                case 0x09 when seed[9] == 0x00 &&
-                               (softwareVersion.StartsWith("VQMJ07") ||
-                                softwareVersion.StartsWith("VQMJ09")):
+                case 0x03 when seed[9] == 0x00:
+                    secret = VSQX01Secrets[accessLevel];
+                    break;
+                case 0x09 when seed[9] == 0x00:
                     secret = VQMJ07Secrets[accessLevel];
                     break;
-                case 0x03 when seed[9] == 0x00:
-                case 0x09 when seed[9] == 0x00:
-                    secret = VSQX01Secrets[accessLevel];
+                case 0x0D when seed[9] == 0x00:
+                    secret = KB5M07Secrets[accessLevel];
                     break;
                 default:
                     Log.WriteLine(
@@ -95,6 +93,21 @@ namespace BitFab.KW1281Test.Cluster
             [0xe7, 0xb4, 0x71, 0x86],
             [0x4f, 0x58, 0xcd, 0x81],
             [0xfd, 0x8e, 0x31, 0x96]    // AccessLevel 7
+        ];
+
+        /// <summary>
+        /// Table of secrets, one for each access level.
+        /// </summary>
+        private static readonly byte[][] KB5M07Secrets =
+        [
+            [0xc9, 0x18, 0xe6, 0x6e],  // AccessLevel 0
+            [0x69, 0xc3, 0x08, 0xcd],
+            [0x37, 0x15, 0xd3, 0x23],
+            [0xe1, 0xe1, 0xa9, 0x3b],
+            [0x19, 0x74, 0x72, 0x18],
+            [0x08, 0x2b, 0x49, 0x1a],
+            [0x82, 0xd1, 0x7d, 0x50],
+            [0x0a, 0x5b, 0x41, 0x4f]    // AccessLevel 7
         ];
 
         /// <summary>

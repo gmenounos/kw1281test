@@ -262,7 +262,7 @@ namespace BitFab.KW1281Test.Cluster
                 Log.WriteLine($"Block: {Utils.Dump(customBlock.Body)}");
 
                 var keyBytes = VdoKeyFinder.FindKey(
-                    customBlock.Body.ToArray(), MaxAccessLevel, softwareVersion);
+                    customBlock.Body.ToArray(), MaxAccessLevel);
 
                 Log.WriteLine("Sending Custom \"Key response\" block");
 
@@ -371,26 +371,29 @@ namespace BitFab.KW1281Test.Cluster
                 case "VAT500MH 01.20": // 1J5920925C V09
                     return [[0x01, 0x04, 0x3D, 0x35]];
 
-                case "$01 $00 $14 $01": // 1J0919860B  A4-KOMBIINSTR. VDO V15
+                case "$01 $00 $14 $01": // 1J0919860B V15
                     return [[0x01, 0x08, 0x05, 0x02]];
 
                 case "V798MLA 01.00": // 7D0920800F V01, 1J0919951C V55
                     return [[0x02, 0x03, 0x05, 0x09]];
 
-                case "$00 $00 $13 $01": // 8D0919880M  B5-KOMBIINSTR. VDO D02
+                case "$00 $00 $13 $01": // 8D0919880M D02
                     return [[0x09, 0x06, 0x05, 0x02]];
 
-                case "VSQX01LM 01.00": // 6Q0920800  KOMBI+WEGFAHRSP VDO V11
+                case "VSQX01LM 01.00": // 6Q0920800 V11
                     return [[0x31, 0x39, 0x34, 0x46]];
 
-                case "VCLM09MH $00 $09": // 3BD920848E KOMBI+WEGFAHRSP VDO V03
+                case "VCLM09MH $00 $09": // 3BD920848E V03
                     return [[0x32, 0x31, 0x36, 0x31]];
 
-                case "VQMJ07HH 08.40": // 6Y0920843L  KOMBIINSTRUMENT VDO V04
-                case "VQMJ07LM 09.00": // 6Q0920804Q  KOMBIINSTRUMENT VDO V06
+                case "VCB07LL  09.00": // 1JD920826E V01
+                    return [[0x33, 0x34, 0x46, 0x4A]];
+
+                case "VQMJ07HH 08.40": // 6Y0920843L V04
+                case "VQMJ07LM 09.00": // 6Q0920804Q V06
                     return [[0x34, 0x3F, 0x43, 0x39]];
 
-                case "VQMJ06LM 09.00": // 6Q0920903   KOMBI+WEGFAHRSP VDO V02
+                case "VQMJ06LM 09.00": // 6Q0920903 V02
                     return [[0x35, 0x3D, 0x47, 0x3E]];
 
                 case "VWK501LL 00.88": // 1J0920906L V58
@@ -399,9 +402,10 @@ namespace BitFab.KW1281Test.Cluster
                 case "VWK501MH 01.00":
                     return [[0x36, 0x3D, 0x3E, 0x47]];
 
-                case "VQMJ09HH 05.10": // 6QE920827C KOMBIINSTRUMENT VDO V06
+                case "VQMJ09HH 05.10": // 6QE920827C V06
                     return [[0x37, 0x42, 0x47, 0x43]];
 
+                case "S599CAA  01.00": // 1M0920800C V15
                 case "V599HLA  00.91": // 7D0920841A V18
                 case "V599LLA  00.91": // 7D0920801B V18
                 case "V599LLA  01.00": // 1J0920800L V59
@@ -422,6 +426,7 @@ namespace BitFab.KW1281Test.Cluster
                 case "SS5501LM 01.00": // 1M0920802D V05
                     return [[0x3C, 0x34, 0x47, 0x35]];
 
+                case "KB5M07HH 09.00": // 3U0920842B V06
                 case "VWK503LL 09.00":
                 case "VWK503MH 09.00": // 1J0920927 V02
                     return [[0x3E, 0x35, 0x3D, 0x3A]];
@@ -429,10 +434,10 @@ namespace BitFab.KW1281Test.Cluster
                 case "VMMJ08MH 09.00": // 1J5920826L V75
                     return [[0x3E, 0x47, 0x3D, 0x48]];
 
-                case "VSQX01LM 01.10": // 6Q0920900  KOMBI+WEGFAHRSP VDO V18
+                case "VSQX01LM 01.10": // 6Q0920900 V18
                     return [[0x43, 0x43, 0x3D, 0x37]];
 
-                case "KPQMLA` $01": // 6Y1920860G KOMBIINSTRUMENT VDO V12
+                case "KPQMLA` $01": // 6Y1920860G V12
                     return [[0x47, 0x3B, 0x31, 0x3F]];
 
                 default:
