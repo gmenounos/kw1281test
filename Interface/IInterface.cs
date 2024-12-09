@@ -29,9 +29,9 @@ namespace BitFab.KW1281Test.Interface
         void SetDtr(bool on);
 
         void SetRts(bool on);
-        
+
         int ReadTimeout { get; set; }
-        
+
         int WriteTimeout { get; set; }
     }
 }
