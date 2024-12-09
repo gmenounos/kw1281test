@@ -91,7 +91,7 @@ namespace BitFab.KW1281Test.Cluster
             Log.WriteLine($"entryH: 0x{entryH:X2}, regBlockH: 0x{regBlockH:X2}, count: 0x{count:X4}");
 
             Log.WriteLine("Sending block 0x6C");
-            _kwp1281.SendBlock(new List<byte> { 0x6C });
+            _kwp1281.SendBlock([0x6C]);
 
             Thread.Sleep(250);
 
@@ -120,7 +120,7 @@ namespace BitFab.KW1281Test.Cluster
 
             var program = new byte[]
             {
-                entryH, 0x00, // Address $xx00 
+                entryH, 0x00, // Address $xx00
 
                 0x14, 0x50,                     // orcc #$50
                 0x07, 0x32,                     // bsr FeedWatchdog
@@ -234,7 +234,7 @@ namespace BitFab.KW1281Test.Cluster
             "8N1919880E KOMBI+WEGFAHRS. M73 D23",   // Audi TT
             "8N1920930",    // Audi TT 8N1920930B M73 D23
         ];
-        
+
         private bool HasSmallEeprom() => _smallEepromEcus.Any(model => _ecuInfo.Contains(model));
 
         private readonly string[] _largeEepromEcus =
@@ -242,12 +242,13 @@ namespace BitFab.KW1281Test.Cluster
             "1C0920921",    // Beetle 1C0920921G M73 V08
             "1C0920941",    // Beetle 1C0920941LX M73 V03
             "1C0920951",    // Beetle 1C0920951A M73 V02
-            "8N1919880E KOMBI+WEGFAHRS. M73 D26",    // Audi TT
+            "8L0920900B  KOMBI+WEGFAHRS. M73 D13",  // Audi A3 8L 2002 (ASZ diesel engine)
+            "8N1919880E KOMBI+WEGFAHRS. M73 D26",   // Audi TT
             "8N1920980",    // Audi TT 8N1920980E M73 D14
             "8N2920930",    // Audi TT 8N2920930C M73 D55
             "8N2920980",    // Audi TT 8N2920980A M73 D14
         ];
-        
+
         private bool HasLargeEeprom() => _largeEepromEcus.Any(model => _ecuInfo.Contains(model));
 
         /// <summary>
@@ -341,7 +342,7 @@ namespace BitFab.KW1281Test.Cluster
 
             return null;
         }
-        
+
         private readonly IKW1281Dialog _kwp1281;
         private readonly string _ecuInfo;
 
