@@ -1,6 +1,6 @@
 ﻿using BitFab.KW1281Test.Interface;
 using System;
-using System.Diagnostics;
+using System.Collections.Generic;
 using System.Runtime;
 using System.Threading;
 
@@ -23,14 +23,14 @@ namespace BitFab.KW1281Test
         void ReadComplement(byte b);
     }
 
-    class KwpCommon : IKwpCommon
+    internal class KwpCommon : IKwpCommon
     {
         public IInterface Interface { get; }
 
         public int WakeUp(byte controllerAddress, bool evenParity)
         {
             // Disable garbage collection int this time-critical method
-            bool noGC = GC.TryStartNoGCRegion(1024 * 1024);
+            var noGC = GC.TryStartNoGCRegion(1024 * 1024);
             if (!noGC)
             {
                 Log.WriteLine("Warning: Unable to disable GC so timing may be compromised.");
@@ -86,6 +86,10 @@ namespace BitFab.KW1281Test
             Interface.ClearReceiveBuffer();
 
             Log.WriteLine("Reading sync byte");
+
+            // Buffer logging in memory until we're done with the wakeup, which is sensitive to timing
+            var logLines = new List<string>();
+
             var syncByte = Interface.ReadByte();
 
             if (syncByte != 0x55)
@@ -94,27 +98,30 @@ namespace BitFab.KW1281Test
                     $"Unexpected sync byte: Expected $55, Actual ${syncByte:X2}");
             }
 
-            var keywordLsb = Interface.ReadByte();
-            Log.WriteLine($"Keyword Lsb ${keywordLsb:X2}");
-
-            var keywordMsb = ReadByte();
-
-            Log.WriteLine($"Keyword Msb ${keywordMsb:X2}");
-
-            var protocolVersion = ((keywordMsb & 0x7F) << 7) + (keywordLsb & 0x7F);
-            Log.WriteLine($"Protocol is KW {protocolVersion} (8N1)");
-
-            if (protocolVersion >= 2000)
+            int protocolVersion;
+            try
             {
-                BusyWait.Delay(25); // The EDC15 ECU needs a longer delay before writing the keywordMsb complement
-            }
-            else
-            {
-                BusyWait.Delay(10); // Supposed to be 25 but communicating with the UART takes a few ms
-            }
+                var keywordLsb = Interface.ReadByte();
+                logLines.Add($"Keyword Lsb ${keywordLsb:X2}");
 
-            var complement = (byte)~keywordMsb;
-            WriteByte(complement);
+                var keywordMsb = ReadByte();
+                logLines.Add($"Keyword Msb ${keywordMsb:X2}");
+
+                protocolVersion = ((keywordMsb & 0x7F) << 7) + (keywordLsb & 0x7F);
+                logLines.Add($"Protocol is KW {protocolVersion} (8N1)");
+
+                BusyWait.Delay(25);
+
+                var complement = (byte)~keywordMsb;
+                WriteByte(complement);
+            }
+            finally
+            {
+                foreach (var line in logLines)
+                {
+                    Log.WriteLine(line);
+                }
+            }
 
             if (protocolVersion >= 2000)
             {
