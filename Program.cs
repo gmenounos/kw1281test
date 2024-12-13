@@ -499,9 +499,16 @@ namespace BitFab.KW1281Test
                 Log.WriteLine($"Opening FTDI serial port {portName}");
                 return new FtdiInterface(portName, baudRate);
             }
+#if Linux
+            else if (Regex.IsMatch(portName.ToUpper(), @"/DEV/"))
+            {
+                Log.WriteLine($"Opening Linux serial port {portName}");
+                return new LinuxInterface(portName, baudRate);
+            }
+#endif
             else
             {
-                Log.WriteLine($"Opening serial port {portName}");
+                Log.WriteLine($"Opening Generic serial port {portName}");
                 return new GenericInterface(portName, baudRate);
             }
         }
