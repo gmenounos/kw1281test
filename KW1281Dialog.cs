@@ -243,7 +243,7 @@ namespace BitFab.KW1281Test
 
         public bool WriteEeprom(ushort address, List<byte> values)
         {
-            Log.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Values: {Utils.DumpBytes(values)}");
+            Log.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Values: {Utils.Dump(values, true)}");
 
             byte count = (byte)values.Count;
             var sendBody = new List<byte>
@@ -374,7 +374,7 @@ namespace BitFab.KW1281Test
                     Log.WriteLine("Blocks received:");
                     foreach (var block in blocks)
                     {
-                        Log.WriteLine($"Block: {Utils.DumpBytes(block.Bytes)}");
+                        Log.WriteLine($"Block: {Utils.Dump(block.Bytes, true)}");
                     }
                 }
                 throw;
@@ -441,7 +441,7 @@ namespace BitFab.KW1281Test
             catch (Exception ex)
             {
                 Log.WriteLine($"Error receiving block: {ex.Message}");
-                Log.WriteLine($"Partial block: {Utils.DumpBytes(blockBytes)}");
+                Log.WriteLine($"Partial block: {Utils.Dump(blockBytes, true)}");
                 if (ex is TimeoutException)
                 {
                     Log.WriteLine($"Read timeout: {KwpCommon.Interface.ReadTimeout}");

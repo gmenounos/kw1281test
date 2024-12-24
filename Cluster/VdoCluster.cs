@@ -726,7 +726,7 @@ namespace BitFab.KW1281Test.Cluster
                 return "NAK";
             }
 
-            return Utils.DumpBytes(block.Body);
+            return Utils.Dump(block.Body, true);
         }
 
         private void DumpEeprom(

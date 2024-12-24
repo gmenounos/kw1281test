@@ -23,7 +23,7 @@ namespace BitFab.KW1281Test.Blocks
             if (bodyBytes.Count > 0)
             {
                 throw new InvalidOperationException(
-                    $"{nameof(GroupReadResponseBlock)} body ({Utils.DumpBytes(Body)}) should be a multiple of 3 bytes long.");
+                    $"{nameof(GroupReadResponseBlock)} body ({Utils.Dump(Body, true)}) should be a multiple of 3 bytes long.");
             }
         }
 

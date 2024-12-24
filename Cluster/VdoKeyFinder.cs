@@ -41,7 +41,7 @@ namespace BitFab.KW1281Test.Cluster
                     break;
             }
 
-            Log.WriteLine($"Access level {accessLevel} secret: {Utils.DumpBytes(secret)}");
+            Log.WriteLine($"Access level {accessLevel} secret: {Utils.Dump(secret, true)}");
 
             var key = CalculateKey(
                 [seed[1], seed[3], seed[5], seed[7]],

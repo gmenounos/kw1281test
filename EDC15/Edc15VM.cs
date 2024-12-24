@@ -163,7 +163,7 @@ namespace BitFab.KW1281Test.EDC15
             var immoNumber = Utils.DumpAscii(eeprom.Slice(0x131, 14).ToArray());
             Log.WriteLine($"Immo Number: {immoNumber}");
 
-            var immoId = Utils.DumpBytes(eeprom.Slice(0x126, 7).ToArray());
+            var immoId = Utils.Dump(eeprom.Slice(0x126, 7).ToArray(), true);
             Log.WriteLine($"Immo Id: {immoId}");
 
             const ushort immo1Addr = 0x1B0;

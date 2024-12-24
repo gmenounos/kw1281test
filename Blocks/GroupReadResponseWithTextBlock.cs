@@ -20,7 +20,7 @@ namespace BitFab.KW1281Test.Blocks
                 if (bodyBytes.Count < subBlockBodyLength)
                 {
                     throw new InvalidOperationException(
-                        $"{nameof(GroupReadResponseWithTextBlock)} body ({Utils.DumpBytes(Body)}) contains extra bytes after sub-blocks.");
+                        $"{nameof(GroupReadResponseWithTextBlock)} body ({Utils.Dump(Body, true)}) contains extra bytes after sub-blocks.");
                 }
 
                 var subBlock = new SubBlock
@@ -43,7 +43,7 @@ namespace BitFab.KW1281Test.Blocks
             if (bodyBytes.Count > 0)
             {
                 throw new InvalidOperationException(
-                    $"{nameof(GroupReadResponseWithTextBlock)} body ({Utils.DumpBytes(Body)}) contains extra bytes after sub-blocks.");
+                    $"{nameof(GroupReadResponseWithTextBlock)} body ({Utils.Dump(Body, true)}) contains extra bytes after sub-blocks.");
             }
         }
 
