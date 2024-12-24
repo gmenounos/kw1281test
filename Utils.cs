@@ -225,8 +225,9 @@ namespace BitFab.KW1281Test
             // Split the input string into an array of hexadecimal strings
             var hexValues = input.Split(' ').ToList();
             var inputLength = hexValues.Count;
+            var charCount = input.Trim().Replace(" ", "").Length;
 
-            if (inputLength != 1 && inputLength != 8 && inputLength != 16 || input.Trim().Length != 32)
+            if (inputLength != 1 && inputLength != 8 && inputLength != 16 || charCount != 32)
             {
                 throw new ArgumentException("Input must be 32 characters and in one of the following formats: 'FFFFFFFF...', 'FFFF FFFF F...', 'FF FF FF FF F...'.");
             }
