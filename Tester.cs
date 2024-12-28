@@ -644,6 +644,10 @@ namespace BitFab.KW1281Test
                     var skc = Utils.GetBcd(buf, 0x08);
                     Log.WriteLine($"SKC: {skc:D5}");
                 }
+                else if (ecuInfo.Text.Contains("AGD"))
+                {
+                    Log.WriteLine($"Unsupported Magneti Marelli AGD cluster: {ecuInfo.Text}");
+                }
                 else
                 {
                     Log.WriteLine($"Unsupported cluster: {ecuInfo.Text}");

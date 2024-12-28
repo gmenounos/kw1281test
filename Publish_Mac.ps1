@@ -1,10 +1,10 @@
 dotnet publish kw1281test.csproj /p:PublishProfile=Win
 dotnet publish kw1281test.csproj /p:PublishProfile=Mac
-# dotnet publish kw1281test.csproj /p:PublishProfile=LinuxArm
+dotnet publish kw1281test.csproj /p:PublishProfile=Linux-Arm64
 dotnet publish kw1281test.csproj /p:PublishProfile=Linux-x64
 
 $Here = (Get-Location).Path
-$PublishSourceDir = "$Here/bin/Release/net8.0/publish"
+$PublishSourceDir = "$Here/bin/Release/net9.0/publish"
 $GitHubDir = "$Here/GitHub"
 
 Remove-Item -Path $GitHubDir/*.*
@@ -21,11 +21,11 @@ zip $MacZip kw1281test
 Move-Item -Force -Path $MacZip -Destination "$GitHubDir/"
 Pop-Location
 
-# $LinuxArmZip = "kw1281test_$($Version)_LinuxArm.zip"
-# Push-Location -Path "$PublishSourceDir/LinuxArm/"
-# zip $LinuxArmZip kw1281test
-# Move-Item -Force -Path $LinuxArmZip -Destination "$GitHubDir/"
-# Pop-Location
+$LinuxArmZip = "kw1281test_$($Version)_Linux-Arm64.zip"
+Push-Location -Path "$PublishSourceDir/Linux-Arm64/"
+zip $LinuxArmZip kw1281test
+Move-Item -Force -Path $LinuxArmZip -Destination "$GitHubDir/"
+Pop-Location
 
 $LinuxZip = "kw1281test_$($Version)_Linux-x64.zip"
 Push-Location -Path "$PublishSourceDir/Linux-x64/"
