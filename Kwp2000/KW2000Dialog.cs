@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Threading;
 using Service = BitFab.KW1281Test.Kwp2000.DiagnosticService;
 
@@ -172,6 +173,7 @@ namespace BitFab.KW1281Test
                 message = new Kwp2000Message(
                     _controllerAddress, _testerAddress, service, body);
             }
+            var checksum = message.CalcChecksum();
             Sleep(P3);
 
             foreach (var b in message.HeaderBytes)
@@ -189,7 +191,7 @@ namespace BitFab.KW1281Test
                 Sleep(P4);
             }
 
-            _kwpCommon.WriteByte(message.Checksum);
+            _kwpCommon.WriteByte(checksum);
 
             Log.WriteLine($"Sent: {message}");
         }

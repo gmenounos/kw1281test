@@ -7,13 +7,13 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using BitFab.KW1281Test.EDC15;
+using System.Runtime.InteropServices;
 
 [assembly: InternalsVisibleTo("BitFab.KW1281Test.Tests")]
 
@@ -499,9 +499,15 @@ namespace BitFab.KW1281Test
                 Log.WriteLine($"Opening FTDI serial port {portName}");
                 return new FtdiInterface(portName, baudRate);
             }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) &&
+                portName.StartsWith("/dev/", StringComparison.CurrentCultureIgnoreCase))
+            {
+                Log.WriteLine($"Opening Linux serial port {portName}");
+                return new LinuxInterface(portName, baudRate);
+            }
             else
             {
-                Log.WriteLine($"Opening serial port {portName}");
+                Log.WriteLine($"Opening Generic serial port {portName}");
                 return new GenericInterface(portName, baudRate);
             }
         }
@@ -509,7 +515,9 @@ namespace BitFab.KW1281Test
         private static void ShowUsage()
         {
             Log.WriteLine(@"Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
-    PORT = COM1|COM2|etc.
+    PORT = COM1|COM2|etc. (Windows)
+           
+           /dev/ttyUSB0 (Linux)
     BAUD = 10400|9600|etc.
     ADDRESS = The controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
     COMMAND =
