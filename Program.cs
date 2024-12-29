@@ -516,8 +516,8 @@ namespace BitFab.KW1281Test
         {
             Log.WriteLine(@"Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
     PORT = COM1|COM2|etc. (Windows)
-           
-           /dev/ttyUSB0 (Linux)
+           /dev/ttyXXXX (Linux)
+           AABBCCDD (macOS/Linux FTDI cable serial number)
     BAUD = 10400|9600|etc.
     ADDRESS = The controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
     COMMAND =

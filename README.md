@@ -31,7 +31,9 @@ Or, load up the project in Visual Studio and Ctrl-Shift-B.
 
 ```
 Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
-    PORT = COM1|COM2|etc.
+    PORT = COM1|COM2|etc. (Windows)
+           /dev/ttyXXXX (Linux)
+           AABBCCDD (macOS/Linux FTDI cable serial number)
     BAUD = 10400|9600|etc.
     ADDRESS = The controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
     COMMAND =
@@ -110,3 +112,5 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
     - [IJskonijn](https://github.com/IJskonijn)
     - [jpadie](https://github.com/jpadie)
     - [kerekt](https://github.com/kerekt)
+    - [Olivier Fauchon](https://github.com/ofauchon)
+    - [Jonathan Klamroth](https://github.com/jonnykl)
