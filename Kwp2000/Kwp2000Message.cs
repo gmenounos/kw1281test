@@ -20,7 +20,16 @@ namespace BitFab.KW1281Test.Kwp2000
 
         public List<byte> Body { get; }
 
-        public byte Checksum { get => CalcChecksum(); }
+        public byte CalcChecksum()
+        {
+            return (byte)(
+                FormatByte +
+                (DestAddress ?? 0) +
+                (SrcAddress ?? 0) +
+                (LengthByte ?? 0) +
+                (byte)Service +
+                Body.Sum(b => b));
+        }
 
         public Kwp2000Message(
             DiagnosticService service, IList<byte> body)
@@ -145,17 +154,6 @@ namespace BitFab.KW1281Test.Kwp2000
         {
             var length = body.Count + 1;
             return length > 63 ? (byte)length : null;
-        }
-
-        private byte CalcChecksum()
-        {
-            return (byte)(
-                FormatByte +
-                (DestAddress ?? 0) +
-                (SrcAddress ?? 0) +
-                (LengthByte ?? 0) +
-                (byte)Service +
-                Body.Sum(b => b));
         }
     }
 }
