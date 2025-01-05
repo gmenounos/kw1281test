@@ -14,7 +14,7 @@
         writeMemoryByAddress = 0x3D,
         testerPresent = 0x3E,
         startCommunication = 0x81,
-        stopCommunicatiom = 0x82,
+        stopCommunication = 0x82,
         accessTimingParameters = 0x83,
     };
 }
