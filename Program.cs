@@ -1,4 +1,5 @@
 ﻿global using static BitFab.KW1281Test.Program;
+using BitFab.KW1281Test.Cluster;
 using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
 using BitFab.KW1281Test.Logging;
@@ -50,13 +51,13 @@ namespace BitFab.KW1281Test
             {
                 if (args.Length == 2 && args[0].Contains("mileage", StringComparison.InvariantCultureIgnoreCase))
                 {
-                    if (string.Equals(args[0], nameof(Utils.MileageHexToDecimal), StringComparison.InvariantCultureIgnoreCase))
+                    if (string.Equals(args[0], nameof(VdoCluster.VdoMileageHexToDecimal), StringComparison.InvariantCultureIgnoreCase))
                     {
-                        Log.WriteLine($"Output mileage in decimal: {Utils.MileageHexToDecimal(args[1])}");
+                        Log.WriteLine($"Output mileage in decimal: {VdoCluster.VdoMileageHexToDecimal(args[1])}");
                     }
-                    else if (string.Equals(args[0], nameof(Utils.MileageDecimalToHex), StringComparison.InvariantCultureIgnoreCase))
+                    else if (string.Equals(args[0], nameof(VdoCluster.VdoMileageDecimalToHex), StringComparison.InvariantCultureIgnoreCase))
                     {
-                        Log.WriteLine($"Output mileage in hex: {Utils.MileageDecimalToHex(int.Parse(args[1]))}");
+                        Log.WriteLine($"Output mileage in hex: {VdoCluster.VdoMileageDecimalToHex(int.Parse(args[1]))}");
                     }
 
                     // Rest of the program needs more than 2 arguments, so return here
