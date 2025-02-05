@@ -3,9 +3,10 @@ dotnet publish kw1281test.csproj /p:PublishProfile=Mac
 dotnet publish kw1281test.csproj /p:PublishProfile=Linux-Arm64
 dotnet publish kw1281test.csproj /p:PublishProfile=Linux-x64
 
-$PublishSourceDir = 'C:\Users\gmeno\src\kw1281test\bin\Release\net9.0\publish'
-$GitHubDir = 'C:\Users\gmeno\src\kw1281test\GitHub'
+$PublishSourceDir = 'D:\src\kw1281test\bin\Release\net9.0\publish'
+$GitHubDir = 'D:\src\kw1281test\GitHub'
 
+New-Item -ItemType Directory -Force -Path $GitHubDir
 Remove-Item -Path $GitHubDir\*.*
 
 $WinExe = "$PublishSourceDir\Win\kw1281test.exe"

@@ -395,7 +395,7 @@ namespace BitFab.KW1281Test
 
             try
             {
-                var blockLength = ReadAndAckByte();
+                var blockLength = ReadAndAckByteFirst();
                 blockBytes.Add(blockLength);
 
                 var blockCounter = ReadBlockCounter();
@@ -481,6 +481,36 @@ namespace BitFab.KW1281Test
             var complement = (byte)~b;
             KwpCommon.WriteByte(complement);
             return b;
+        }
+
+        /// <summary>
+        /// https://github.com/gmenounos/kw1281test/issues/93
+        /// </summary>
+        private byte ReadAndAckByteFirst(int count = 0)
+        {
+            if (count > 5)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot sync with {count} repeated attempts.");
+            }
+            var b = KwpCommon.ReadByte();
+            if (b == 0x55)
+            {
+                var keywordLsb = KwpCommon.ReadByte();
+                var keywordMsb = KwpCommon.ReadByte();
+                var complement = (byte)~keywordMsb;
+                BusyWait.Delay(25);
+                KwpCommon.WriteByte(complement);
+                Log.WriteLine($"Warning. Sync repeated.");
+                return ReadAndAckByteFirst(count);
+            }
+            else
+            {
+                Thread.Sleep(TimeInterval.R6);
+                var complement = (byte)~b;
+                KwpCommon.WriteByte(complement);
+                return b;
+            }
         }
 
         public void KeepAlive()

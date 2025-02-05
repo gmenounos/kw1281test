@@ -1,5 +1,4 @@
 using BitFab.KW1281Test.Cluster;
-using FluentAssertions;
 
 namespace BitFab.KW1281Test.Tests.Cluster;
 
@@ -15,7 +14,7 @@ public class MarelliClusterTests
     {
         var eeprom = File.ReadAllBytes($"Cluster/{fileName}");
         var skc = MarelliCluster.GetSkc(eeprom);
-        skc.Should().Be((ushort?)expectedSkc);
+        Assert.AreEqual((ushort?)expectedSkc, skc);
     }
     
     [TestMethod]
@@ -23,6 +22,6 @@ public class MarelliClusterTests
     {
         var eeprom = new byte[1024];
         var skc = MarelliCluster.GetSkc(eeprom);
-        skc.Should().BeNull();
+        Assert.IsNull(skc);
     }
 }

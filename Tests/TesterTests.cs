@@ -1,5 +1,3 @@
-using FluentAssertions;
-
 namespace BitFab.KW1281Test.Tests
 {
     [TestClass]
@@ -16,7 +14,11 @@ namespace BitFab.KW1281Test.Tests
         {
             string[] actualGroups = Tester.FindAndParsePartNumber(ecuInfo);
 
-            actualGroups.Should().BeEquivalentTo(expectedGroups);
+            Assert.AreEqual(expectedGroups.Length, actualGroups.Length);
+            for (var i = 0; i < expectedGroups.Length; i++)
+            {
+                Assert.AreEqual(expectedGroups[i], actualGroups[i]);
+            }
         }
     }
 }
