@@ -246,6 +246,7 @@ namespace BitFab.KW1281Test.Cluster
             "8L0920900E",   // KOMBI+WEGFAHRS. M73 D56
             "8N1919880E KOMBI+WEGFAHRS. M73 D26",   // Audi TT
             "8N1920980",    // Audi TT 8N1920980E M73 D14
+            "8N2919910A",   // KOMBI+WEGFAHRS. M73 D29, Audi TT
             "8N2920930",    // Audi TT 8N2920930C M73 D55
             "8N2920980",    // Audi TT 8N2920980A M73 D14
         ];
