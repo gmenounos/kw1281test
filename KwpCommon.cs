@@ -1,6 +1,8 @@
 ﻿using BitFab.KW1281Test.Interface;
 using System;
 using System.Collections.Generic;
+using System.Data.SqlTypes;
+using System.Diagnostics;
 using System.Runtime;
 using System.Threading;
 
@@ -164,9 +166,13 @@ namespace BitFab.KW1281Test
         private void BitBang5Baud(byte b, bool evenParity)
         {
             const int bitsPerSec = 5;
-            const long msPerBit = 1000 / bitsPerSec - 3;
+            const long msPerBit = 1000 / bitsPerSec;
+            long msNextBit = 0;
 
             b = Utils.AdjustParity(b, evenParity);
+
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
 
             BitBang(false); // Start bit
 
@@ -185,7 +191,10 @@ namespace BitFab.KW1281Test
             // Delay the appropriate amount and then set/clear the TxD line
             void BitBang(bool bit)
             {
-                BusyWait.Delay(msPerBit);
+                msNextBit += msPerBit;
+                while (sw.ElapsedMilliseconds < msNextBit)
+                {
+                }
                 Interface.SetBreak(!bit);
             }
         }

@@ -331,6 +331,9 @@ namespace BitFab.KW1281Test
 
         public void SendBlock(List<byte> blockBytes)
         {
+            // For better support of 4D0919035AJ
+            Thread.Sleep(25);
+
             var blockLength = (byte)(blockBytes.Count + 2);
 
             blockBytes.Insert(0, _blockCounter!.Value);
