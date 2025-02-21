@@ -644,6 +644,28 @@ namespace BitFab.KW1281Test
                     var skc = Utils.GetBcd(buf, 0x08);
                     Log.WriteLine($"SKC: {skc:D5}");
                 }
+                else if (ecuInfo.Text.Contains("VWZ3Z0"))
+                {
+                    // IMMO BOX 1 1H0 953 257 and 7M0 953 257 support
+                    // Tried to shorten count but IMMO responds only with code 0x50 or higher
+                    var blockBytes = _kwp1281.ReadRomEeprom(0x0190, 176);
+                    if (blockBytes == null)
+                    {
+                        Log.WriteLine("ROM read failed");
+                    }
+                    else
+                    {
+                        if (blockBytes.Count == 0)
+                        {
+                            Log.WriteLine("Failed to read SKC. Immo appers to be locked. You have to use adapted key.");
+                            return;
+                        }
+
+                        var skc = Utils.GetShortBE(blockBytes.ToArray(), 1);
+
+                        Log.WriteLine($"SKC: {skc:D5}");
+                    }
+                }
                 else if (ecuInfo.Text.Contains("AGD"))
                 {
                     Log.WriteLine($"Unsupported Magneti Marelli AGD cluster: {ecuInfo.Text}");
