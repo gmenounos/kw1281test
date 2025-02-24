@@ -80,6 +80,8 @@ namespace BitFab.KW1281Test
 
         bool GroupRead(byte groupNumber, bool useBasicSetting = false);
 
+        List<byte> ReadSecureImmoAccess(List<byte> blockBytes);
+
         public IKwpCommon KwpCommon { get; }
         Block ReceiveBlock();
     }
@@ -829,6 +831,29 @@ namespace BitFab.KW1281Test
             Log.WriteLine(LogDest.Console);
 
             return true;
+        }
+
+        public List<byte> ReadSecureImmoAccess(List<byte> blockBytes)
+        {
+
+            blockBytes.Insert(0, (byte)BlockTitle.SecurityImmoAccess1);
+
+            Log.WriteLine($"Sending ReadSecureImmoAccess block: {Utils.DumpBytes(blockBytes)}");
+
+            SendBlock(blockBytes);
+            var blocks = ReceiveBlocks();
+
+            if (blocks.Count == 1 && blocks[0] is NakBlock)
+            {
+                return new List<byte>();
+            }
+
+            blocks = blocks.Where(b => !b.IsAckNak).ToList();
+            if (blocks.Count != 1)
+            {
+                throw new InvalidOperationException($"ReadRomEeprom returned {blocks.Count} blocks instead of 1");
+            }
+            return blocks[0].Body.ToList();
         }
 
         /// <summary>
