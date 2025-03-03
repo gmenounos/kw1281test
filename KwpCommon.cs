@@ -163,10 +163,18 @@ namespace BitFab.KW1281Test
         /// False for odd parity (KWP1281), true for even parity (KWP2000).</param>
         private void BitBang5Baud(byte b, bool evenParity)
         {
-            const int bitsPerSec = 5;
-            const long msPerBit = 1000 / bitsPerSec - 3;
-
             b = Utils.AdjustParity(b, evenParity);
+
+            const int bitsPerSec = 5;
+            const long msPerBit = 1000 / bitsPerSec;
+
+            var waiter = new BusyWait(msPerBit);
+
+            // The first call to SetBreak takes extra time (at least with an FTDI cable on Linux)
+            // so do that here outside of the timing loop. Since the break state should already be
+            // false, this should have no effect other than to delay a couple milliseconds and it
+            // makes the timing of the rest of the bits be more accurate.
+            Interface.SetBreak(false);
 
             BitBang(false); // Start bit
 
@@ -185,7 +193,7 @@ namespace BitFab.KW1281Test
             // Delay the appropriate amount and then set/clear the TxD line
             void BitBang(bool bit)
             {
-                BusyWait.Delay(msPerBit);
+                waiter.DelayUntilNextCycle();
                 Interface.SetBreak(!bit);
             }
         }
