@@ -25,6 +25,7 @@
         AdaptationSave = 0x2A,
         Login = 0x2B,
         SecurityAccessMode2 = 0x3D,
+        SecurityImmoAccess1 = 0x5C,
         SecurityAccessMode1 = 0xD7,
         AdaptationResponse = 0xE6,
         GroupReadResponse = 0xE7,
