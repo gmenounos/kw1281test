@@ -230,7 +230,7 @@ namespace BitFab.KW1281Test.Cluster
                         $"Unlock code for software version '{softwareVersion}' is{Utils.Dump(unlockCode)}");
                     if (unlockCodes.Length > 1)
                     {
-                        Log.WriteLine("Please report this to the program maintainer.");
+                        Log.WriteLine("Please report this to the program author.");
                     }
                     unlocked = true;
                     break;

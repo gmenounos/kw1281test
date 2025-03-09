@@ -35,7 +35,17 @@ namespace BitFab.KW1281Test.Cluster
             }
             else
             {
-                throw new InvalidOperationException("Unsupported cluster version.");
+                Log.WriteLine();
+                Log.WriteLine("Unsupported Marelli cluster version.");
+                Log.WriteLine("You can try the following commands to see if either produces a dump file.");
+                Log.WriteLine("Then please contact the program author with the results.");
+                Log.WriteLine();
+
+                var prefix = string.Join(' ', Program.CommandAndArgs.Take(4));
+                Log.WriteLine($"{prefix} DumpMarelliMem 3072 1024");
+                Log.WriteLine($"{prefix} DumpMarelliMem 14336 2048");
+
+                throw new UnableToProceedException();
             }
         }
 
@@ -85,7 +95,7 @@ namespace BitFab.KW1281Test.Cluster
             else
             {
                 Log.WriteLine("Unsupported cluster software version");
-                return Array.Empty<byte>();
+                return [];
             }
 
             Log.WriteLine($"entryH: 0x{entryH:X2}, regBlockH: 0x{regBlockH:X2}, count: 0x{count:X4}");
@@ -103,7 +113,7 @@ namespace BitFab.KW1281Test.Cluster
             };
             if (!WriteMarelliBlockAndReadAck(data))
             {
-                return Array.Empty<byte>();
+                return [];
             }
 
             // Now we write a small memory dump program to the 68HC12 processor

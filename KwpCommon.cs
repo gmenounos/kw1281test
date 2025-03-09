@@ -59,7 +59,15 @@ namespace BitFab.KW1281Test
                         }
                         else
                         {
-                            throw new InvalidOperationException("Controller did not wake up.");
+                            Log.WriteLine();
+                            Log.WriteLine("Controller did not wake up.");
+                            Log.WriteLine("    - Are you using a supported cable?");
+                            Log.WriteLine("    - Is the cable plugged in and any necessary drivers installed?");
+                            Log.WriteLine("    - Is the ignition on?");
+                            Log.WriteLine("    - Is the controller address correct?");
+                            Log.WriteLine("    - Is the baud rate correct (unexpected sync byte errors)? Try 10400, 9600, 4800.");
+                            Log.WriteLine("You can try other software (e.g. VCDS-Lite) to verify that the cable/drivers/address are ok.");
+                            throw new UnableToProceedException();
                         }
                     }
                 }

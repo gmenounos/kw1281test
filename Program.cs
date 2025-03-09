@@ -14,6 +14,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using BitFab.KW1281Test.EDC15;
 using System.Runtime.InteropServices;
+using System.IO;
 
 [assembly: InternalsVisibleTo("BitFab.KW1281Test.Tests")]
 
@@ -23,14 +24,23 @@ namespace BitFab.KW1281Test
     {
         public static ILog Log { get; private set; } = new ConsoleLog();
 
+        internal static List<string> CommandAndArgs { get; private set; } = [];
+
         static void Main(string[] args)
         {
             try
             {
                 Log = new FileLog("KW1281Test.log");
 
+                CommandAndArgs.Add(
+                    Path.GetFileNameWithoutExtension(Environment.GetCommandLineArgs()[0]));
+                CommandAndArgs.AddRange(args);
+
                 var tester = new Program();
                 tester.Run(args);
+            }
+            catch (UnableToProceedException)
+            {
             }
             catch (Exception ex)
             {
@@ -57,7 +67,7 @@ namespace BitFab.KW1281Test
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
                 .InformationalVersion;
             Log.WriteLine($"Version {version} (https://github.com/gmenounos/kw1281test/releases)");
-            Log.WriteLine($"Args: {string.Join(' ', args)}");
+            Log.WriteLine($"Command Line: {string.Join(' ', CommandAndArgs)}");
             Log.WriteLine($"OSVersion: {Environment.OSVersion}");
             Log.WriteLine($".NET Version: {Environment.Version}");
             Log.WriteLine($"Culture: {CultureInfo.InstalledUICulture}");

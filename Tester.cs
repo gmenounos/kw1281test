@@ -709,7 +709,8 @@ namespace BitFab.KW1281Test
             }
             else
             {
-                Log.WriteLine("Only supported for clusters (address 17) and ECUs (address 1)");
+                Log.WriteLine(
+                    "GetSKC only supported for clusters (address 17), Immo boxes (address 25) and ECUs (address 1)");
             }
         }
 

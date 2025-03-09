@@ -36,7 +36,7 @@ namespace BitFab.KW1281Test.Cluster
                     if (SendCustom(first, second))
                     {
                         Log.WriteLine($"Combination ${first:X2} ${second:X2} Succeeded.");
-                        Log.WriteLine("Please report this to the program maintainer.");
+                        Log.WriteLine("Please report this to the program author.");
                         return;
                     }
                 }
