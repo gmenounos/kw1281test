@@ -114,3 +114,4 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
     - [kerekt](https://github.com/kerekt)
     - [Olivier Fauchon](https://github.com/ofauchon)
     - [Jonathan Klamroth](https://github.com/jonnykl)
+    - [Martin Sestak](https://github.com/poure-1)
