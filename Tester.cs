@@ -644,6 +644,54 @@ namespace BitFab.KW1281Test
                     var skc = Utils.GetBcd(buf, 0x08);
                     Log.WriteLine($"SKC: {skc:D5}");
                 }
+                else if (ecuInfo.Text.Contains("VWZ3Z0"))
+                {
+                    // IMMO BOX 1 1H0 953 257 and 7M0 953 257 support based on sniffed communication.
+                    // 7M0 953 257 can be both IMMO BOX 1 or IMMO BOX 2.
+
+                    var blockBytes = _kwp1281.ReadRomEeprom(0x0190, 176);
+                    if (blockBytes == null)
+                    {
+                        Log.WriteLine("ROM read failed");
+                        return;
+                    }
+                    else if (blockBytes.Count == 0)
+                    {
+
+                        if (ecuInfo.Text.Contains("1H0"))
+                        {
+                            Log.WriteLine("Failed to read SKC. Immo appears to be locked. You have to use an adapted key.");
+                            return;
+                        }
+                        else if (ecuInfo.Text.Contains("6H0") || ecuInfo.Text.Contains("7M0"))
+                        {
+                            // This part adds IMMO BOX 2 experimental support (could not test this with real box).
+                            // Should work for 6H0 953 257 and 7M0 953 257
+
+                            Log.WriteLine("Trying to unlock IMMO BOX 2. This function is experimental and may not work...");
+
+                            // Unlock ROM
+                            _kwp1281.SendBlock([0xCB, 0x5D, 0x3B, 0xD3, 0x8A]);
+
+                            // Send custom read command
+                            blockBytes = _kwp1281.ReadSecureImmoAccess([0x02, 0x00, 0x65, 0x34, 0x9D]);
+
+                            if (blockBytes == null || blockBytes.Count == 0)
+                            {
+                                Log.WriteLine("Failed to read SKC. Immo appears to be locked. You have to use an adapted key.");
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            Log.WriteLine("Failed to read SKC for non 1H0/6H0/7M0 ECU.");
+                            return;
+                        }
+                    }
+
+                    var skc = Utils.GetShortBE(blockBytes.ToArray(), 1);
+                    Log.WriteLine($"SKC: {skc:D5}");
+                }
                 else if (ecuInfo.Text.Contains("AGD"))
                 {
                     Log.WriteLine($"Unsupported Magneti Marelli AGD cluster: {ecuInfo.Text}");
