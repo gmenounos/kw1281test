@@ -20,7 +20,7 @@ namespace BitFab.KW1281Test
 
         void SetDisconnected();
 
-        void Login(ushort code, int workshopCode);
+        List<Block> Login(ushort code, int workshopCode);
 
         List<ControllerIdent> ReadIdent();
 
@@ -95,20 +95,20 @@ namespace BitFab.KW1281Test
             return new ControllerInfo(blocks.Where(b => !b.IsAckNak));
         }
 
-        public void Login(ushort code, int workshopCode)
+        public List<Block> Login(ushort code, int workshopCode)
         {
             Log.WriteLine("Sending Login block");
-            SendBlock(new List<byte>
-            {
+            SendBlock(
+            [
                 (byte)BlockTitle.Login,
                 (byte)(code >> 8),
                 (byte)(code & 0xFF),
                 (byte)(workshopCode >> 16),
                 (byte)((workshopCode >> 8) & 0xFF),
                 (byte)(workshopCode & 0xFF)
-            });
+            ]);
 
-            _ = ReceiveBlocks();
+            return ReceiveBlocks();
         }
 
         public List<ControllerIdent> ReadIdent()
