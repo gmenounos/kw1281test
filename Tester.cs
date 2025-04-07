@@ -24,15 +24,15 @@ namespace BitFab.KW1281Test
             _controllerAddress = controllerAddress;
         }
 
-        public ControllerInfo Kwp1281Wakeup(bool evenParityWakeup = false)
+        public ControllerInfo Kwp1281Wakeup(bool evenParityWakeup = false, bool failQuietly = false)
         {
             Log.WriteLine("Sending wakeup message");
 
-            var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParityWakeup);
+            var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParityWakeup, failQuietly);
 
             if (kwpVersion != 1281)
             {
-                throw new InvalidOperationException("Expected KWP1281 protocol.");
+                throw new UnexpectedProtocolException("Expected KWP1281 protocol.");
             }
 
             var ecuInfo = _kwp1281.Connect();
@@ -48,7 +48,7 @@ namespace BitFab.KW1281Test
 
             if (kwpVersion == 1281)
             {
-                throw new InvalidOperationException("Expected KWP2000 protocol.");
+                throw new UnexpectedProtocolException("Expected KWP2000 protocol.");
             }
 
             var kwp2000 = new KW2000Dialog(_kwpCommon, (byte)_controllerAddress);

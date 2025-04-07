@@ -10,7 +10,7 @@ namespace BitFab.KW1281Test
     {
         IInterface Interface { get; }
 
-        int WakeUp(byte controllerAddress, bool evenParity = false);
+        int WakeUp(byte controllerAddress, bool evenParity = false, bool failQuietly = false);
 
         byte ReadByte();
 
@@ -27,7 +27,7 @@ namespace BitFab.KW1281Test
     {
         public IInterface Interface { get; }
 
-        public int WakeUp(byte controllerAddress, bool evenParity)
+        public int WakeUp(byte controllerAddress, bool evenParity, bool failQuietly)
         {
             // Disable garbage collection int this time-critical method
             var noGC = GC.TryStartNoGCRegion(1024 * 1024);
@@ -59,14 +59,17 @@ namespace BitFab.KW1281Test
                         }
                         else
                         {
-                            Log.WriteLine();
-                            Log.WriteLine("Controller did not wake up.");
-                            Log.WriteLine("    - Are you using a supported cable?");
-                            Log.WriteLine("    - Is the cable plugged in and any necessary drivers installed?");
-                            Log.WriteLine("    - Is the ignition on?");
-                            Log.WriteLine("    - Is the controller address correct?");
-                            Log.WriteLine("    - Is the baud rate correct (unexpected sync byte errors)? Try 10400, 9600, 4800.");
-                            Log.WriteLine("You can try other software (e.g. VCDS-Lite) to verify that the cable/drivers/address are ok.");
+                            if (!failQuietly)
+                            {
+                                Log.WriteLine();
+                                Log.WriteLine("Controller did not wake up.");
+                                Log.WriteLine("    - Are you using a supported cable?");
+                                Log.WriteLine("    - Is the cable plugged in and any necessary drivers installed?");
+                                Log.WriteLine("    - Is the ignition on?");
+                                Log.WriteLine("    - Is the controller address correct?");
+                                Log.WriteLine("    - Is the baud rate correct (unexpected sync byte errors)? Try 10400, 9600, 4800.");
+                                Log.WriteLine("You can try other software (e.g. VCDS-Lite) to verify that the cable/drivers/address are ok.");
+                            }
                             throw new UnableToProceedException();
                         }
                     }

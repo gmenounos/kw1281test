@@ -49,6 +49,7 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
             CHANNEL = Channel number (0-99)
             VALUE = Channel value (0-65535)
             LOGIN = Optional login (0-65535)
+        AutoScan
         BasicSetting GROUP
             GROUP = Group number (0-255)
             (Group 0: Raw controller data)

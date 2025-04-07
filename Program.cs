@@ -273,6 +273,10 @@ namespace BitFab.KW1281Test
             
             switch (command.ToLower())
             {
+                case "autoscan":
+                    AutoScan(@interface);
+                    return;
+
                 case "dumprbxmem":
                     tester.DumpRBxMem(address, length, _filename);
                     tester.EndCommunication();
@@ -432,6 +436,38 @@ namespace BitFab.KW1281Test
             tester.EndCommunication();
         }
 
+        private static void AutoScan(IInterface @interface)
+        {
+            var kwp1281Addresses = new List<string>();
+            var kwp2000Addresses = new List<string>();
+            foreach (var evenParity in new bool[] { false, true })
+            {
+                var parity = evenParity ? "(EvenParity)" : "";
+                for (var address = 0; address < 0x80; address++)
+                {
+                    var tester = new Tester(@interface, address);
+                    try
+                    {
+                        Log.WriteLine($"Attempting to wake up controller at address {address:X}{parity}...");
+                        tester.Kwp1281Wakeup(evenParity, failQuietly: true);
+                        tester.EndCommunication();
+                        kwp1281Addresses.Add($"{address:X}{parity}");
+                    }
+                    catch (UnableToProceedException)
+                    {
+                    }
+                    catch (UnexpectedProtocolException)
+                    {
+                        kwp2000Addresses.Add($"{address:X}{parity}");
+                    }
+                }
+            }
+
+            Log.WriteLine($"AutoScan Results:");
+            Log.WriteLine($"KWP1281: {string.Join(' ', kwp1281Addresses)}");
+            Log.WriteLine($"KWP2000: {string.Join(' ', kwp2000Addresses)}");
+        }
+
         /// <summary>
         /// Accept a series of string values in the format:
         /// ADDRESS1 VALUE1 [ADDRESS2 VALUE2 ... ADDRESSn VALUEn]
@@ -543,6 +579,7 @@ namespace BitFab.KW1281Test
             CHANNEL = Channel number (0-99)
             VALUE = Channel value (0-65535)
             LOGIN = Optional login (0-65535)
+        AutoScan
         BasicSetting GROUP
             GROUP = Group number (0-255)
             (Group 0: Raw controller data)
