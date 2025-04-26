@@ -37,7 +37,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.IO.Ports" Version="9.0.3" />
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
+    <PackageReference Include="System.IO.Ports" Version="9.0.4" />
   </ItemGroup>
 
 </Project>
