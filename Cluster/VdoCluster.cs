@@ -390,6 +390,7 @@ namespace BitFab.KW1281Test.Cluster
                     return [[0x33, 0x34, 0x46, 0x4A]];
 
                 case "VQMJ07HH 08.40": // 6Y0920843L V04
+                case "VQMJ07LM 08.40": // 6Q0920923Q V02
                 case "VQMJ07LM 09.00": // 6Q0920804Q V06
                     return [[0x34, 0x3F, 0x43, 0x39]];
 
