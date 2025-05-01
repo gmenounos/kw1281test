@@ -61,7 +61,7 @@ namespace BitFab.KW1281Test
             var parser = new Parser(with =>
             {
                 with.CaseSensitive = false;
-                with.EnableDashDash = true;
+                with.EnableDashDash = false;
                 with.HelpWriter = null;
             });
 
@@ -89,21 +89,21 @@ namespace BitFab.KW1281Test
 
             if (errors.IsVersion())
             {
-                Log.WriteLine($"\u001b[32m{appName}: Yesterday's diagnostics... Today.\u001b[0m");
-                Log.WriteLine(copyright);
-                Log.WriteLine($"Version: {version} (https://github.com/gmenounos/kw1281test/releases)");
-                Log.WriteLine($"OS Version: {Environment.OSVersion}");
-                Log.WriteLine($".NET Version: {Environment.Version}");
-                Log.WriteLine($"Culture: {CultureInfo.InstalledUICulture}");
+                Console.WriteLine($"\u001b[32m{appName}: Yesterday's diagnostics... Today.\u001b[0m");
+                Console.WriteLine(copyright);
+                Console.WriteLine($"Version {version} (\u001b[94mhttps://github.com/gmenounos/kw1281test/releases\u001b[0m)");
+                Console.WriteLine($"OS Version: {Environment.OSVersion}");
+                Console.WriteLine($".NET Version: {Environment.Version}");
+                Console.WriteLine($"Culture: {CultureInfo.InstalledUICulture}");
                 return;
             } else {
                 helpText = HelpText.AutoBuild(result, h =>
                 {
                     h.Heading = $"\u001b[32m{appName}: Yesterday's diagnostics... Today.\u001b[0m";
                     h.Copyright = copyright;
-                    h.AddPreOptionsLine($"Version: {version} (https://github.com/gmenounos/kw1281test/releases)");
+                    h.AddPreOptionsLine($"Version {version} (\u001b[94mhttps://github.com/gmenounos/kw1281test/releases\u001b[0m)");
                     h.AddPreOptionsLine("");
-                    h.AddPreOptionsLine("Common options (required unless otherwise specified):");
+                    h.AddPreOptionsLine("Usage: kw1281test.exe <port> <baud> <unit> <verb> [<verb options>]");
                     h.AddPreOptionsLine("");
 
                     foreach (var prop in typeof(CommonOptions).GetProperties())
@@ -121,17 +121,17 @@ namespace BitFab.KW1281Test
                         }
                     }
 
-                    h.AddPreOptionsLine("Verbs / Options:");
+                    h.AddPreOptionsLine("Verbs:");
                     return h;
                 }, e => e);
 
-                Log.WriteLine(helpText);
+                Console.WriteLine(helpText);
             }
         }
 
         void Run(object options)
         {
-            string portName = null;
+            string portName = default;
             int baudRate = 0;
             int controllerAddress = 0;
             var addressValuePairs = new List<KeyValuePair<ushort, byte>>();
@@ -141,8 +141,8 @@ namespace BitFab.KW1281Test
             // Check if the command inherits from CommonOptions
             if (options is CommonOptions commonOptions)
             {
-                portName = commonOptions.Port;
-                baudRate = int.Parse(commonOptions.Baud);
+                portName = commonOptions.PortName;
+                baudRate = int.Parse(commonOptions.BaudRate);
                 controllerAddress = int.Parse(commonOptions.ControllerAddress, NumberStyles.HexNumber);
                 silent = commonOptions.Silent;
             }
@@ -153,27 +153,33 @@ namespace BitFab.KW1281Test
             }
             else
             {
-                Log.WriteLine("Invalid command. Use --help for usage information.");
+                Console.WriteLine("Invalid command. Start the program without arguments for usage information.");
                 return;
             }
+
+            var assembly = Assembly.GetExecutingAssembly();
+            var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "Unknown";
+            var appName = assembly.GetCustomAttribute<AssemblyTitleAttribute>()?.Title ?? "KW1281Test";
 
             // Skip the startup message when the application is silent
             if (!silent)
             {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write("KW1281Test: Yesterday's diagnostics...");
+                Console.Write($"\u001b[32m{appName}: Yesterday's diagnostics... ");
                 Thread.Sleep(2000);
-                Console.WriteLine("Today.");
+                Console.WriteLine("Today.\u001b[0m");
+                Console.ResetColor();
                 Thread.Sleep(2000);
+                Console.WriteLine();
+            }
+            else
+            {
+                Console.WriteLine($"\u001b[32m{appName}: Yesterday's diagnostics... Today.\u001b[0m");
                 Console.ResetColor();
                 Console.WriteLine();
             }
 
-            var version = GetType().GetTypeInfo().Assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-                .InformationalVersion ?? "Unknown";
             Log.WriteLine($"Version {version} (https://github.com/gmenounos/kw1281test/releases)");
-            Log.WriteLine($"Command Line: {string.Join(" ", Environment.GetCommandLineArgs())}");
+            Log.WriteLine($"Command Line: {string.Join(" ", Environment.GetCommandLineArgs().Skip(1))}");
             Log.WriteLine($"OSVersion: {Environment.OSVersion}");
             Log.WriteLine($".NET Version: {Environment.Version}");
             Log.WriteLine($"Culture: {CultureInfo.InstalledUICulture}");
