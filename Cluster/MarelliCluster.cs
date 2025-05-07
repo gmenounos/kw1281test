@@ -13,9 +13,9 @@ namespace BitFab.KW1281Test.Cluster
             // Nothing to do
         }
 
-        public string DumpEeprom(uint? address, uint? length, string? dumpFileName)
+        public string DumpEeprom(uint? address, uint? length, string? dumpFileName, string prefix = default)
         {
-            address ??= GetDefaultAddress();
+            address ??= GetDefaultAddress(prefix: prefix);
             dumpFileName ??= $"marelli_mem_${address:X4}.bin";
 
             _ = DumpMem(dumpFileName, (ushort)address, (ushort?)length);
@@ -23,7 +23,7 @@ namespace BitFab.KW1281Test.Cluster
             return dumpFileName;
         }
 
-        private ushort GetDefaultAddress()
+        private ushort GetDefaultAddress(string prefix = default)
         {
             if (HasSmallEeprom())
             {
@@ -41,7 +41,6 @@ namespace BitFab.KW1281Test.Cluster
                 Log.WriteLine("Then please contact the program author with the results.");
                 Log.WriteLine();
 
-                var prefix = string.Join(' ', Program.CommandAndArgs.Take(4));
                 Log.WriteLine($"{prefix} DumpMarelliMem 3072 1024");
                 Log.WriteLine($"{prefix} DumpMarelliMem 14336 2048");
 

@@ -54,7 +54,7 @@ internal class AudiC5Cluster : ICluster
         Thread.Sleep(TimeSpan.FromSeconds(2));
     }
 
-    public string DumpEeprom(uint? address, uint? length, string? dumpFileName)
+    public string DumpEeprom(uint? address, uint? length, string? dumpFileName, string prefix = default)
     {
         ArgumentNullException.ThrowIfNull(address);
         ArgumentNullException.ThrowIfNull(length);

@@ -15,7 +15,7 @@ namespace BitFab.KW1281Test.Cluster
         }
 
         public string DumpEeprom(
-            uint? optionalAddress, uint? optionalLength, string? optionalFileName)
+            uint? optionalAddress, uint? optionalLength, string? optionalFileName, string prefix = default)
         {
             uint address = optionalAddress ?? 0x10400;
             uint length = optionalLength ?? 0x400;
