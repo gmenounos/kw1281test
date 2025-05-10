@@ -252,6 +252,7 @@ namespace BitFab.KW1281Test.Cluster
             "1C0920921",    // Beetle 1C0920921G M73 V08
             "1C0920941",    // Beetle 1C0920941LX M73 V03
             "1C0920951",    // Beetle 1C0920951A M73 V02
+            "8D0920900R",   // KOMBI+WEGFAHRS. M73 D54 (Audi A4 B5 2001)
             "8L0920900B",   // KOMBI+WEGFAHRS. M73 D13, Audi A3 8L 2002 (ASZ diesel engine)
             "8L0920900E",   // KOMBI+WEGFAHRS. M73 D56
             "8N1919880E KOMBI+WEGFAHRS. M73 D26",   // Audi TT
