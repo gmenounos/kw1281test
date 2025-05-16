@@ -4,6 +4,6 @@
     {
         void UnlockForEepromReadWrite();
 
-        string DumpEeprom(uint? address, uint? length, string? dumpFileName);
+        string DumpEeprom(uint? address, uint? length, string? dumpFileName, string prefix = default);
     }
 }
