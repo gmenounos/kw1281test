@@ -31,6 +31,9 @@ namespace BitFab.KW1281Test.Cluster
                 case 0x09 when seed[9] == 0x00:
                     secret = VQMJ07Secrets[accessLevel];
                     break;
+                case 0x0B when seed[9] == 0x00:
+                    secret = K5MJ07Secrets[accessLevel];
+                    break;
                 case 0x0D when seed[9] == 0x00:
                     secret = KB5M07Secrets[accessLevel];
                     break;
@@ -108,6 +111,18 @@ namespace BitFab.KW1281Test.Cluster
             [0x08, 0x2b, 0x49, 0x1a],
             [0x82, 0xd1, 0x7d, 0x50],
             [0x0a, 0x5b, 0x41, 0x4f]    // AccessLevel 7
+        ];
+
+        private static readonly byte[][] K5MJ07Secrets =
+        [
+            [0x47, 0x36, 0x9a, 0xbb],   // AccessLevel 0
+            [0xad, 0x4e, 0x61, 0x44],
+            [0xd3, 0xd6, 0x42, 0x59],
+            [0x13, 0x6f, 0x43, 0x74],
+            [0xfc, 0xb8, 0x59, 0x2e],
+            [0x09, 0x58, 0x9d, 0x7f],
+            [0x24, 0x27, 0xc3, 0x9d],
+            [0x87, 0xed, 0x34, 0x63]    // AccessLevel 7
         ];
 
         /// <summary>
