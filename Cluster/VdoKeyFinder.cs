@@ -23,24 +23,24 @@ namespace BitFab.KW1281Test.Cluster
             switch (seed[8])
             {
                 case 0x01 when seed[9] == 0x00:
-                    secret = VWK501Secrets[accessLevel];
+                    secret = Secrets0100[accessLevel];
                     break;
                 case 0x03 when seed[9] == 0x00:
-                    secret = VSQX01Secrets[accessLevel];
+                    secret = Secrets0300[accessLevel];
                     break;
                 case 0x09 when seed[9] == 0x00:
-                    secret = VQMJ07Secrets[accessLevel];
+                    secret = Secrets0900[accessLevel];
                     break;
                 case 0x0B when seed[9] == 0x00:
-                    secret = K5MJ07Secrets[accessLevel];
+                    secret = Secrets0B00[accessLevel];
                     break;
                 case 0x0D when seed[9] == 0x00:
-                    secret = KB5M07Secrets[accessLevel];
+                    secret = Secrets0D00[accessLevel];
                     break;
                 default:
                     Log.WriteLine(
                         $"Unexpected seed suffix: ${seed[8]:X2} ${seed[9]:X2}");
-                    secret = VWK501Secrets[accessLevel]; // Try something
+                    secret = Secrets0100[accessLevel]; // Try something
                     break;
             }
 
@@ -50,13 +50,13 @@ namespace BitFab.KW1281Test.Cluster
                 [seed[1], seed[3], seed[5], seed[7]],
                 secret);
 
-            return [(byte)accessLevel, key[0], key[1], 0x00, key[2], 0x00, key[3], 0x00];
+            return [(byte)accessLevel, key[0], key[1], 0x00, key[2], 0x00, key[3]];
         }
 
         /// <summary>
         /// Table of secrets, one for each access level.
         /// </summary>
-        private static readonly byte[][] VWK501Secrets =
+        private static readonly byte[][] Secrets0100 =
         [
             [0xe5, 0x7c, 0x20, 0xb3],   // AccessLevel 0
             [0x67, 0xb8, 0xf0, 0xe2],
@@ -71,7 +71,7 @@ namespace BitFab.KW1281Test.Cluster
         /// <summary>
         /// Table of secrets, one for each access level.
         /// </summary>
-        private static readonly byte[][] VSQX01Secrets =
+        private static readonly byte[][] Secrets0300 =
         [
             [0x4c, 0x29, 0x92, 0x1b],   // AccessLevel 0
             [0x42, 0x0a, 0x0b, 0x66],
@@ -86,7 +86,7 @@ namespace BitFab.KW1281Test.Cluster
         /// <summary>
         /// Table of secrets, one for each access level.
         /// </summary>
-        private static readonly byte[][] VQMJ07Secrets =
+        private static readonly byte[][] Secrets0900 =
         [
             [0xa7, 0xd2, 0xe9, 0x8d],  // AccessLevel 0
             [0xe6, 0xfa, 0x9e, 0xba],
@@ -101,7 +101,7 @@ namespace BitFab.KW1281Test.Cluster
         /// <summary>
         /// Table of secrets, one for each access level.
         /// </summary>
-        private static readonly byte[][] KB5M07Secrets =
+        private static readonly byte[][] Secrets0D00 =
         [
             [0xc9, 0x18, 0xe6, 0x6e],  // AccessLevel 0
             [0x69, 0xc3, 0x08, 0xcd],
@@ -113,7 +113,7 @@ namespace BitFab.KW1281Test.Cluster
             [0x0a, 0x5b, 0x41, 0x4f]    // AccessLevel 7
         ];
 
-        private static readonly byte[][] K5MJ07Secrets =
+        private static readonly byte[][] Secrets0B00 =
         [
             [0x47, 0x36, 0x9a, 0xbb],   // AccessLevel 0
             [0xad, 0x4e, 0x61, 0x44],
