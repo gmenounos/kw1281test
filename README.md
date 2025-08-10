@@ -31,77 +31,81 @@ Or, load up the project in Visual Studio and Ctrl-Shift-B.
 
 ```
 Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
-    PORT = COM1|COM2|etc. (Windows)
-           /dev/ttyXXXX (Linux)
-           AABBCCDD (macOS/Linux FTDI cable serial number)
-    BAUD = 10400|9600|etc.
-    ADDRESS = The controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
-    COMMAND =
-        ActuatorTest
-        AdaptationRead CHANNEL [LOGIN]
-            CHANNEL = Channel number (0-99)
-            LOGIN = Optional login (0-65535)
-        AdaptationSave CHANNEL VALUE [LOGIN]
-            CHANNEL = Channel number (0-99)
-            VALUE = Channel value (0-65535)
-            LOGIN = Optional login (0-65535)
-        AdaptationTest CHANNEL VALUE [LOGIN]
-            CHANNEL = Channel number (0-99)
-            VALUE = Channel value (0-65535)
-            LOGIN = Optional login (0-65535)
-        AutoScan
-        BasicSetting GROUP
-            GROUP = Group number (0-255)
-            (Group 0: Raw controller data)
-        ClarionVWPremium4SafeCode
-        ClearFaultCodes
-        DelcoVWPremium5SafeCode
-        DumpEdc15Eeprom [FILENAME]
-            FILENAME = Optional filename
-        DumpEeprom START LENGTH [FILENAME]
-            START = Start address in decimal (e.g. 0) or hex (e.g. $0)
-            LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. $800)
-            FILENAME = Optional filename
-        DumpMarelliMem START LENGTH [FILENAME]
-            START = Start address in decimal (e.g. 3072) or hex (e.g. $C00)
-            LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
-            FILENAME = Optional filename
-        DumpMem START LENGTH [FILENAME]
-            START = Start address in decimal (e.g. 8192) or hex (e.g. $2000)
-            LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. $10000)
-            FILENAME = Optional filename
-        DumpRBxMem START LENGTH [FILENAME]
-            START = Start address in decimal (e.g. 66560) or hex (e.g. $10400)
-            LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. $400)
-            FILENAME = Optional filename
-        GetSKC
-        GroupRead GROUP
-            GROUP = Group number (0-255)
-            (Group 0: Raw controller data)
-        LoadEeprom START FILENAME
-            START = Start address in decimal (e.g. 0) or hex (e.g. $0)
-            FILENAME = Name of file containing binary data to load into EEPROM
-        MapEeprom
-        ReadFaultCodes
-        ReadIdent
-        ReadEeprom ADDRESS
-            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
-        ReadRAM ADDRESS
-            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
-        ReadROM ADDRESS
-            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
-        ReadSoftwareVersion
-        Reset
-        SetSoftwareCoding CODING WORKSHOP
-            CODING = Software coding in decimal (e.g. 4361) or hex (e.g. $1109)
-            WORKSHOP = Workshop code in decimal (e.g. 4361) or hex (e.g. $1109)
-        ToggleRB4Mode
-        WriteEdc15Eeprom ADDRESS1 VALUE1 [ADDRESS2 VALUE2 ... ADDRESSn VALUEn]
-            ADDRESS = EEPROM address in decimal (0-511) or hex ($00-$1FF)
-            VALUE = Value to be stored at address in decimal (0-255) or hex ($00-$FF)
-        WriteEeprom ADDRESS VALUE
-            ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. $1109)
-            VALUE = Value in decimal (e.g. 138) or hex (e.g. $8A)
+
+PORT = COM1|COM2|etc. (Windows)
+        /dev/ttyXXXX (Linux)
+        AABBCCDD (macOS/Linux FTDI cable serial number)
+BAUD = 10400|9600|etc.
+ADDRESS = Controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
+COMMAND =
+    ActuatorTest
+    AdaptationRead CHANNEL [LOGIN]
+        CHANNEL = Channel number (0-99)
+        LOGIN = Optional login (0-65535)
+    AdaptationSave CHANNEL VALUE [LOGIN]
+        CHANNEL = Channel number (0-99)
+        VALUE = Channel value (0-65535)
+        LOGIN = Optional login (0-65535)
+    AdaptationTest CHANNEL VALUE [LOGIN]
+        CHANNEL = Channel number (0-99)
+        VALUE = Channel value (0-65535)
+        LOGIN = Optional login (0-65535)
+    AutoScan
+    BasicSetting GROUP
+        GROUP = Group number (0-255)
+        (Group 0: Raw controller data)
+    ClarionVWPremium4SafeCode
+    ClearFaultCodes
+    DelcoVWPremium5SafeCode
+    DumpEdc15Eeprom [FILENAME]
+        FILENAME = Optional filename
+    DumpEeprom START LENGTH [FILENAME]
+        START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
+        LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. 0x800)
+        FILENAME = Optional filename
+    DumpMarelliMem START LENGTH [FILENAME]
+        START = Start address in decimal (e.g. 3072) or hex (e.g. 0xC00)
+        LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. 0x400)
+        FILENAME = Optional filename
+    DumpMem START LENGTH [FILENAME]
+        START = Start address in decimal (e.g. 8192) or hex (e.g. 0x2000)
+        LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. 0x10000)
+        FILENAME = Optional filename
+    DumpRBxMem START LENGTH [FILENAME]
+        START = Start address in decimal (e.g. 66560) or hex (e.g. 0x10400)
+        LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. 0x400)
+        FILENAME = Optional filename
+    DumpRom START LENGTH [FILENAME]
+        START = Start address in decimal (e.g. 8192) or hex (e.g. 0x2000)
+        LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. 0x10000)
+    GetSKC
+    GroupRead GROUP
+        GROUP = Group number (0-255)
+        (Group 0: Raw controller data)
+    LoadEeprom START FILENAME
+        START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
+        FILENAME = Name of file containing binary data to load into EEPROM
+    MapEeprom
+    ReadFaultCodes
+    ReadIdent
+    ReadEeprom ADDRESS
+        ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
+    ReadRAM ADDRESS
+        ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
+    ReadROM ADDRESS
+        ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
+    ReadSoftwareVersion
+    Reset
+    SetSoftwareCoding CODING WORKSHOP
+        CODING = Software coding in decimal (e.g. 4361) or hex (e.g. 0x1109)
+        WORKSHOP = Workshop code in decimal (e.g. 4361) or hex (e.g. 0x1109)
+    ToggleRB4Mode
+    WriteEdc15Eeprom ADDRESS1 VALUE1 [ADDRESS2 VALUE2 ... ADDRESSn VALUEn]
+        ADDRESS = EEPROM address in decimal (0-511) or hex (0x00-0x1FF)
+    VALUE = Value to be stored in decimal (0-255) or hex (0x00-0xFF)
+    WriteEeprom ADDRESS VALUE
+        ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
+        VALUE = Value in decimal (e.g. 138) or hex (e.g. 0x8A)
 ```
 
 ##### Credits
