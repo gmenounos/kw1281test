@@ -3,7 +3,7 @@ dotnet publish kw1281test.csproj /p:PublishProfile=Mac
 dotnet publish kw1281test.csproj /p:PublishProfile=Linux-Arm64
 dotnet publish kw1281test.csproj /p:PublishProfile=Linux-x64
 
-$PublishSourceDir = 'D:\src\kw1281test\bin\Release\net9.0\publish'
+$PublishSourceDir = 'D:\src\kw1281test\bin\Release\net10.0\publish'
 $GitHubDir = 'D:\src\kw1281test\GitHub'
 
 New-Item -ItemType Directory -Force -Path $GitHubDir

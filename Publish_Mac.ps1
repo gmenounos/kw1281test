@@ -4,7 +4,7 @@ dotnet publish kw1281test.csproj /p:PublishProfile=Linux-Arm64
 dotnet publish kw1281test.csproj /p:PublishProfile=Linux-x64
 
 $Here = (Get-Location).Path
-$PublishSourceDir = "$Here/bin/Release/net9.0/publish"
+$PublishSourceDir = "$Here/bin/Release/net10.0/publish"
 $GitHubDir = "$Here/GitHub"
 
 Remove-Item -Path $GitHubDir/*.*
