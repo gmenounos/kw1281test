@@ -18,7 +18,7 @@ public class ProgramTests
             ["1", "25", "17", "42"], out var addressValuePairs);
         
         Assert.IsTrue(returnValue);
-        Assert.AreEqual(2, addressValuePairs.Count);
+        Assert.HasCount(2, addressValuePairs);
         Assert.AreEqual(new KeyValuePair<ushort, byte>(1, 25), addressValuePairs[0]);
         Assert.AreEqual(new KeyValuePair<ushort, byte>(17, 42), addressValuePairs[1]);
     }

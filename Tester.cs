@@ -1079,7 +1079,7 @@ internal class Tester
     }
 
     private void DumpEeprom(
-        ushort startAddr, ushort length, byte maxReadLength, string fileName)
+        ushort startAddr, uint length, byte maxReadLength, string fileName)
     {
         bool succeeded = true;
 
@@ -1088,10 +1088,10 @@ internal class Tester
             for (uint addr = startAddr; addr < (startAddr + length); addr += maxReadLength)
             {
                 var readLength = (byte)Math.Min(startAddr + length - addr, maxReadLength);
-                var blockBytes = _kwp1281.ReadEeprom((ushort)addr, (byte)readLength);
-                if (blockBytes == null)
+                var blockBytes = _kwp1281.ReadEeprom((ushort)addr, (byte)readLength) ?? [];
+                if (blockBytes.Count < readLength)
                 {
-                    blockBytes = Enumerable.Repeat((byte)0, readLength).ToList();
+                    blockBytes.AddRange(Enumerable.Repeat((byte)0, readLength - blockBytes.Count));
                     succeeded = false;
                 }
                 fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);

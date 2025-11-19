@@ -415,6 +415,9 @@ internal class VdoCluster : ICluster
             case "VQMJ09HH 05.10": // 6QE920827C V06
                 return [[0x37, 0x42, 0x47, 0x43]];
 
+            case "VWK502MH 09.00":
+                return [[0x38, 0x37, 0x3E, 0x31]];
+
             case "VT5X02LL 09.00":
                 return [[0x38, 0x39, 0x3A, 0x47]];
 

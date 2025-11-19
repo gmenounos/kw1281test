@@ -14,7 +14,7 @@ namespace BitFab.KW1281Test.Tests
         {
             string[] actualGroups = Tester.FindAndParsePartNumber(ecuInfo);
 
-            Assert.AreEqual(expectedGroups.Length, actualGroups.Length);
+            Assert.HasCount(expectedGroups.Length, actualGroups);
             for (var i = 0; i < expectedGroups.Length; i++)
             {
                 Assert.AreEqual(expectedGroups[i], actualGroups[i]);
