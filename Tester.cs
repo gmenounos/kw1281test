@@ -197,7 +197,14 @@ internal class Tester
 
         _kwp1281.Login(code, workshopCode);
         var bytes = _kwp1281.ReadRomEeprom(0x0014, 2);
-        Log.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
+        if (bytes != null)
+        {
+            Log.WriteLine($"Safe code: {bytes[0]:X2}{bytes[1]:X2}");
+        }
+        else
+        {
+            Log.WriteLine($"Unable to determine Safe code.");
+        }
     }
 
     public void DumpCcmRom(string? filename)
