@@ -380,6 +380,69 @@ internal class Tester
         }
     }
 
+    public void DumpEepromAudiA4B5ClusterFirstGen(string? filename)
+    {
+        if (_controllerAddress != (int)ControllerAddress.Cluster)
+        {
+            Log.WriteLine("Only supported for cluster");
+            return;
+        }
+
+        //{8D0919033C  B5-KOMBIINSTRUMENT  D08
+        //Software Coding 00083, Workshop Code: 00001}
+        var ident = _kwp1281.ReadIdent()
+            .Select(x => x.ToString())
+            .ToList();
+
+        if (!AudiA4B5VdoClusterWithoutImmo.IsSupportedIdent(ident, out var reason))
+        {
+            Log.WriteLine(reason);
+            return;
+        }
+
+        ICluster cluster = new AudiA4B5VdoClusterWithoutImmo(_kwp1281);
+
+        cluster.UnlockForEepromReadWrite();
+        cluster.DumpEeprom(0, 0x80, filename);
+
+
+    }
+
+    public void WriteEepromAudiA4B5ClusterFirstGen(string filename)
+    {
+        if (_controllerAddress != (int)ControllerAddress.Cluster)
+        {
+            Log.WriteLine("Only supported for cluster");
+            return;
+        }
+
+        //{8D0919033C  B5-KOMBIINSTRUMENT  D08
+        //Software Coding 00083, Workshop Code: 00001}
+        var ident = _kwp1281.ReadIdent()
+            .Select(x => x.ToString())
+            .ToList();
+
+        if (!AudiA4B5VdoClusterWithoutImmo.IsSupportedIdent(ident, out var reason))
+        {
+            Log.WriteLine(reason);
+            return;
+        }
+
+        var cluster = new AudiA4B5VdoClusterWithoutImmo(_kwp1281);
+
+        cluster.UnlockForEepromReadWrite();
+
+        byte[] bytes = File.ReadAllBytes(filename);
+        if (bytes.Length != 0x80)
+        {
+            Log.WriteLine("The file does not match the expected size.");
+            return;
+        }
+
+        cluster.WriteEeprom(bytes);
+
+    }
+
     public void DumpMarelliMem(
         uint address, uint length, ControllerInfo ecuInfo, string? filename)
     {

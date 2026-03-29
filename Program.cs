@@ -433,6 +433,15 @@ class Program
                 tester.WriteEeprom(address, value);
                 break;
 
+            case "dumpeepromaudia4b5clusterfirstgen":
+                _filename = args[4];
+                tester.DumpEepromAudiA4B5ClusterFirstGen(_filename);
+                break;
+
+            case "writeepromaudia4b5clusterfirstgen":
+                _filename = args[4];
+                tester.WriteEepromAudiA4B5ClusterFirstGen(_filename);
+                break;
             default:
                 ShowUsage();
                 break;
@@ -649,6 +658,9 @@ COMMAND =
     WriteEeprom ADDRESS VALUE
         ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
         VALUE = Value in decimal (e.g. 138) or hex (e.g. 0x8A)
+    DumpEepromAudiA4B5ClusterFirstGen [FILENAME]
+        FILENAME = Optional filename
+    WriteEepromAudiA4B5ClusterFirstGen [FILENAME]
 """);
     }
 
