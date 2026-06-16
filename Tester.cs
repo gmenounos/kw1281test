@@ -883,9 +883,9 @@ internal class Tester
     }
     public void ClearCrashData(byte fillValue = 0xFF)
     {
-        if (_controllerAddress != 15 && _controllerAddress != 21)
+        if (_controllerAddress != (int)ControllerAddress.Airbag)
         {
-            Log.WriteLine("ClearCrashData: поддерживается только для блока подушек (адрес 15 или 21).");
+            Log.WriteLine($"Only supported for airbag address {(int)ControllerAddress.Airbag:X2}");
             return;
         }
 

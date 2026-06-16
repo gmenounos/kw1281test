@@ -7,6 +7,7 @@
     {
         Ecu = 0x01,
         CentralElectric = 0x09,
+        Airbag = 0x15,
         Cluster = 0x17,
         CanGateway = 0x19,
         Immobilizer = 0x25,
