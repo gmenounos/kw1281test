@@ -23,14 +23,22 @@ namespace BitFab.KW1281Test.Airbag
             _ecuText = ecuText ?? string.Empty;
         }
 
-        /// <summary>Версия блока: VW51 или VW61.</summary>
-        public enum ModuleVersion { VW51, VW61 }
+        /// <summary>Версия блока: VW51, VW61 или конкретный артикул 1C0909601.</summary>
+        public enum ModuleVersion { VW51, VW61, VW_1C0909601 }
 
         private ModuleVersion _version = ModuleVersion.VW51;
 
         public bool IsSupportedIdent(string ecuIdent, out string reason)
         {
             var text = string.IsNullOrWhiteSpace(ecuIdent) ? _ecuText : ecuIdent;
+
+            // Сначала проверяем конкретный артикул — он имеет приоритет
+            if (text.Contains("1C0909601", StringComparison.OrdinalIgnoreCase))
+            {
+                _version = ModuleVersion.VW_1C0909601;
+                reason = string.Empty;
+                return true;
+            }
 
             bool isAirbag = text.Contains("AIRBAG", StringComparison.OrdinalIgnoreCase);
 
@@ -48,7 +56,7 @@ namespace BitFab.KW1281Test.Airbag
                 return true;
             }
 
-            reason = "Not a supported VW Airbag module (expected VW51 or VW61)";
+            reason = "Not a supported VW Airbag module (expected VW51, VW61, or part# 1C0909601)";
             return false;
         }
 
@@ -130,7 +138,7 @@ namespace BitFab.KW1281Test.Airbag
                     $"VW51 airbag: ClearCrashData (VW51) — 0x000-0x04F, значение 0x{fillValue:X2}");
                 FillRange(0x000, 0x04F, fillValue);
             }
-            else // VW61
+            else if (_version == ModuleVersion.VW61)
             {
                 // VW61: два диапазона:
                 //   0x000-0x030 и 0x151-0x1EF
@@ -138,6 +146,18 @@ namespace BitFab.KW1281Test.Airbag
                     $"VW51 airbag: ClearCrashData (VW61) — 0x000-0x030 и 0x151-0x1EF, значение 0x{fillValue:X2}");
                 FillRange(0x000, 0x030, fillValue);
                 FillRange(0x151, 0x1EF, fillValue);
+            }
+            else // VW_1C0909601
+            {
+                // 1C0909601:
+                //   0x000-0x30F — область ошибок
+                //   0x151-0x1EB и 0x1EE-0x1EF — краш-данные
+                Log.WriteLine(
+                    $"VW51 airbag: ClearCrashData (1C0909601) — " +
+                    $"0x000-0x30F (ошибки), 0x151-0x1EB, 0x1EE-0x1EF (краш), значение 0x{fillValue:X2}");
+                FillRange(0x000, 0x30F, fillValue);
+                FillRange(0x151, 0x1EB, fillValue);
+                FillRange(0x1EE, 0x1EF, fillValue);
             }
         }
 
