@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="kw1281test.csproj" />
+  <Project Path="Tests/BitFab.KW1281Test.Tests.csproj" />
+</Solution>
