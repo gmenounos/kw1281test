@@ -1,33 +1,32 @@
-namespace KW1281Test.Airbag
+namespace KW1281Test.Airbag;
+
+public interface IAirbagModule
 {
-    public interface IAirbagModule
-    {
-        bool IsSupportedIdent(
-            string ecuIdent,
-            out string reason
-        );
+    bool IsSupportedIdent(
+        string ecuIdent,
+        out string reason
+    );
 
-        /// <summary>Полный размер EEPROM модуля в байтах (зависит от определённой версии).</summary>
-        int EepromSize { get; }
+    /// <summary>Полный размер EEPROM модуля в байтах (зависит от определённой версии).</summary>
+    int EepromSize { get; }
 
-        void PrepareSession();
+    void PrepareSession();
 
-        byte[] DumpEeprom(
-            int startAddress,
-            int length
-        );
+    byte[] DumpEeprom(
+        int startAddress,
+        int length
+    );
 
-        void LoadEeprom(
-            int startAddress,
-            byte[] data
-        );
+    void LoadEeprom(
+        int startAddress,
+        byte[] data
+    );
 
-        /// <summary>
-        /// Очищает данные о срабатывании подушек.
-        /// VW51: заполняет 0x000-0x04F (80 байт).
-        /// VW61: заполняет 0x000-0x030 и 0x151-0x1EF.
-        /// По умолчанию заполняет байтом 0xFF.
-        /// </summary>
-        void ClearCrashData(byte fillValue = 0xFF);
-    }
+    /// <summary>
+    /// Очищает данные о срабатывании подушек.
+    /// VW51: заполняет 0x000-0x04F (80 байт).
+    /// VW61: заполняет 0x000-0x030 и 0x151-0x1EF.
+    /// По умолчанию заполняет байтом 0xFF.
+    /// </summary>
+    void ClearCrashData(byte fillValue = 0xFF);
 }
