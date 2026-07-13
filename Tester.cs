@@ -69,8 +69,12 @@ internal class Tester
     {
         using KW1281KeepAlive keepAlive = new(_kwp1281);
 
-        ConsoleKeyInfo keyInfo;
-        do
+        // Console.ReadKey() only works on a real console; when stdin is redirected (e.g. a
+        // GUI driving this process over piped streams) it throws/hangs. In that case fall
+        // back to line-based commands over stdin ("N"/"Q") instead of raw keypresses.
+        bool interactive = !Console.IsInputRedirected;
+
+        while (true)
         {
             var response = keepAlive.ActuatorTest(0x00);
             if (response == null || response.ActuatorName == "End")
@@ -80,14 +84,36 @@ internal class Tester
             }
             Log.WriteLine($"Actuator Test: {response.ActuatorName}");
 
-            // Press any key to advance to next test or press Q to exit
-            Console.Write("Press 'N' to advance to next test or 'Q' to quit");
-            do
+            bool quit;
+            if (interactive)
             {
-                keyInfo = Console.ReadKey(intercept: true);
-            } while (keyInfo.Key != ConsoleKey.N && keyInfo.Key != ConsoleKey.Q);
-            Console.WriteLine();
-        } while (keyInfo.Key != ConsoleKey.Q);
+                // Press any key to advance to next test or press Q to exit
+                Console.Write("Press 'N' to advance to next test or 'Q' to quit");
+                ConsoleKeyInfo keyInfo;
+                do
+                {
+                    keyInfo = Console.ReadKey(intercept: true);
+                } while (keyInfo.Key != ConsoleKey.N && keyInfo.Key != ConsoleKey.Q);
+                Console.WriteLine();
+                quit = keyInfo.Key == ConsoleKey.Q;
+            }
+            else
+            {
+                // Marker line so a piped caller knows we're now blocked waiting for a command.
+                Console.WriteLine("WAITING_FOR_INPUT");
+                string? line;
+                do
+                {
+                    line = Console.In.ReadLine();
+                } while (line != null &&
+                         !line.Trim().Equals("N", StringComparison.OrdinalIgnoreCase) &&
+                         !line.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase));
+                quit = line == null || line.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (quit)
+                break;
+        }
     }
 
     public void AdaptationRead(
@@ -378,8 +404,7 @@ internal class Tester
                 DumpCcmEeprom((ushort)address, (ushort)length, filename);
                 break;
 
-            case 15:
-            case 21:
+            case (int)ControllerAddress.Airbag:
                 Log.WriteLine("[DBG] Airbag DumpEeprom branch selected");
                 DumpAirbagEeprom(address, length, filename);
                 break;
@@ -871,8 +896,7 @@ internal class Tester
             case (int)ControllerAddress.CentralLocking:
                 LoadCcmEeprom((ushort)address, filename);
                 break;
-            case 15:
-            case 21:
+            case (int)ControllerAddress.Airbag:
                 Log.WriteLine("[DBG] Airbag LoadEeprom branch selected");
                 LoadAirbagEeprom(address, filename);
                 break;
@@ -933,6 +957,14 @@ internal class Tester
         if (module == null)
         {
             return;
+        }
+
+        if (length == uint.MaxValue)
+        {
+            // Короткая форма (DumpEeprom FILENAME): читаем весь EEPROM, размер
+            // определяется по версии блока, распознанной из ReadIdent.
+            length = (uint)module.EepromSize;
+            Log.WriteLine($"No length given, dumping whole EEPROM ({length} bytes).");
         }
 
         string fileName = string.IsNullOrWhiteSpace(filename)

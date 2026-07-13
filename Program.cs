@@ -116,6 +116,16 @@ class Program
 
             address = Utils.ParseUint(args[4]);
         }
+        else if (string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 &&
+                 controllerAddress == (int)ControllerAddress.Airbag &&
+                 args.Length == 5)
+        {
+            // Короткая форма для Airbag: DumpEeprom FILENAME -> весь EEPROM с адреса 0.
+            // Длина определяется по версии блока (VW51/VW61/1C0909601) после ReadIdent.
+            address = 0;
+            length = uint.MaxValue;
+            _filename = args[4];
+        }
         else if (string.Compare(command, "DumpMarelliMem", ignoreCase: true) == 0 ||
                  string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 ||
                  string.Compare(command, "DumpMem", ignoreCase: true) == 0 ||
@@ -624,6 +634,8 @@ COMMAND =
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. 0x800)
         FILENAME = Optional filename
+        For Airbag address: DumpEeprom FILENAME also works and dumps the
+        whole EEPROM (size auto-detected from ReadIdent).
     DumpMarelliMem START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 3072) or hex (e.g. 0xC00)
         LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. 0x400)

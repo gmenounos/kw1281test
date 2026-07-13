@@ -7,6 +7,9 @@ namespace KW1281Test.Airbag
             out string reason
         );
 
+        /// <summary>Полный размер EEPROM модуля в байтах (зависит от определённой версии).</summary>
+        int EepromSize { get; }
+
         void PrepareSession();
 
         byte[] DumpEeprom(
