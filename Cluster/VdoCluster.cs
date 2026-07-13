@@ -425,8 +425,9 @@ internal class VdoCluster : ICluster
             case "V599HLA  00.91": // 7D0920841A V18
             case "V599LLA  00.91": // 7D0920801B V18
             case "V599LLA  01.00": // 1J0920800L V59
-            case "V599MLA  01.00": // 7D0920821D V22
             case "V599LLA  03.00": // 1J0920900J V60
+            case "V599MLA  01.00": // 7D0920821D V22
+            case "V599MLA  03.00": // 3B0920920B V26
                 return [[0x38, 0x3F, 0x40, 0x35]];
 
             case "MPV300LL 04.00":
@@ -479,7 +480,9 @@ internal class VdoCluster : ICluster
             case "KPQMLA` $01": // 6Y1920860G V12
                 return [[0x47, 0x3B, 0x31, 0x3F]];
 
+            case "K5MJ07HH 09.00": // 5J0920840B V92
             case "K5MJ07LM 08.10": // 5J0920810C V2721446
+            case "K5MJ07LM 09.00": // 5J0920900B V2823466
                 return [[0x47, 0x3F, 0x39, 0x44]];
 
             default:
@@ -795,6 +798,20 @@ internal class VdoCluster : ICluster
             Log.WriteLine("**********************************************************************");
             Log.WriteLine();
         }
+    }
+
+    public void WriteRam(ushort address, byte value)
+    {
+        Log.WriteLine("Sending Custom \"Write RAM\" block");
+
+        SendCustom(
+            [
+                0x87,
+                1, // Count
+                (byte)(address & 0xFF),
+                (byte)((address >> 8) & 0xFF),
+                value
+            ]);
     }
 
     private readonly IKW1281Dialog _kwp1281;
