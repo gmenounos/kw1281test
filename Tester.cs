@@ -341,25 +341,38 @@ internal class Tester
     public byte[] ReadWriteEdc15Eeprom(
         string? filename, List<KeyValuePair<ushort, byte>>? addressValuePairs = null)
     {
-        _kwp1281.EndCommunication();
-
-        Thread.Sleep(1000);
-
-        // Now wake it up again, hopefully in KW2000 mode
-        _kwpCommon!.Interface.SetBaudRate(10400);
-        var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParity: false);
-        if (kwpVersion < 2000)
+        const int maxAttempts = 3;
+        for (var attempt = 1; ; attempt++)
         {
-            throw new InvalidOperationException(
-                $"Unable to wake up ECU in KW2000 mode. KW version: {kwpVersion}");
+            try
+            {
+                _kwp1281.EndCommunication();
+
+                Thread.Sleep(1000);
+
+                // Now wake it up again, hopefully in KW2000 mode
+                _kwpCommon!.Interface.SetBaudRate(10400);
+                var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParity: false);
+                if (kwpVersion < 2000)
+                {
+                    throw new InvalidOperationException(
+                        $"Unable to wake up ECU in KW2000 mode. KW version: {kwpVersion}");
+                }
+                Log.WriteLine($"KW Version: {kwpVersion}");
+
+                var edc15 = new Edc15VM(_kwpCommon, _controllerAddress);
+
+                var dumpFileName = filename ?? $"EDC15_EEPROM.bin";
+
+                return edc15.ReadWriteEeprom(dumpFileName, addressValuePairs);
+            }
+            catch (TimeoutException) when (attempt < maxAttempts)
+            {
+                Log.WriteLine(
+                    $"Timed out talking to ECU over KW2000 (attempt {attempt}/{maxAttempts})." +
+                    " Restarting session...");
+            }
         }
-        Log.WriteLine($"KW Version: {kwpVersion}");
-
-        var edc15 = new Edc15VM(_kwpCommon, _controllerAddress);
-
-        var dumpFileName = filename ?? $"EDC15_EEPROM.bin";
-
-        return edc15.ReadWriteEeprom(dumpFileName, addressValuePairs);
     }
 
     public void DumpEeprom(uint address, uint length, string? filename)
