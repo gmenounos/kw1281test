@@ -550,21 +550,35 @@ class Program
     /// <returns></returns>
     private static IInterface OpenPort(string portName, int baudRate)
     {
-        if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
+        try
         {
-            Log.WriteLine($"Opening FTDI serial port {portName}");
-            return new FtdiInterface(portName, baudRate);
+            if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
+            {
+                Log.WriteLine($"Opening FTDI serial port {portName}");
+                return new FtdiInterface(portName, baudRate);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) &&
+                portName.StartsWith("/dev/", StringComparison.CurrentCultureIgnoreCase))
+            {
+                Log.WriteLine($"Opening Linux serial port {portName}");
+                return new LinuxInterface(portName, baudRate);
+            }
+            else
+            {
+                Log.WriteLine($"Opening Generic serial port {portName}");
+                return new GenericInterface(portName, baudRate);
+            }
         }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) &&
-            portName.StartsWith("/dev/", StringComparison.CurrentCultureIgnoreCase))
+        catch (Exception ex) when (
+            ex is FileNotFoundException or UnauthorizedAccessException or IOException)
         {
-            Log.WriteLine($"Opening Linux serial port {portName}");
-            return new LinuxInterface(portName, baudRate);
-        }
-        else
-        {
-            Log.WriteLine($"Opening Generic serial port {portName}");
-            return new GenericInterface(portName, baudRate);
+            var availablePorts = System.IO.Ports.SerialPort.GetPortNames();
+            Log.WriteLine($"Unable to open port {portName}: {ex.Message}");
+            Log.WriteLine(
+                availablePorts.Length > 0
+                    ? $"Available ports: {string.Join(", ", availablePorts)}"
+                    : "No serial ports were detected on this system.");
+            throw new UnableToProceedException();
         }
     }
 
