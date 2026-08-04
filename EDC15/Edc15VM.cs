@@ -66,9 +66,7 @@ namespace BitFab.KW1281Test.EDC15
                     break;
                 }
 
-                _ = kwp2000.SendReceive(
-                    DiagnosticService.transferData, blockBytes.Take(readCount).ToArray(),
-                    excludeAddresses: true);
+                SendTransferDataWithRetry(kwp2000, blockBytes.Take(readCount).ToArray());
             }
 
             // Ask the ECU to execute our loader
@@ -142,6 +140,31 @@ namespace BitFab.KW1281Test.EDC15
             }
 
             return eeprom;
+        }
+
+        /// <summary>
+        /// The K-line can drop a byte mid-transfer during the (slow, multi-chunk) loader
+        /// upload. Retry the individual chunk rather than aborting the whole read/write.
+        /// </summary>
+        private static void SendTransferDataWithRetry(
+            KW2000Dialog kwp2000, byte[] data, int maxAttempts = 3)
+        {
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    _ = kwp2000.SendReceive(
+                        DiagnosticService.transferData, data, excludeAddresses: true);
+                    return;
+                }
+                catch (TimeoutException) when (attempt < maxAttempts)
+                {
+                    Log.WriteLine(
+                        $"Timed out sending loader block (attempt {attempt}/{maxAttempts})." +
+                        " Retrying...");
+                    Thread.Sleep(200);
+                }
+            }
         }
 
         public static void DisplayEepromInfo(ReadOnlySpan<byte> eeprom)
