@@ -423,6 +423,7 @@ internal class VdoCluster : ICluster
 
             case "S599CAA  01.00": // 1M0920800C V15
             case "V599HLA  00.91": // 7D0920841A V18
+            case "V599HLA  01.00": // 3B0920842 B5-KOMBIINSTR. VDO V25
             case "V599LLA  00.91": // 7D0920801B V18
             case "V599LLA  01.00": // 1J0920800L V59
             case "V599LLA  03.00": // 1J0920900J V60
