@@ -1,6 +1,7 @@
 ﻿using BitFab.KW1281Test.Blocks;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace BitFab.KW1281Test.Cluster;
@@ -10,8 +11,9 @@ internal class MotometerBOOCluster : ICluster
     public void UnlockForEepromReadWrite()
     {
         string softwareVersion = GetClusterInfo();
-        if (softwareVersion.Length < 10 ||
-            !VersionToLogin.TryGetValue(softwareVersion[..10], out ushort login))
+        string versionKey = softwareVersion.Length >= 10 ?
+            softwareVersion[..10] : softwareVersion;
+        if (!VersionToLogin.TryGetValue(versionKey, out ushort login))
         {
             Log.WriteLine("Warning: Unknown software version. Login may fail.");
             login = 11899;
@@ -25,24 +27,85 @@ internal class MotometerBOOCluster : ICluster
             return;
         }
 
-        Log.WriteLine("$08 $15 failed. Trying all combinations (this may take a while)...");
+        if (VersionToUnlockCode.TryGetValue(versionKey, out var knownCode))
+        {
+            Log.WriteLine($"Sending Custom ${knownCode.first:X2} ${knownCode.second:X2} block");
+            if (SendCustom(knownCode.first, knownCode.second))
+            {
+                return;
+            }
+        }
 
-        for (int first = 0; first < 0x100; first++)
+        Log.WriteLine("Known unlock codes failed. Trying all combinations (this may take a while)...");
+
+        string progressFile = GetBruteForceProgressFile(versionKey);
+
+        var (startFirst, startSecond) = LoadBruteForceProgress(progressFile);
+        if (startFirst > 0 || startSecond > 0)
+        {
+            Log.WriteLine(
+                $"Resuming from ${startFirst:X2} ${startSecond:X2} " +
+                $"(progress saved from a previous, cancelled run for {versionKey}).");
+        }
+
+        for (int first = startFirst; first < 0x100; first++)
         {
             Log.WriteLine($"Trying ${first:X2} $00-$FF");
 
-            for (int second = 0; second < 0x100; second++)
+            for (int second = (first == startFirst ? startSecond : 0); second < 0x100; second++)
             {
+                File.WriteAllText(progressFile, $"{first} {second}");
+
                 if (SendCustom(first, second))
                 {
                     Log.WriteLine($"Combination ${first:X2} ${second:X2} Succeeded.");
                     Log.WriteLine("Please report this to the program author.");
+                    File.Delete(progressFile);
                     return;
                 }
             }
         }
 
+        File.Delete(progressFile);
         Log.WriteLine("All combinations failed. EEPROM access will likely fail.");
+    }
+
+    /// <summary>
+    /// Each cluster software version gets its own checkpoint file, since the correct
+    /// unlock combination (if any) differs per version.
+    /// </summary>
+    private static string GetBruteForceProgressFile(string softwareVersion)
+    {
+        var sanitized = softwareVersion.Trim();
+        foreach (var c in Path.GetInvalidFileNameChars())
+        {
+            sanitized = sanitized.Replace(c, '_');
+        }
+
+        return $"boo_unlock_bruteforce_progress_{sanitized}.txt";
+    }
+
+    /// <summary>
+    /// Reads the ($first, $second) combination to resume from, if a previous brute-force
+    /// run was cancelled (e.g. via Ctrl+C) partway through. Returns (0, 0) if there's no
+    /// saved progress, or if it's unreadable.
+    /// </summary>
+    private static (int first, int second) LoadBruteForceProgress(string progressFile)
+    {
+        if (!File.Exists(progressFile))
+        {
+            return (0, 0);
+        }
+
+        var parts = File.ReadAllText(progressFile).Trim().Split(' ');
+        if (parts.Length == 2 &&
+            int.TryParse(parts[0], out int first) &&
+            int.TryParse(parts[1], out int second))
+        {
+            return (first, second);
+        }
+
+        return (0, 0);
     }
 
     private bool SendCustom(int first, int second)
@@ -64,6 +127,11 @@ internal class MotometerBOOCluster : ICluster
                 $"Expected ACK or NAK block but got: {block}");
         }
     }
+
+    private readonly Dictionary<string, (byte first, byte second)> VersionToUnlockCode = new()
+    {
+        { "h1340_06.2", (0x45, 0x1C) },
+    };
 
     private readonly Dictionary<string, ushort> VersionToLogin = new()
     {
