@@ -80,11 +80,18 @@ internal class AudiC5Cluster : ICluster
         return dumpFileName;
     }
 
+    private const int MaxAccessLevel = 7;
+
     private void Login()
     {
         SendHello();
         LoginWithPassword();
-        GetAccessLevel();
+
+        var accessLevel = GetAccessLevel();
+        if (accessLevel is not null && accessLevel != MaxAccessLevel)
+        {
+            UnlockViaSeedKey();
+        }
     }
 
     private void SendHello()
@@ -148,6 +155,46 @@ internal class AudiC5Cluster : ICluster
 
         Log.WriteLine("Warning: Access level is unknown.");
         return null;
+    }
+
+    private void UnlockViaSeedKey()
+    {
+        Log.WriteLine("Sending \"Seed Request\" request");
+        WriteBlock([Constants.Login, 0x96, 0x01]);
+        var blockBytes = ReadBlock();
+        Log.WriteLine($"Received block:{Utils.Dump(blockBytes)}");
+
+        if (BlockTitle(blockBytes) != Constants.Login || blockBytes.Count != 14)
+        {
+            Log.WriteLine("Warning: Unexpected response to seed request. EEPROM access will likely fail.");
+            return;
+        }
+
+        var seed = blockBytes.Skip(3).Take(10).ToArray();
+        var key = VdoKeyFinder.FindKey(seed, MaxAccessLevel);
+
+        Log.WriteLine("Sending \"Key Response\" request");
+        var keyBlockBytes = new List<byte> { Constants.Login, 0x96, 0x02 };
+        keyBlockBytes.AddRange(key);
+        WriteBlock(keyBlockBytes);
+
+        blockBytes = ReadBlock();
+        Log.WriteLine($"Received block:{Utils.Dump(blockBytes)}");
+        if (BlockTitle(blockBytes) != Constants.Ack)
+        {
+            Log.WriteLine("Warning: Key was not accepted. EEPROM access will likely fail.");
+        }
+
+        // An ACK above only confirms the block was well-formed, not that the key was actually
+        // correct, so re-query to see whether access level genuinely changed.
+        //
+        // Note: this key-computation algorithm has been verified correct against multiple real
+        // (seed, key) pairs captured from a genuine unlocking tool talking to a cluster stuck
+        // below max access level, but a kw1281test-submitted key has not yet been observed to
+        // actually raise access level on real hardware - only the genuine tool's own
+        // submissions have. If reads still fail after this despite a correct key, the cluster
+        // is likely gated by some additional precondition outside this exchange.
+        GetAccessLevel();
     }
 
     private void DumpEeprom(
