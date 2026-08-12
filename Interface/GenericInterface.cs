@@ -1,4 +1,6 @@
-﻿using System.IO.Ports;
+﻿using System;
+using System.IO.Ports;
+using System.Threading;
 
 namespace BitFab.KW1281Test.Interface
 {
@@ -21,11 +23,21 @@ namespace BitFab.KW1281Test.Interface
             };
 
             _port.Open();
+
+            // Many KKL cables power/enable their K-line transceiver off the DTR line.
+            // Pulse it low then high so the transceiver gets a clean power-on reset
+            // before we start the wakeup sequence, regardless of whatever state a
+            // previous tool/process left the line in.
+            _port.DtrEnable = false;
+            Thread.Sleep(300);
+            _port.DtrEnable = true;
+            Thread.Sleep(300);
         }
 
         public void Dispose()
         {
             SetDtr(false);
+            SetRts(false);
             _port.Close();
         }
 
