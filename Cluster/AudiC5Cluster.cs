@@ -80,6 +80,32 @@ internal class AudiC5Cluster : ICluster
         return dumpFileName;
     }
 
+    /// <summary>
+    /// Writes the contents of <paramref name="filename"/> to EEPROM starting at
+    /// <paramref name="address"/>. Confirmed against real unlocking-tool write traffic (both a
+    /// full 2048-byte image write and a small 2-byte targeted write) — same $77 opcode/framing
+    /// as $72 ReadEeprom, just with the data to write appended to the request instead of the
+    /// response.
+    /// </summary>
+    public void WriteEeprom(uint? address, string? filename)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+        ArgumentNullException.ThrowIfNull(filename);
+
+        var data = File.ReadAllBytes(filename);
+
+        Login();
+
+        Log.WriteLine($"Writing EEPROM from {filename}");
+        WriteEeprom((ushort)address.Value, data, maxWriteLength: 0x08);
+
+        _kw1281Dialog.SetDisconnected();
+
+        Log.WriteLine();
+        Log.WriteLine("Power-cycle the cluster (ignition off/on) for the new EEPROM data " +
+            "(mileage/IMMO ID/VIN) to take effect.");
+    }
+
     private const int MaxAccessLevel = 7;
 
     private void Login()
@@ -229,6 +255,44 @@ internal class AudiC5Cluster : ICluster
         }
     }
 
+    private void WriteEeprom(ushort startAddr, byte[] data, byte maxWriteLength)
+    {
+        var succeeded = true;
+        for (var offset = 0; offset < data.Length; offset += maxWriteLength)
+        {
+            var chunkLen = (byte)Math.Min(data.Length - offset, maxWriteLength);
+            var addr = (ushort)(startAddr + offset);
+
+            List<byte> blockBytes =
+            [
+                Constants.WriteEeprom,
+                chunkLen,
+                (byte)(addr >> 8),
+                (byte)(addr & 0xFF),
+            ];
+            blockBytes.AddRange(data.Skip(offset).Take(chunkLen));
+            WriteBlock(blockBytes);
+
+            var response = ReadBlock();
+            Log.WriteLine($"Received block:{Utils.Dump(response)}");
+            if (BlockTitle(response) != Constants.Ack)
+            {
+                succeeded = false;
+                Log.WriteLine(
+                    $"Warning: Expected block of type ${Constants.Ack:X2} but got ${BlockTitle(response):X2} (address ${addr:X4})");
+            }
+        }
+
+        if (!succeeded)
+        {
+            Log.WriteLine();
+            Log.WriteLine("**********************************************************************");
+            Log.WriteLine("*** Warning: Some bytes may not have been written (see warnings above) ***");
+            Log.WriteLine("**********************************************************************");
+            Log.WriteLine();
+        }
+    }
+
     private List<byte> ReadEepromByAddress(uint addr, byte readLength)
     {
         List<byte> blockBytes =
@@ -342,6 +406,7 @@ internal class AudiC5Cluster : ICluster
         public const byte Hello = 0x49;
         public const byte Login = 0x53;
         public const byte ReadEeprom = 0x72;
+        public const byte WriteEeprom = 0x77;
     }
 
     private readonly IKW1281Dialog _kw1281Dialog;

@@ -760,6 +760,33 @@ internal class Tester
         }
     }
 
+    public void WriteEepromAudiC5(uint address, string filename)
+    {
+        if (_controllerAddress is not ((int)ControllerAddress.Cluster or (int)ControllerAddress.Immobilizer))
+        {
+            Log.WriteLine("Only supported for cluster");
+            return;
+        }
+
+        var ecuInfo = Kwp1281Wakeup();
+
+        if (!(ecuInfo.Text.Contains("4B0920") ||
+              ecuInfo.Text.Contains("4Z7920") ||
+              ecuInfo.Text.Contains("8D0920") ||
+              ecuInfo.Text.Contains("8Z0920")))
+        {
+            Log.WriteLine(
+                "Not a recognized Audi C5-family cluster (expected a 4B0920/4Z7920/8D0920/" +
+                "8Z0920 part-number prefix).");
+            return;
+        }
+
+        var cluster = new AudiC5Cluster(_kwp1281);
+
+        cluster.UnlockForEepromReadWrite();
+        cluster.WriteEeprom(address, filename);
+    }
+
     /// <summary>
     /// Takes the info returned when connecting to the ECU, finds the ECU part number and
     /// splits into its components. For example, if the ECU info is this:
