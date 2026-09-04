@@ -1,0 +1,51 @@
+; ============================================================================
+; Loader-boot-stage1.a66  --  EDC15 boot-mode FIRST-stage loader.
+;
+; The C167 ROM bootstrap loader (BSL) is entered in hardware; the host sends 0x00
+; for auto-baud, the BSL replies 0xC5, then the host sends EXACTLY 32 bytes which
+; the BSL copies to 0FA40H and jumps to. *(All silicon-fixed: the 32-byte count,
+; the 0FA40H load address, and the auto-baud/0xC5 handshake are the C167 BSL
+; contract, identical for any tool.)* This file is those 32 bytes.
+;
+; Our job (our design within the 32-byte budget): signal readiness, receive the
+; stage-2 Monitor (Loader-boot-monitor.a66) byte-by-byte into its load region, and enter
+; it. The Monitor loads at 0F800H -- BELOW this loader (0FA40H) so receiving it
+; never overwrites this still-running code, and above the flash helper (0F600H).
+; The Monitor is 382 bytes, so its last byte lands at 0F97DH (0F800H+382-1).
+;
+; Half-duplex K-line: our ready marker is echoed back to us and discarded; then
+; each received Monitor byte is stored and the pointer walked to the end.
+;
+; Load addresses are written as literals (not EQU) so both Keil and the reasm.py
+; gate assemble them identically. If Loader-boot-monitor.a66 changes size, update the
+; 0F97DH below (= 0F800H + monitor_size - 1).
+;
+; Toolchain: Keil A166 authoritative ($INCLUDE REG167.INC); also assembles under
+; Tools/c166/reasm.py. Must assemble to EXACTLY 32 bytes.
+; ============================================================================
+
+$M167
+$NOLI
+$INCLUDE (REG167.INC)
+$LI
+
+BslStage1	SECTION CODE AT 0FA40H
+Stage1Code	PROC NEAR
+Stage1Entry:
+	MOV     S0TBUF, #0A5H                   ; send 0xA5 "stage-1 ready" marker
+S1_Sync:
+	JNB     S0RIR, S1_Sync                  ; wait for its echo on the K-line, then discard
+	MOV     R0, #0F800H                     ; R0 = Monitor load pointer (0F800H)
+
+; Receive one Monitor byte into [R0], advance, until the last byte is stored.
+S1_RxLoop:
+	BCLR    S0RIR
+S1_Wait:
+	JNB     S0RIR, S1_Wait
+	MOVB    [R0], S0RBUF                    ; store received byte
+	CMPI1   R0, #0F97DH                     ; R0++ ; loop until 0F97DH (last byte, 382 total) stored
+	JMPR    CC_NZ, S1_RxLoop
+	JMPA    CC_UC, 0F800H                   ; enter the Monitor
+Stage1Code	ENDP
+BslStage1	ENDS
+		END

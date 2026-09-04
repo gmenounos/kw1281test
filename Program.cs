@@ -213,6 +213,34 @@ class Program
                 return;
             }
         }
+        else if (string.Compare(command, "LoadEdc15Eeprom", ignoreCase: true) == 0)
+        {
+            // Args in any order (same convention as DumpEdc15Flash): the numeric token is the
+            // optional START address (default 0), the other token is the required FILENAME.
+            if (args.Length < 5)
+            {
+                ShowUsage();
+                return;
+            }
+
+            _filename = null;
+            foreach (var a in args.Skip(4))
+            {
+                if (TryParseUint(a, out var start))
+                {
+                    address = start;
+                }
+                else
+                {
+                    _filename = a;
+                }
+            }
+            if (_filename == null)
+            {
+                ShowUsage();
+                return;
+            }
+        }
         else if (string.Compare(command, "AdaptationRead", ignoreCase: true) == 0)
         {
             if (args.Length < 5)
@@ -297,6 +325,49 @@ class Program
             case "togglerb4mode":
                 tester.ToggleRB4Mode();
                 tester.EndCommunication();
+                return;
+
+            case "dumpedc15flash":
+                // Self-connecting (Edc15FlashVM does its own wakeup + loader upload), so it runs
+                // here, before the KW1281 wakeup below.
+                tester.DumpEdc15Flash(
+                    Edc15FlashVM.Variant.V, ParseFlashFilename(args),
+                    flashSpeed: ParseFlashSpeed(args));
+                return;
+
+            case "loadedc15flash":
+            {
+                // Args in any order (same convention as DumpEdc15Flash): the filename is the token
+                // that isn't a SPEED/full/noverify keyword; the rest are optional modifiers.
+                var lfFile = ParseFlashFilename(args);
+                if (lfFile == null)
+                {
+                    ShowUsage();
+                    return;
+                }
+
+                var lfArgs = args.Skip(4).Select(a => a.ToLowerInvariant()).ToList();
+                tester.LoadEdc15Flash(
+                    Edc15FlashVM.Variant.V, lfFile,
+                    forceFullWrite: lfArgs.Contains("full"),
+                    flashSpeed: ParseFlashSpeed(args),
+                    verify: !(lfArgs.Contains("noverify") || lfArgs.Contains("unverified")));
+                return;
+            }
+
+            case "dumpedc15flashboot":
+                // Boot mode: a lower-level 28800-baud path that requires the ECU to be physically
+                // placed into boot mode before power-up. Edc15BootModeVM does its own handshake.
+                tester.DumpEdc15FlashBoot(args.Length > 4 ? args[4] : null);
+                return;
+
+            case "loadedc15flashboot":
+                if (args.Length < 5)
+                {
+                    ShowUsage();
+                    return;
+                }
+                tester.LoadEdc15FlashBoot(args[4]);
                 return;
 
             default:
@@ -388,6 +459,20 @@ class Program
 
             case "loadeeprom":
                 tester.LoadEeprom(address, _filename!);
+                break;
+
+            case "loadedc15eeprom":
+            {
+                // No pre-write dump: ask the loader for a post-write, pre-reboot read-back and show
+                // that (what's actually on the ECU now).
+                byte[]? postWrite = null;
+                tester.LoadEdc15Eeprom(
+                    address, _filename!, onPostWriteReadback: img => postWrite = img);
+                if (postWrite is { Length: 512 })
+                {
+                    Edc15VM.DisplayEepromInfo(postWrite);
+                }
+            }
                 break;
 
             case "mapeeprom":
@@ -484,6 +569,75 @@ class Program
     ///     ADDRESS = EEPROM address in decimal (0-511) or hex ($00-$1FF)
     ///     VALUE = Value to be stored at address in decimal (0-255) or hex ($00-$FF)
     /// </summary>
+    /// <summary>
+    /// Picks an EDC15 flash <see cref="EDC15.Edc15FlashVM.FlashSpeed"/> out of the command args
+    /// (a "Low"/"Medium"/"High" token anywhere after the command), defaulting to Medium.
+    /// </summary>
+    /// <summary>
+    /// The EDC15 flash link speed from the command args (a "Low"/"Medium"/"High" token anywhere
+    /// after the command), defaulting to Medium. Used as-is -- the speed is not capped by cable type.
+    /// </summary>
+    private static EDC15.Edc15FlashVM.FlashSpeed ParseFlashSpeed(string[] args)
+    {
+        foreach (var a in args.Skip(4))
+        {
+            if (string.Equals(a, "low", StringComparison.OrdinalIgnoreCase))
+                return EDC15.Edc15FlashVM.FlashSpeed.Low;
+            if (string.Equals(a, "medium", StringComparison.OrdinalIgnoreCase))
+                return EDC15.Edc15FlashVM.FlashSpeed.Medium;
+            if (string.Equals(a, "high", StringComparison.OrdinalIgnoreCase))
+                return EDC15.Edc15FlashVM.FlashSpeed.High;
+        }
+        return EDC15.Edc15FlashVM.FlashSpeed.Medium;
+    }
+
+    /// <summary>
+    /// Utils.ParseUint that returns false instead of throwing on a non-numeric token -- used to tell
+    /// a numeric argument (e.g. an EEPROM START address) from a filename when scanning args.
+    /// </summary>
+    private static bool TryParseUint(string s, out uint value)
+    {
+        try
+        {
+            value = Utils.ParseUint(s);
+            return true;
+        }
+        catch (FormatException)
+        {
+            value = 0;
+            return false;
+        }
+        catch (OverflowException)
+        {
+            value = 0;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The filename among the command args: the first token that isn't a speed/flag keyword. Used by
+    /// DumpEdc15Flash (optional output) and LoadEdc15Flash (required input); returns null if none.
+    /// </summary>
+    private static string? ParseFlashFilename(string[] args)
+    {
+        foreach (var a in args.Skip(4))
+        {
+            switch (a.ToLowerInvariant())
+            {
+                case "low":
+                case "medium":
+                case "high":
+                case "full":
+                case "noverify":
+                case "unverified":
+                    continue;
+                default:
+                    return a;
+            }
+        }
+        return null;
+    }
+
     internal static bool ParseAddressesAndValues(
         List<string> addressesAndValues,
         out List<KeyValuePair<ushort, byte>> addressValuePairs)
@@ -630,6 +784,25 @@ COMMAND =
     GroupRead GROUP
         GROUP = Group number (0-255)
         (Group 0: Raw controller data)
+    DumpEdc15Flash [SPEED] [FILENAME]
+        SPEED = Low | Medium | High (default Medium)
+        FILENAME = Optional output filename
+    LoadEdc15Flash [SPEED] [full] [noverify] FILENAME
+        (arguments may be given in any order)
+        FILENAME = Binary flash image to write
+        SPEED = Low | Medium | High (default Medium)
+        full = Write every sector (default: skip sectors whose checksum already matches)
+        noverify = Skip the post-write per-sector checksum verify
+    DumpEdc15FlashBoot [FILENAME]
+        FILENAME = Optional output filename
+        (Boot mode: ECU must be physically in boot mode before power-up; fixed 28800 baud)
+    LoadEdc15FlashBoot FILENAME
+        FILENAME = Binary flash image to write
+        (Boot mode: ECU must be physically in boot mode before power-up; fixed 28800 baud)
+    LoadEdc15Eeprom [START] FILENAME
+        (arguments may be given in any order)
+        START = Optional EEPROM start address in decimal (0-511) or hex (0x00-0x1FF); default 0
+        FILENAME = Name of file containing binary data to write into the EDC15 EEPROM
     LoadEeprom START FILENAME
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         FILENAME = Name of file containing binary data to load into EEPROM

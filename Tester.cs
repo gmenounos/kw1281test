@@ -1,8 +1,9 @@
-﻿using BitFab.KW1281Test.Cluster;
+using BitFab.KW1281Test.Cluster;
 using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -339,27 +340,452 @@ internal class Tester
     }
 
     public byte[] ReadWriteEdc15Eeprom(
-        string? filename, List<KeyValuePair<ushort, byte>>? addressValuePairs = null)
+        string? filename,
+        List<KeyValuePair<ushort, byte>>? addressValuePairs = null,
+        Action<byte[]>? onPostWriteReadback = null)
     {
-        _kwp1281.EndCommunication();
-
-        Thread.Sleep(1000);
-
-        // Now wake it up again, hopefully in KW2000 mode
-        _kwpCommon!.Interface.SetBaudRate(10400);
-        var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParity: false);
-        if (kwpVersion < 2000)
+        // Session-level retry (incorporates gmenounos/kw1281test#185): the K-line occasionally drops
+        // the whole KW2000 session mid-way through the slow loader upload. Rather than fail the whole
+        // command on a transient timeout, restart the wakeup -> session -> loader-upload sequence up
+        // to maxAttempts times. Safe for writes too: each attempt re-uploads a fresh loader and, for
+        // a write, re-sends the same absolute (address, value) pairs -- an EEPROM re-write is
+        // idempotent -- and the in-session verify (onPostWriteReadback) runs on the successful attempt.
+        const int maxAttempts = 3;
+        for (var attempt = 1; ; attempt++)
         {
-            throw new InvalidOperationException(
-                $"Unable to wake up ECU in KW2000 mode. KW version: {kwpVersion}");
+            try
+            {
+                _kwp1281.EndCommunication();
+
+                Thread.Sleep(1000);
+
+                // Now wake it up again, hopefully in KW2000 mode
+                _kwpCommon!.Interface.SetBaudRate(10400);
+                var kwpVersion = _kwpCommon.WakeUp((byte)_controllerAddress, evenParity: false);
+                if (kwpVersion < 2000)
+                {
+                    throw new InvalidOperationException(
+                        $"Unable to wake up ECU in KW2000 mode. KW version: {kwpVersion}");
+                }
+                Log.WriteLine($"KW Version: {kwpVersion}");
+
+                var edc15 = new Edc15VM(_kwpCommon, _controllerAddress);
+
+                // Pass filename through as-is (nullable): on a pure read ReadWriteEeprom falls back to a
+                // default name; on a WRITE a null filename means "don't take a pre-write dump" rather
+                // than silently writing one to a default file.
+                return edc15.ReadWriteEeprom(filename, addressValuePairs, onPostWriteReadback);
+            }
+            catch (TimeoutException) when (attempt < maxAttempts)
+            {
+                Log.WriteLine(
+                    $"Timed out talking to ECU over KW2000 (attempt {attempt}/{maxAttempts})." +
+                    " Restarting session...");
+            }
         }
-        Log.WriteLine($"KW Version: {kwpVersion}");
+    }
 
-        var edc15 = new Edc15VM(_kwpCommon, _controllerAddress);
+    /// <summary>
+    /// Like <see cref="ReadWriteEdc15Eeprom"/>, but the address/value pairs to write come from
+    /// reading a raw binary file starting at <paramref name="startAddress"/>, rather than being
+    /// typed in one by one -- mirrors <see cref="LoadEeprom"/>'s shape (a START address plus an
+    /// input file) applied to EDC15's KWP2000 write path. Writes via the batched Loader-EEPROM.bin
+    /// path. Takes no pre-write dump: the loader sets up its own EEPROM-bus GPIO directions at the
+    /// start of every write command (the EInit routine, see <see cref="Edc15VM.ReadWriteEeprom"/>).
+    /// <paramref name="onPostWriteReadback"/>, when set, receives the loader's in-session, pre-reboot
+    /// read-back of the EEPROM for verification.
+    /// </summary>
+    public byte[] LoadEdc15Eeprom(
+        uint startAddress, string inputFilename,
+        Action<byte[]>? onPostWriteReadback = null)
+    {
+        if (!File.Exists(inputFilename))
+        {
+            Log.WriteLine($"File {inputFilename} does not exist.");
+            return [];
+        }
 
-        var dumpFileName = filename ?? $"EDC15_EEPROM.bin";
+        Log.WriteLine($"Reading {inputFilename}");
+        var bytes = File.ReadAllBytes(inputFilename);
 
-        return edc15.ReadWriteEeprom(dumpFileName, addressValuePairs);
+        if (startAddress + bytes.Length > 512)
+        {
+            throw new ArgumentException(
+                $"File is {bytes.Length} bytes starting at 0x{startAddress:X}, which extends " +
+                "past the EEPROM's 512-byte range (0-0x1FF). Trim the file or choose a lower " +
+                "start address.");
+        }
+
+        var addressValuePairs = new List<KeyValuePair<ushort, byte>>(bytes.Length);
+        for (var i = 0; i < bytes.Length; i++)
+        {
+            addressValuePairs.Add(new KeyValuePair<ushort, byte>((ushort)(startAddress + i), bytes[i]));
+        }
+
+        Log.WriteLine(
+            $"Writing {bytes.Length} bytes to EDC15 EEPROM starting at 0x{startAddress:X}...");
+
+        return ReadWriteEdc15Eeprom(null, addressValuePairs, onPostWriteReadback);
+    }
+
+
+    /// <summary>
+    /// Formats a duration for the elapsed-time line every flash read/write logs on exit (success,
+    /// failure, or Stop -- see each call site's try/finally). "Xm Ys" below an hour (the common
+    /// case for a read); adds "Xh " once a write is slow enough to cross that threshold, rather
+    /// than switching to a fixed h:mm:ss format that would print a misleading "0h" on every read.
+    /// </summary>
+    private static string FormatElapsed(TimeSpan elapsed)
+    {
+        var totalSeconds = (int)elapsed.TotalSeconds;
+        var hours = totalSeconds / 3600;
+        var minutes = totalSeconds % 3600 / 60;
+        var seconds = totalSeconds % 60;
+        return hours > 0 ? $"{hours}h {minutes}m {seconds}s" : $"{minutes}m {seconds}s";
+    }
+
+    /// <summary>
+    /// Reads the full EDC15 external program flash (~512KB) to <paramref name="filename"/>. Unlike
+    /// <see cref="ReadWriteEdc15Eeprom"/> (which reuses the app's normal KW2000 wakeup), this uses
+    /// its own ISO14230 fast-init handshake internally -- see <see cref="Edc15FlashVM.Connect"/>.
+    /// </summary>
+    /// <param name="onChecksumWarning">
+    /// Invoked once, after a successful read, only if <see cref="Edc15Checksum"/> recognizes the
+    /// dumped file's layout AND finds at least one region whose stored checksum doesn't match the
+    /// file's actual contents -- e.g. a read that completed but was subtly corrupted. Purely
+    /// informational (this never blocks or retries the read); a file whose layout isn't recognized
+    /// at all is silently skipped rather than reported as a warning, since "unrecognized" isn't
+    /// evidence of anything wrong. See <see cref="Edc15Checksum"/>'s own doc comment for why.
+    /// </param>
+    public void DumpEdc15Flash(
+        Edc15FlashVM.Variant variant, string? filename, Action<string>? onChecksumWarning = null,
+        Func<bool>? isStopRequested = null,
+        Edc15FlashVM.FlashSpeed flashSpeed = Edc15FlashVM.FlashSpeed.Medium)
+    {
+        // Covers the WHOLE command, connect included, not just the bulk transfer -- matches what
+        // the "=== Read EDC15 Flash ... ===" header already logged by the caller means by "the
+        // command". Logged in a finally so a failed or Stopped read still reports how long it ran
+        // before giving up, not just a successful one.
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var edc15Flash = new Edc15FlashVM(_kwpCommon);
+            edc15Flash.Connect(variant, flashSpeed, isStopRequested);
+
+            var dumpFileName = filename ?? "EDC15_Flash.bin";
+            Log.WriteLine($"Reading EDC15 flash to {dumpFileName}...");
+            edc15Flash.ReadFlash(
+                dumpFileName,
+                onPercent: percent => Log.WriteLine($"{percent}%"),
+                isStopRequested: isStopRequested);
+            Log.WriteLine("Done!");
+
+            try
+            {
+                var readBytes = File.ReadAllBytes(dumpFileName);
+                var checksumResult = Edc15Checksum.Verify(readBytes);
+                if (checksumResult.Supported && !checksumResult.Valid)
+                {
+                    var message =
+                        $"The checksums stored in {dumpFileName} don't match its contents " +
+                        $"({checksumResult.RegionsMismatched} of {checksumResult.RegionsChecked} " +
+                        $"region(s), {checksumResult.Algorithm} algorithm). This can mean the read " +
+                        "was corrupted or interrupted partway through -- consider reading again.";
+                    Log.WriteLine($"\nWARNING: {message}\n");
+                    onChecksumWarning?.Invoke(message);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Checksum verification is a safety net on top of an already-successful read, not a
+                // requirement for one -- a problem here (e.g. this app's checksum algorithm doesn't
+                // recognize the file at all) must never make an otherwise-successful read look like a
+                // failure to the caller.
+                Log.WriteLine($"(Checksum verification skipped: {ex.Message})\n");
+            }
+        }
+        finally
+        {
+            Log.WriteLine($"Read time: {FormatElapsed(stopwatch.Elapsed)}");
+        }
+    }
+
+    /// <summary>
+    /// Erases and writes the full EDC15 external program flash from <paramref name="filename"/>.
+    /// DESTRUCTIVE: an interrupted or incorrect write can brick the ECU -- see the safety notes on
+    /// <see cref="Edc15FlashVM"/> and <see cref="Edc15FlashVM.WriteFlash"/>.
+    /// </summary>
+    /// <param name="confirmChecksumCorrection">
+    /// Invoked BEFORE any connection to the ECU is opened, only if <see cref="Edc15Checksum"/>
+    /// recognizes <paramref name="filename"/>'s layout AND finds at least one region whose stored
+    /// checksum doesn't match its contents. Returning true corrects the checksums in memory (and
+    /// persists the correction back to <paramref name="filename"/>) before flashing; returning
+    /// false (or a null callback) flashes the file exactly as given. A file whose layout isn't
+    /// recognized at all is never touched and never prompted about -- see
+    /// <see cref="Edc15Checksum"/>'s own doc comment for why.
+    /// </param>
+    /// <param name="forceFullWrite">
+    /// The user-facing "Force Full Write" toggle -- when true, disables
+    /// <see cref="Edc15FlashVM.WriteFlash"/>'s default skip-blank-chunk optimization (see that
+    /// method's own doc comment) so every single chunk is written regardless of content. Defaults
+    /// to false (skip enabled), matching how <see cref="CommandRunner.Run"/>'s forceSlowSpeed
+    /// parameter defaults to leaving its own optimization on.
+    /// </param>
+    public void LoadEdc15Flash(
+        Edc15FlashVM.Variant variant, string filename,
+        Func<string, bool>? confirmChecksumCorrection = null,
+        Func<bool>? isStopRequested = null, bool forceFullWrite = false,
+        Edc15FlashVM.FlashSpeed flashSpeed = Edc15FlashVM.FlashSpeed.Medium,
+        bool verify = true,
+        bool allowUnverifiedChecksum = false,
+        Func<bool>? confirmWriteUnverified = null)
+    {
+        // See DumpEdc15Flash's identical stopwatch for why this covers the whole command (checksum
+        // pre-check included -- it's local file I/O, negligible next to the ECU write itself) and
+        // is logged in a finally, so a failed or Stopped write still reports how long it ran.
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var image = File.ReadAllBytes(filename);
+
+            // Validate the image BEFORE any ECU communication. Connect (below) uploads the RAM loader
+            // and leaves it running, so every reason to reject a file has to be caught here, up front --
+            // otherwise a bad file is only discovered after the loader is already on the ECU, leaving it
+            // hanging (exactly the failure this guards against). (Boot-mode write guards the same way;
+            // see LoadEdc15FlashBoot.)
+            //
+            // 1) Size: a real EDC15 external flash is EXACTLY 0x80000 (512 KB). Anything else isn't a
+            //    full flash image -- and, just as importantly, can't be checksum-checked at all
+            //    (Edc15Checksum requires this exact length and reports Supported=false otherwise), so a
+            //    wrong-size file would sail straight past the checksum gate below. Reject it outright.
+            const int Edc15FlashSize = 0x80000;
+            if (image.Length != Edc15FlashSize)
+            {
+                Log.WriteLine(
+                    $"ERROR: {filename} is {image.Length} bytes; an EDC15 flash image must be exactly " +
+                    $"0x{Edc15FlashSize:X} ({Edc15FlashSize}) bytes -- this doesn't look like a full flash " +
+                    "file. Nothing was sent to the ECU. Aborting.");
+                return;
+            }
+
+            // The deliberate opt-in for writing a file this app can't verify (an unrecognized checksum
+            // layout) or can't correct without a prompt: either a pre-authorized flag (the CLI /
+            // command-tab 'unverified' argument) or an in-the-moment confirmation (the GUI's "unverified
+            // file -- continue?" dialog). Absent both, such a file is refused below.
+            bool ProceedUnverified() =>
+                allowUnverifiedChecksum || (confirmWriteUnverified?.Invoke() ?? false);
+
+            // 2) Checksums: writing a file whose stored checksums are wrong must be an explicit,
+            //    acknowledged decision -- never something that scrolls past. Verify/VerifyAndCorrect
+            //    operate on (and correct) the very same in-memory image that gets flashed below.
+            Edc15Checksum.Result checksumResult;
+            try
+            {
+                checksumResult = Edc15Checksum.Verify(image);
+            }
+            catch (Exception ex)
+            {
+                // A throw here is a bug in our own checksum code, not evidence the file is fine. Don't
+                // write blind on the back of it -- refuse and say why (nothing has touched the ECU yet).
+                Log.WriteLine(
+                    $"ERROR: EDC15 checksum verification threw ({ex.Message}); refusing to write without a " +
+                    "verified file. Nothing was sent to the ECU. Aborting.");
+                return;
+            }
+
+            if (checksumResult.Supported && !checksumResult.Valid)
+            {
+                var message =
+                    $"The checksums stored in {filename} don't match its contents " +
+                    $"({checksumResult.RegionsMismatched} of {checksumResult.RegionsChecked} " +
+                    $"region(s), {checksumResult.Algorithm} algorithm). Flashing this file as-is will " +
+                    "write those same incorrect checksums to the ECU. Correct them first?";
+                Log.WriteLine($"\nWARNING: {message}\n");
+
+                if (confirmChecksumCorrection == null)
+                {
+                    // No interactive correct/continue prompt available (e.g. a headless/automation run).
+                    // Only proceed if the caller explicitly opted in to writing an unverified file
+                    // (the 'unverified' arg); otherwise we do NOT silently write a known-bad file.
+                    if (ProceedUnverified())
+                    {
+                        Log.WriteLine(
+                            "Writing the file with its original (invalid) checksums -- explicitly requested.\n");
+                    }
+                    else
+                    {
+                        Log.WriteLine(
+                            "ERROR: this file's stored checksums are invalid and there's no confirmation " +
+                            "prompt available to approve writing it as-is. Correct the checksums first, run " +
+                            "it from the GUI where you can choose to correct or continue, or pass 'unverified' " +
+                            "to write it anyway. Nothing was sent to the ECU. Aborting.");
+                        return;
+                    }
+                }
+                else if (confirmChecksumCorrection.Invoke(message))
+                {
+                    var corrected = Edc15Checksum.VerifyAndCorrect(image);
+                    File.WriteAllBytes(filename, image);
+                    Log.WriteLine($"Corrected {corrected.RegionsMismatched} checksum region(s) in {filename}.\n");
+                }
+                else
+                {
+                    // The user saw the prompt and explicitly chose to write the file unchanged.
+                    Log.WriteLine("Continuing with the file's original (uncorrected) checksums (confirmed).\n");
+                }
+            }
+            else if (!checksumResult.Supported)
+            {
+                // Correct size, but the checksum layout isn't one this app recognizes -- so it can
+                // neither verify nor correct it. We can't confirm the file is even a sane EDC15 image,
+                // so by default we refuse rather than push an unverifiable file to the ECU. The only way
+                // past this is the deliberate opt-in (ProceedUnverified) -- never silent.
+                if (ProceedUnverified())
+                {
+                    Log.WriteLine(
+                        $"NOTE: {filename}'s checksum layout isn't recognized, so it can't be verified -- " +
+                        "writing it as-is at explicit request.\n");
+                }
+                else
+                {
+                    Log.WriteLine(
+                        $"ERROR: couldn't verify {filename} -- its checksum layout isn't one this app " +
+                        "recognizes, so it can't be checked or corrected and might not be a valid EDC15 " +
+                        "flash image at all. Refusing to write an unverifiable file. Pass 'unverified' " +
+                        "to write it anyway. Nothing was sent to the ECU. " +
+                        "Aborting.");
+                    return;
+                }
+            }
+
+            var edc15Flash = new Edc15FlashVM(_kwpCommon);
+            var effectiveSpeed = flashSpeed;
+
+            if (forceFullWrite)
+            {
+                // Force Full Write -> the proven whole-chip path: erase the entire chip, then write
+                // every chunk (no skip). Uses the standard whole-chip loader, not the sector loader.
+                edc15Flash.Connect(variant, effectiveSpeed, isStopRequested);
+                Log.WriteLine($"Writing full EDC15 flash from {filename} (whole-chip erase + write)...");
+                edc15Flash.WriteFlash(
+                    image,
+                    onStage: stage => Log.WriteLine(stage),
+                    onPercent: percent => Log.WriteLine($"{percent}%"),
+                    isStopRequested: isStopRequested,
+                    skipBlankChunks: false);
+            }
+            else
+            {
+                // Default -> per-sector: query each sector's CmdB2 checksum, erase+write only the
+                // sectors that differ from the image, optionally re-verifying by checksum. Uploads the
+                // sector-erase loader (with the checksum command) through the same recovery/speed-aware
+                // Connect. Requires the assembled CmdB2 loader (docs/Loader-sector-erase.a66).
+                Log.WriteLine($"Writing EDC15 flash from {filename} (per-sector: only changed sectors)...");
+                edc15Flash.WriteFlashPerSectorChecksum(
+                    image, effectiveSpeed, verify, forceFull: false,
+                    onStage: stage => Log.WriteLine(stage),
+                    onPercent: percent => Log.WriteLine($"{percent}%"),
+                    isStopRequested: isStopRequested);
+            }
+            Log.WriteLine("Done!");
+        }
+        finally
+        {
+            Log.WriteLine($"Write time: {FormatElapsed(stopwatch.Elapsed)}");
+        }
+    }
+
+    /// Reads the full EDC15 external flash (512KB) via the microcontroller's own hardware boot
+    /// mode -- a completely different, lower-level path than <see cref="DumpEdc15Flash"/> (which
+    /// talks KWP2000 to the ECU's normal firmware, transparently handling recovery mode itself).
+    /// Requires the ECU to already be physically placed into boot mode before this is
+    /// called (a manual hardware procedure this app can't trigger itself) and the interface to
+    /// already be at 28800 baud (see CommandCatalog.FixedBaudCommands).
+    /// </summary>
+    public void DumpEdc15FlashBoot(
+        string? filename, Action<string>? onChecksumWarning = null, Func<bool>? isStopRequested = null)
+    {
+        // See DumpEdc15Flash's identical stopwatch reasoning.
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var bootMode = new Edc15BootModeVM(_kwpCommon.Interface);
+            bootMode.Connect(isStopRequested);
+
+            var dumpFileName = filename ?? "EDC15_Flash_BootMode.bin";
+            Log.WriteLine($"Reading EDC15 flash (boot mode) to {dumpFileName}...");
+            bootMode.ReadFlash(
+                dumpFileName,
+                onPercent: percent => Log.WriteLine($"{percent}%"),
+                isStopRequested: isStopRequested);
+            Log.WriteLine("Done!");
+
+            // Same checksum sanity-check as DumpEdc15Flash -- the flash
+            // content is identical regardless of which path read it, so a mismatch
+            // here is just as meaningful a "this read may be corrupted, consider redoing it" signal.
+            try
+            {
+                var readBytes = File.ReadAllBytes(dumpFileName);
+                var checksumResult = Edc15Checksum.Verify(readBytes);
+                if (checksumResult.Supported && !checksumResult.Valid)
+                {
+                    var message =
+                        $"The checksums stored in {dumpFileName} don't match its contents " +
+                        $"({checksumResult.RegionsMismatched} of {checksumResult.RegionsChecked} " +
+                        $"region(s), {checksumResult.Algorithm} algorithm). This can mean the read " +
+                        "was corrupted or interrupted partway through -- consider reading again.";
+                    Log.WriteLine($"\nWARNING: {message}\n");
+                    onChecksumWarning?.Invoke(message);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"(Checksum verification skipped: {ex.Message})\n");
+            }
+        }
+        finally
+        {
+            Log.WriteLine($"Read time: {FormatElapsed(stopwatch.Elapsed)}");
+        }
+    }
+
+    /// <summary>
+    /// Writes a full 512KB EDC15 external-flash image via the microcontroller's own hardware boot
+    /// mode -- the write counterpart to <see cref="DumpEdc15FlashBoot"/>, and a completely different,
+    /// lower-level path than <see cref="LoadEdc15Flash"/> (which talks KWP2000 to the ECU's normal
+    /// firmware). Requires the ECU to already be physically placed into boot mode and the interface
+    /// to already be at 28800 baud (see CommandCatalog.FixedBaudCommands). Whole-chip-erases the flash
+    /// (validated on hardware), then programs the image. See
+    /// <see cref="Edc15BootModeVM.EraseAndWriteFlash"/> for the register-level protocol.
+    /// </summary>
+    public void LoadEdc15FlashBoot(string filename, Func<bool>? isStopRequested = null)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var image = File.ReadAllBytes(filename);
+            if (image.Length != Edc15BootModeVM.FlashSize)
+            {
+                Log.WriteLine(
+                    $"ERROR: {filename} is {image.Length} bytes; a boot-mode flash image must be " +
+                    $"exactly {Edc15BootModeVM.FlashSize} (0x{Edc15BootModeVM.FlashSize:X}) bytes. Aborting.");
+                return;
+            }
+
+            var bootMode = new Edc15BootModeVM(_kwpCommon.Interface);
+            bootMode.ConnectForWrite(isStopRequested);
+
+            Log.WriteLine($"Writing EDC15 flash (boot mode, whole-chip erase) from {filename}...");
+            bootMode.EraseAndWriteFlash(
+                image,
+                onPercent: percent => Log.WriteLine($"{percent}%"),
+                isStopRequested: isStopRequested);
+            Log.WriteLine("Done!");
+        }
+        finally
+        {
+            Log.WriteLine($"Write time: {FormatElapsed(stopwatch.Elapsed)}");
+        }
     }
 
     public void DumpEeprom(uint address, uint length, string? filename)

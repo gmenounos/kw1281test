@@ -1,0 +1,481 @@
+; ============================================================================
+; Loader-flash.a66
+; (== EDC15P.FLD == the Arduino EDC15_Loader[] byte array).
+;
+; This loader is the SAME family as vendored EDC15/Loader.a66 (identical UART
+; framing, dispatch shape, flash primitives) with three deliberate differences,
+; called out at each site below:
+;   1. INTER-SEGMENT LINKAGE.  Every subroutine call is CALLS (seg 0) and every
+;      return is RETS, where Loader.a66 uses near CALL/RET.  The source therefore
+;      spells these out explicitly (CALLS 0,label / RETS) so Keil re-encodes the
+;      exact DA../DB.. bytes -- writing plain CALL here would (wrongly) assemble
+;      to CALLR/CALLA.
+;   2. REDUCED COMMAND SET.  Only 0x23/0x36/0xA2/0xA3/0xA4/0xA5 are handled; the
+;      EEPROM commands 0xA6/0xA7/0xA8 (and their 3-wire bit-bang + E1C6/E324/E356
+;      routines) present in Loader.a66 are absent.
+;   3. CmdA2 (reboot) is trimmed (no leading SendACK; see CmdA2_Reboot).
+;
+; The trailing 6 bytes at 0E3AAH (089H,0C5H,012H,0CEH,0C7H,0B3H) are the checksum-
+; correction value.  Edc15VM.GetLoaderFromResource RE-COMPUTES these at load time
+; so the loader's rolling checksum equals EFCD8631 for whatever the content/length
+; is -- so the DB values below are only a placeholder snapshot, not load-bearing.
+; ============================================================================
+
+$M167
+$NOLI
+$INCLUDE (REG167.INC)
+$LI
+
+All		SECTION CODE AT 0E000H
+; --- 66-byte (0x42) loader header, byte-for-byte identical to vendored Loader.a66's
+; --- header except the RoutineEnd pointer (this build ends at 0E3B0H).
+		DB	0A5H, 0A5H, 14H, 0E0H, 00H, 00H, 3CH, 0E0H
+		DB	00H, 00H
+		DW	RoutineStart
+		DB	00H, 00H
+		DW	RoutineEnd
+		DB	00H, 00H, 02H, 47H, 13H, 00H, 00H, 01H
+		DB	00H, 02H, 00H, 03H, 00H, 04H, 00H, 05H
+		DB	00H, 06H, 00H, 07H, 00H, 08H, 00H, 09H
+		DB	00H, 0AH, 00H, 0BH, 00H, 0CH, 00H, 0DH
+		DB	00H, 0EH, 00H, 0FH, 80H, 0FH, 0A0H, 0FH
+		DB	0C0H, 0FH, 00H, 10H, 45H, 2FH, 7DH, 64H
+		DB	9BH, 0C3H
+
+RoutineStart	PROC FAR
+	BCLR    IEN
+	BSET    S0REN
+	MOV     R0, #0E7FEH
+
+; Receive-and-dispatch loop.  RecvMsg returns status in R6
+; (0=ok,1=timeout,2=bad checksum).  Called back here after every handler.
+RxDispatch:
+	CALLS   0, RecvMsg
+	CMP     R6, #1H
+	JMPR    CC_Z, RxTimeoutReply            ; R6==1 timeout -> probe reply
+	CMP     R6, #2H
+	JMPR    CC_Z, NakReply                  ; R6==2 bad checksum -> NAK
+	MOV     R1, #0E600H
+	MOVB    RL2, [R1+#1H]                   ; service byte = buf[1] -> RL2
+	CMPB    RL2, #23H
+	JMPR    CC_Z, Cmd23_ReadFlash
+	CMPB    RL2, #0A2H
+	JMPR    CC_Z, CmdA2_Reboot
+	CMPB    RL2, #0A3H
+	JMPR    CC_Z, CmdA3_Ping55
+	CMPB    RL2, #0A4H
+	JMPR    CC_Z, CmdA4_SetBaud
+	CMPB    RL2, #0A5H
+	JMPR    CC_Z, CmdA5_EraseChip
+	CMPB    RL2, #36H
+	JMPR    CC_Z, Cmd36_ProgFlash
+
+; Unknown/!ok service -> send negative response, then dispatch again.
+NakReply:
+	CALLS   0, SendNAK
+	JMPR    CC_UC, RxDispatch
+
+; 0x23 Read flash: ReadFlash builds+sends its own response.
+Cmd23_ReadFlash:
+	CALLS   0, ReadFlash
+	JMPR    CC_UC, RxDispatch
+
+; 0xA2 Reboot.  NOTE trimmed vs Loader.a66: no SendACK here -- just emit
+; 0x55, wait, then SRST.
+CmdA2_Reboot:
+	MOVB    RL7, #55H
+	CALLS   0, XmitRL7
+	CALLS   0, Delay256
+	SRST                                    ; software reset (reboot into firmware)
+
+; 0xA3 Respond with 0x55 (liveness ping).
+CmdA3_Ping55:
+	MOVB    RL7, #55H
+	CALLS   0, XmitRL7
+	JMPR    CC_UC, RxDispatch
+
+; 0xA4 Set baud rate: buf[2] -> S0BG (serial baud generator reload).
+CmdA4_SetBaud:
+	CALLS   0, SendACK
+	CALLS   0, Delay256
+	MOV     R2, #0H
+	MOVB    RL2, [R1+#2H]
+	MOV     S0BG, R2
+	MOVB    RL7, #0AAH
+	CALLS   0, XmitRL7
+	JMPR    CC_UC, RxDispatch
+
+; Timeout path (R6==1): echo buf[0]+1 as a probe reply.
+RxTimeoutReply:
+	MOVB    RL7, [R1]
+	ADDB    RL7, #1H
+	CALLS   0, XmitRL7
+	JMPR    CC_UC, RxDispatch
+
+; 0xA5 Erase whole chip (JEDEC 0x10), then ACK.
+CmdA5_EraseChip:
+	CALLS   0, SendACK
+	CALLS   0, EraseChip
+	CALLS   0, SendACK
+	JMPR    CC_UC, RxDispatch
+
+; 0x36 Program flash: ProgFlash writes the payload, then ACK.
+Cmd36_ProgFlash:
+	CALLS   0, ProgFlash
+	CALLS   0, SendACK
+	JMPR    CC_UC, RxDispatch
+	RETS
+
+; SendNAK: transmit a 1-byte 0x7F negative response (buf @0E600H).
+SendNAK:
+	MOV     [-R0], R1
+	MOV     [-R0], R2
+	MOV     R1, #0E600H
+	MOVB    RL2, #1H
+	MOVB    [R1], RL2
+	MOVB    RL2, #7FH
+	MOVB    [R1+#1H], RL2
+	CALLS   0, SendMsg
+	MOV     R2, [R0+]
+	MOV     R1, [R0+]
+	RETS
+
+; SendACK: transmit a 1-byte 0x76 positive response (buf @0E600H).
+SendACK:
+	MOV     [-R0], R1
+	MOV     [-R0], R2
+	MOV     R1, #0E600H
+	MOVB    RL2, #1H
+	MOVB    [R1], RL2
+	MOVB    RL2, #76H
+	MOVB    [R1+#1H], RL2
+	CALLS   0, SendMsg
+	MOV     R2, [R0+]
+	MOV     R1, [R0+]
+	RETS
+
+; RecvMsg -> buffer @0E600H.  Frame = [len][len payload bytes incl. checksum].
+; len is a SINGLE byte (max 255).  R2 low = len is used as the down-counter
+; (CMPD1 R2). Buffer 0E600H sits ~0x1FE (510) bytes below the R0 software
+; stack top (0E7FEH), so a full 255-byte frame fits with room to spare --
+; this is why program chunks up to ~249 bytes work here.  Bug inherited
+; from Loader.a66: R6 is never pre-set to 0 and E1A2 never actually times
+; out, so status 1 is unreachable.
+RecvMsg:
+	MOV     [-R0], R1
+	MOV     [-R0], R2
+	MOV     [-R0], R3
+	MOV     R1, #0E600H
+	CALLS   0, RecvByte
+	MOV     R2, #0H
+	MOVB    RL2, RL7
+	MOVB    RL3, RL7
+	MOVB    [R1], RL7
+	ADD     R1, #1H
+RecvMsg_Loop:
+	CALLS   0, RecvByteTO
+	CMP     R6, #0H
+	JMPR    CC_NZ, RecvMsg_Ret
+	MOVB    [R1], RL7
+	ADDB    RL3, RL7
+	ADD     R1, #1H
+	CMPD1   R2, #0H
+	JMPR    CC_NZ, RecvMsg_Loop
+	SUBB    RL3, RL7
+	CMPB    RL3, RL7
+	JMPR    CC_Z, RecvMsg_Ret
+	MOV     R6, #2H
+RecvMsg_Ret:
+	MOV     R3, [R0+]
+	MOV     R2, [R0+]
+	MOV     R1, [R0+]
+	RETS
+
+; SendMsg: transmit buf[0..len] from @0E600H followed by a summed checksum.
+SendMsg:
+	MOV     [-R0], R1
+	MOV     [-R0], R2
+	MOV     [-R0], R3
+	MOV     R1, #0E600H
+	MOV     R2, #0H
+	MOVB    RL2, [R1]
+	MOVB    RL3, #0H
+SendMsg_Loop:
+	MOVB    RL7, [R1+]
+	ADDB    RL3, RL7
+	CALLS   0, XmitRL7
+	CMPD1   R2, #0H
+	JMPR    CC_NZ, SendMsg_Loop
+	MOVB    RL7, RL3
+	CALLS   0, XmitRL7
+	MOV     R3, [R0+]
+	MOV     R2, [R0+]
+	MOV     R1, [R0+]
+	RETS
+
+; XmitRL7: send RL7 on S0, then RecvByte to swallow the local echo.
+XmitRL7:
+	MOVB    S0TBUF, RL7
+	CALLS   0, RecvByte
+	RETS
+
+; RecvByte: spin on S0RIR (no timeout) -> R7, clear flag.
+RecvByte:
+	SRVWDT
+	JNB     S0RIR, RecvByte
+	MOV     R7, S0RBUF
+	BCLR    S0RIR
+	RETS
+
+; RecvByteTO: receive with a 0FFFFH spin timeout; R6=0 ok / 1 timeout.
+; (the timeout branch works but RecvMsg discards it -- see note there).
+RecvByteTO:
+	MOV     [-R0], R1
+	MOV     R1, #0FFFFH
+	MOV     R6, #0H
+RecvByteTO_Loop:
+	SRVWDT
+	JB      S0RIR, RecvByteTO_Got
+	CMPD1   R1, #0H
+	JMPR    CC_NZ, RecvByteTO_Loop
+	MOV     R6, #1H
+	JMPR    CC_UC, RecvByteTO_Ret
+RecvByteTO_Got:
+	MOV     R7, S0RBUF
+	BCLR    S0RIR
+RecvByteTO_Ret:
+	MOV     R1, [R0+]
+	RETS
+
+; ProgFlash: addr from buf[2..4] (hi/med/lo), word count = (len-4)/2.
+; Walks R3 from buf+5, feeding 16-bit words to ProgWord; R1:R2 = flash addr,
+; advanced by 2 per word.  Max payload therefore (255-4)/2 = 125 words.
+ProgFlash:
+	MOV     [-R0], R1
+	MOV     [-R0], R2
+	MOV     [-R0], R3
+	MOV     [-R0], R4
+	MOV     R3, #0E600H
+	MOV     R2, #0H
+	MOVB    RL2, [R3+#2H]
+	MOVB    RH1, [R3+#3H]
+	MOVB    RL1, [R3+#4H]
+	MOV     R4, #0H
+	MOVB    RL4, [R3]
+	SUB     R4, #4H                         ; len-4 (drop service+3 addr bytes)
+	SHR     R4, #1H                         ; /2 -> word count
+	SUB     R4, #1H                         ; -1 (do-while)
+	ADD     R3, #5H
+ProgFlash_Loop:
+	SRVWDT
+	MOVB    RL7, [R3+]
+	MOVB    RH7, [R3+]
+	CALLS   0, ProgWord
+	ADD     R1, #2H
+	ADDC    R2, #0H
+	CMPD1   R4, #0H
+	JMPR    CC_NZ, ProgFlash_Loop
+	MOV     R4, [R0+]
+	MOV     R3, [R0+]
+	MOV     R2, [R0+]
+	MOV     R1, [R0+]
+	RETS
+
+; ProgWord: Am29F400 unlock AA->AAAA,55->5555,A0->AAAA then program word,
+; then WaitToggle for completion.
+ProgWord:
+	MOV     [-R0], R1
+	MOV     [-R0], R7
+	MOV     R1, #0AAAAH
+	MOVB    RL7, #0AAH
+	CALLS   0, WriteExtByte
+	MOV     R1, #5555H
+	MOVB    RL7, #55H
+	CALLS   0, WriteExtByte
+	MOV     R1, #0AAAAH
+	MOVB    RL7, #0A0H
+	CALLS   0, WriteExtByte
+	MOV     R7, [R0+]
+	MOV     R1, [R0+]
+	CALLS   0, WriteExtWord
+	CALLS   0, WaitToggle
+	RETS
+
+; ReadFlash: addr from buf[2..4], count buf[5]; reads count+1 bytes via
+; ReadExtByte into the response buffer and SendMsg.
+ReadFlash:
+	MOV     [-R0], R1
+	MOV     [-R0], R2
+	MOV     [-R0], R3
+	MOV     [-R0], R4
+	MOV     [-R0], R5
+	MOV     R3, #0E600H
+	MOV     R2, #0H
+	MOVB    RL2, [R3+#2H]
+	MOVB    RH1, [R3+#3H]
+	MOVB    RL1, [R3+#4H]
+	MOV     R4, #0H
+	MOVB    RL4, [R3+#5H]
+	ADDB    RL4, #1H
+	MOVB    [R3], RL4
+	ADD     R3, #1H
+	MOVB    RL7, #36H
+	MOVB    [R3], RL7
+	ADD     R3, #1H
+	SUBB    RL4, #1H
+ReadFlash_Loop:
+	CALLS   0, ReadExtByte
+	MOVB    [R3], RL7
+	ADD     R3, #1H
+	ADD     R1, #1H
+	ADDC    R2, #0H
+	CMPD1   R4, #0H
+	JMPR    CC_NZ, ReadFlash_Loop
+	CALLS   0, SendMsg
+	MOV     R5, [R0+]
+	MOV     R4, [R0+]
+	MOV     R3, [R0+]
+	MOV     R2, [R0+]
+	MOV     R1, [R0+]
+	RETS
+
+; ReadExtByte: set DPP0 from R2:R1, mask to 14 bits, read one flash byte -> RL7.
+ReadExtByte:
+	MOV     [-R0], R1
+	SRVWDT
+	CALLS   0, SetDPP0
+	AND     R1, #3FFFH
+	MOVB    RL7, [R1]
+	MOV     R1, [R0+]
+	RETS
+
+; SetDPP0: fold R2:R1 (24-bit addr) into DPP0 so [R1 & 3FFFH] hits the page.
+SetDPP0:
+	MOV     [-R0], R1
+	MOV     [-R0], R2
+	SHL     R2, #2H
+	AND     R2, #0FCH
+	ROL     R1, #2H
+	AND     R1, #3H
+	OR      R2, R1
+	MOV     DPP0, R2
+	MOV     R2, [R0+]
+	MOV     R1, [R0+]
+	RETS
+
+; Delay256: busy-wait, R3 counts 0..0100H (feeds watchdog each pass).
+Delay256:
+	MOV     [-R0], R3
+	MOV     R3, #0H
+Delay256_Loop:
+	SRVWDT
+	ADD     R3, #1H
+	CMP     R3, #100H
+	JMPR    CC_NZ, Delay256_Loop
+	MOV     R3, [R0+]
+	RETS
+	MOV     [-R0], R3                       ; DEAD CODE: Delay16 (to 0x10); nothing CALLS 0E2D2H (unreachable after RETS above)
+	MOV     R3, #0H
+L_E2D6:
+	SRVWDT
+	ADD     R3, #1H
+	CMP     R3, #10H
+	JMPR    CC_NZ, L_E2D6
+	MOV     R3, [R0+]
+	RETS
+
+; EraseChip: full Am29F400 chip-erase command sequence (AA/55/80/AA/55/10),
+; then WaitToggle.
+EraseChip:
+	MOV     [-R0], R1
+	MOV     [-R0], R2
+	MOV     [-R0], R3
+	MOV     [-R0], R7
+	MOV     R3, #0E600H
+	MOV     R2, #20H
+	MOV     R1, #0AAAAH
+	MOVB    RL7, #0AAH
+	CALLS   0, WriteExtByte
+	MOV     R1, #5555H
+	MOVB    RL7, #55H
+	CALLS   0, WriteExtByte
+	MOV     R1, #0AAAAH
+	MOVB    RL7, #80H
+	CALLS   0, WriteExtByte
+	MOV     R1, #0AAAAH
+	MOVB    RL7, #0AAH
+	CALLS   0, WriteExtByte
+	MOV     R1, #5555H
+	MOVB    RL7, #55H
+	CALLS   0, WriteExtByte
+	MOV     R1, #0AAAAH
+	MOVB    RL7, #10H
+	CALLS   0, WriteExtByte
+	CALLS   0, Delay256
+	MOVB    RL7, #80H
+	CALLS   0, WaitToggle
+	MOV     R7, [R0+]
+	MOV     R3, [R0+]
+	MOV     R2, [R0+]
+	MOV     R1, [R0+]
+	RETS
+
+; WaitToggle: poll flash DQ7 until the programmed/erased value settles.
+WaitToggle:
+	MOV     [-R0], R2
+	MOV     [-R0], R7
+	SUB     R2, #18H
+	MOVB    RH7, RL7
+	ANDB    RH7, #80H
+WaitToggle_Loop:
+	CALLS   0, ReadExtByte
+	ANDB    RL7, #80H
+	CMPB    RL7, RH7
+	JMPR    CC_NZ, WaitToggle_Loop
+	MOV     R7, [R0+]
+	MOV     R2, [R0+]
+	RETS
+
+; WriteExtByte: SetDPP0 then store RL7 to [R1 & 3FFFH] (flash command write).
+WriteExtByte:
+	MOV     [-R0], R1
+	CALLS   0, SetDPP0
+	AND     R1, #3FFFH
+	MOVB    [R1], RL7
+	MOV     R1, [R0+]
+	RETS
+
+; WriteExtWord: SetDPP0 then store R7 (word) to [R1 & 3FFFH].
+WriteExtWord:
+	MOV     [-R0], R1
+	CALLS   0, SetDPP0
+	AND     R1, #3FFFH
+	MOV     [R1], R7
+	MOV     R1, [R0+]
+	RETS
+RoutineStart	ENDP
+
+; ---- 0E394H: end of executable code (last RETS at 0E392H) ----
+; 22 bytes of 0C3H fill + 6-byte checksum-correction value (E3AAH..E3AFH,
+; recomputed by GetLoaderFromResource -- placeholder here):
+		DB	0C3H, 0C3H, 0C3H, 0C3H, 0C3H, 0C3H, 0C3H, 0C3H
+		DB	0C3H, 0C3H, 0C3H, 0C3H, 0C3H, 0C3H, 0C3H, 0C3H
+		DB	0C3H, 0C3H, 0C3H, 0C3H, 0C3H, 0C3H, 89H, 0C5H
+		DB	12H, 0CEH, 0C7H, 0B3H
+RoutineEnd:
+; ---- 0E3B0H..0E3F7H: 72-byte block appended by GetLoaderFromResource
+; (a truncated copy of the loader header signature + fill); carried so the
+; reconstruction is byte-exact.  Not executed.
+		DB	0A5H, 0A5H, 14H, 0E0H, 00H, 00H, 3CH, 0E0H
+		DB	00H, 00H, 42H, 0E0H, 00H, 00H, 00H, 0E4H
+		DB	00H, 00H, 02H, 47H, 13H, 00H, 00H, 01H
+		DB	00H, 02H, 00H, 03H, 00H, 04H, 00H, 05H
+		DB	00H, 06H, 00H, 07H, 00H, 08H, 00H, 09H
+		DB	00H, 0AH, 00H, 0BH, 00H, 0CH, 00H, 0DH
+		DB	00H, 0EH, 00H, 0FH, 80H, 0FH, 0A0H, 0FH
+		DB	0C0H, 0FH, 00H, 10H, 45H, 2FH, 7DH, 64H
+		DB	9BH, 0C3H, 0C3H, 0C3H, 0C3H, 0C3H, 0C3H, 0C3H
+
+All		ENDS
+
+		END
