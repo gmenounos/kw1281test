@@ -1,6 +1,7 @@
 ﻿using BitFab.KW1281Test.Interface;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime;
 using System.Threading;
 
@@ -28,6 +29,14 @@ namespace BitFab.KW1281Test
         int WakeUp(
             byte controllerAddress, bool evenParity = false, bool failQuietly = false,
             Func<bool>? isStopRequested = null, Func<int, bool>? stopRetryingOnSyncByte = null);
+
+        /// <summary>
+        /// One ISO 14230 fast-init attempt to <paramref name="targetAddress"/>: a 25 ms break-low
+        /// pulse, then StartCommunication at Twup, at 10400 baud. Returns the KWP2000 protocol
+        /// version, or 0 if no StartCommunication response was seen. Bit-banged over USB-serial it
+        /// is probabilistic, so callers retry; the break pulse works on FTDI and CH340 KKL cables.
+        /// </summary>
+        int TryFastInit(byte targetAddress);
 
         /// <summary>
         /// The raw sync byte read on the most recent <see cref="WakeUp"/> attempt (the value seen
@@ -399,6 +408,100 @@ namespace BitFab.KW1281Test
                 throw new InvalidOperationException($"Wrote 0x{b:X2} to port but echo was 0x{echo:X2}");
             }
 #endif
+        }
+
+        // ISO 14230 Twup: StartCommunication first bit falls 50 ms after the low pulse starts.
+        private const double FastInitTwupSeconds = 0.050;
+
+        public int TryFastInit(byte targetAddress)
+        {
+            Interface.SetBaudRate(10400);
+            var savedTimeout = Interface.ReadTimeout;
+            Interface.ReadTimeout = (int)TimeSpan.FromSeconds(2).TotalMilliseconds;
+            try
+            {
+                Interface.SetBreak(false);
+                Thread.Sleep(300);                   // W5: bus idle high >= 300 ms
+
+                // 25 ms low pulse; the stopwatch starts at the falling edge so StartCommunication
+                // lands at Twup after the pulse start. Busy-wait keeps the edges tight.
+                var sw = Stopwatch.StartNew();
+                Interface.SetBreak(true);
+                FastInitBusyWaitUntil(sw, 0.025);
+                Interface.SetBreak(false);
+                Interface.ClearReceiveBuffer();
+
+                FastInitBusyWaitUntil(sw, FastInitTwupSeconds);
+
+                Interface.ClearReceiveBuffer();
+                var req = new byte[] { 0x81, targetAddress, 0xF1, 0x81 };
+                byte checksum = 0;
+                foreach (var b in req) checksum += b;
+                var frame = new byte[req.Length + 1];
+                Array.Copy(req, frame, req.Length);
+                frame[req.Length] = checksum;
+                Interface.WriteBytesRaw(frame);
+
+                // Scan the echo + reply for the StartCommunication positive response (SID 0xC1 then
+                // two keyword bytes); scanning for 0xC1 skips our echo and any pulse garbage.
+                var buf = FastInitReadBurst(48, 400, 30);
+                var idx = Array.IndexOf(buf, (byte)0xC1);
+                if (idx < 0 || idx + 2 >= buf.Length)
+                {
+                    return 0;
+                }
+                int kwLsb = buf[idx + 1];
+                int kwMsb = buf[idx + 2];
+                var version = ((kwMsb & 0x7F) << 7) + (kwLsb & 0x7F);
+                return version >= 2000 ? version : 0x2000;
+            }
+            finally
+            {
+                Interface.ReadTimeout = savedTimeout;
+            }
+        }
+
+        private static void FastInitBusyWaitUntil(Stopwatch sw, double seconds)
+        {
+            var targetTicks = (long)(seconds * Stopwatch.Frequency);
+            while (sw.ElapsedTicks < targetTicks) { }
+        }
+
+        // Read the half-duplex echo + reply into one buffer until gapTimeoutMs of silence or
+        // maxBytes, so the caller can scan for the reply without aligning to the echo boundary.
+        private byte[] FastInitReadBurst(int maxBytes, int firstTimeoutMs, int gapTimeoutMs)
+        {
+            var outBuf = new List<byte>(maxBytes);
+            var savedTimeout = Interface.ReadTimeout;
+            try
+            {
+                Interface.ReadTimeout = firstTimeoutMs;
+                try
+                {
+                    outBuf.Add(Interface.ReadByte());
+                }
+                catch (TimeoutException)
+                {
+                    return outBuf.ToArray();
+                }
+                Interface.ReadTimeout = gapTimeoutMs;
+                while (outBuf.Count < maxBytes)
+                {
+                    try
+                    {
+                        outBuf.Add(Interface.ReadByte());
+                    }
+                    catch (TimeoutException)
+                    {
+                        break;
+                    }
+                }
+            }
+            finally
+            {
+                Interface.ReadTimeout = savedTimeout;
+            }
+            return outBuf.ToArray();
         }
 
         public KwpCommon(IInterface @interface)

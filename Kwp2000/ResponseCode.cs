@@ -5,6 +5,7 @@ public enum ResponseCode
     generalReject = 0x10,
     serviceNotSupported = 0x11,
     subFunctionNotSupportedInvalidFormat = 0x12,
+    incorrectMessageLengthOrInvalidFormat = 0x13,
     busyRepeatRequest = 0x21,
     conditionsNotCorrectOrRequestSequenceError = 0x22,
     routineNotComplete = 0x23,
@@ -29,5 +30,6 @@ public enum ResponseCode
     blockTransferDataChecksumError = 0x77,
     reqCorrectlyRcvdRspPending = 0x78,
     incorrectByteCountDuringBlockTransfer = 0x79,
+    serviceNotSupportedInActiveDiagnosticSession = 0x80,
     // Manufacturer-Specific 0x80-0xFF
 }
