@@ -370,6 +370,39 @@ class Program
                 tester.LoadEdc15FlashBoot(args[4]);
                 return;
 
+            case "dumpedc16flash":
+                // Self-connecting (Edc16FlashVM runs its own ISO14230 fast-init), like the EDC15
+                // flash commands above.
+                tester.ReadFlashEdc16(ParseFlashFilename(args), ParseEdc16FlashSpeed(args));
+                return;
+
+            case "loadedc16flash":
+            {
+                var lf16 = ParseFlashFilename(args);
+                if (lf16 == null)
+                {
+                    ShowUsage();
+                    return;
+                }
+
+                var lf16Args = args.Skip(4).Select(a => a.ToLowerInvariant()).ToList();
+                tester.WriteFlashEdc16(
+                    lf16,
+                    confirmChecksumCorrection: message =>
+                    {
+                        Console.Write($"{message} Correct them now? [y/N] ");
+                        var key = Console.ReadKey();
+                        Console.WriteLine();
+                        return key.Key == ConsoleKey.Y;
+                    },
+                    allowUnverifiedChecksum:
+                        lf16Args.Contains("unverified") || lf16Args.Contains("noverify"),
+                    forceFullWrite: lf16Args.Contains("full"),
+                    fastInitPrime: lf16Args.Contains("fastinit"),
+                    speed: ParseEdc16FlashSpeed(args));
+                return;
+            }
+
             default:
                 break;
         }
@@ -614,6 +647,20 @@ class Program
         return EDC15.Edc15FlashVM.FlashSpeed.Medium;
     }
 
+    private static EDC16.Edc16FlashVM.FlashSpeed ParseEdc16FlashSpeed(string[] args)
+    {
+        foreach (var a in args.Skip(4))
+        {
+            if (string.Equals(a, "low", StringComparison.OrdinalIgnoreCase))
+                return EDC16.Edc16FlashVM.FlashSpeed.Low;
+            if (string.Equals(a, "medium", StringComparison.OrdinalIgnoreCase))
+                return EDC16.Edc16FlashVM.FlashSpeed.Medium;
+            if (string.Equals(a, "high", StringComparison.OrdinalIgnoreCase))
+                return EDC16.Edc16FlashVM.FlashSpeed.High;
+        }
+        return EDC16.Edc16FlashVM.FlashSpeed.Medium;
+    }
+
     /// <summary>
     /// Utils.ParseUint that returns false instead of throwing on a non-numeric token -- used to tell
     /// a numeric argument (e.g. an EEPROM START address) from a filename when scanning args.
@@ -821,9 +868,20 @@ COMMAND =
     DumpEdc15FlashBoot [FILENAME]
         FILENAME = Optional output filename
         (Boot mode: ECU must be physically in boot mode before power-up; fixed 28800 baud)
+    DumpEdc16Flash [SPEED] [FILENAME]
+        SPEED = Low | Medium | High (default Medium)
+        FILENAME = Optional output filename
     LoadEdc15FlashBoot FILENAME
         FILENAME = Binary flash image to write
         (Boot mode: ECU must be physically in boot mode before power-up; fixed 28800 baud)
+    LoadEdc16Flash FILENAME [SPEED] [full] [unverified] [fastinit]
+        (arguments may be given in any order)
+        FILENAME = 2 MB binary flash image to write
+        SPEED = Low | Medium | High (default Medium)
+        full = Write every block (default: skip blocks whose checksum already matches)
+        unverified = Skip the post-write checksum verify
+        fastinit = Prime with an ISO 14230 fast init before the slow init (only a later
+                   CAN-init EDC16 that ignores a cold slow init needs this)
     LoadEdc15Eeprom [START] FILENAME
         (arguments may be given in any order)
         START = Optional EEPROM start address in decimal (0-511) or hex (0x00-0x1FF); default 0

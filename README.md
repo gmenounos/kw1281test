@@ -65,6 +65,9 @@ COMMAND =
     DumpEdc15FlashBoot [FILENAME]
         FILENAME = Optional filename
         (ECU must be physically placed into C167 hardware boot mode first)
+    DumpEdc16Flash [SPEED] [FILENAME]
+        SPEED = low|medium|high link speed (default medium)
+        FILENAME = Optional filename
     DumpEeprom START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. 0x800)
@@ -101,6 +104,13 @@ COMMAND =
     LoadEdc15FlashBoot FILENAME
         FILENAME = Name of file containing the flash image to write
         (ECU must be physically placed into C167 hardware boot mode first)
+    LoadEdc16Flash FILENAME [SPEED] [full] [unverified] [fastinit]
+        FILENAME = Name of file containing the 2 MB flash image to write
+        SPEED = low|medium|high link speed (default medium)
+        full = Force a whole-chip write instead of the per-block checksum decide
+        unverified = Skip the post-write checksum verify
+        fastinit = Prime with an ISO 14230 fast init before the slow init (only a later
+                   CAN-init EDC16 that ignores a cold slow init needs this)
     LoadEeprom START FILENAME
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         FILENAME = Name of file containing binary data to load into EEPROM
