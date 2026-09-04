@@ -374,28 +374,51 @@ class Program
                 break;
         }
 
-        ControllerInfo ecuInfo = tester.Kwp1281Wakeup();
+        // Fast init is opt-in and only for the group read on a later CAN-init EDC16 (see WakeUpAny);
+        // every other command, and any EDC15, uses the normal 5-baud slow init.
+        var groupReadFastInit =
+            string.Equals(command, "groupread", StringComparison.OrdinalIgnoreCase) &&
+            args.Any(a => string.Equals(a, "fastinit", StringComparison.OrdinalIgnoreCase));
+        EcuSession session = tester.WakeUpAny(tryFastInit: groupReadFastInit);
+        ControllerInfo? ecuInfo = session.Kw1281;
+
+        // The diagnostic commands below run over either protocol via their *Any(session)
+        // overloads; a KW1281-only command is rejected cleanly if the controller answered KWP2000.
+        var kwp2000SharedCommands = new HashSet<string>
+        {
+            "readident", "readfaultcodes", "clearfaultcodes", "groupread", "basicsetting",
+            "actuatortest", "adaptationread", "adaptationtest", "adaptationsave",
+            "setsoftwarecoding", "reset",
+        };
+        if (session.IsKwp2000 && !kwp2000SharedCommands.Contains(command.ToLower()))
+        {
+            Log.WriteLine(
+                $"Command '{command}' is not available over KWP2000 -- this controller answered " +
+                $"KWP2000, and '{command}' is a KW1281-only operation.");
+            tester.EndCommunication();
+            return;
+        }
 
         switch (command.ToLower())
         {
             case "actuatortest":
-                tester.ActuatorTest();
+                tester.ActuatorTestAny(session);
                 break;
 
             case "adaptationread":
-                tester.AdaptationRead(channel, login, ecuInfo.WorkshopCode);
+                tester.AdaptationReadAny(session, channel, login, ecuInfo?.WorkshopCode ?? 0);
                 break;
 
             case "adaptationsave":
-                tester.AdaptationSave(channel, channelValue, login, ecuInfo.WorkshopCode);
+                tester.AdaptationSaveAny(session, channel, channelValue, login, ecuInfo?.WorkshopCode ?? 0);
                 break;
 
             case "adaptationtest":
-                tester.AdaptationTest(channel, channelValue, login, ecuInfo.WorkshopCode);
+                tester.AdaptationTestAny(session, channel, channelValue, login, ecuInfo?.WorkshopCode ?? 0);
                 break;
 
             case "basicsetting":
-                tester.BasicSettingRead(groupNumber);
+                tester.BasicSettingAny(session, groupNumber);
                 break;
 
             case "clarionvwpremium4safecode":
@@ -403,7 +426,7 @@ class Program
                 break;
 
             case "clearfaultcodes":
-                tester.ClearFaultCodes();
+                tester.ClearFaultCodesAny(session);
                 break;
 
             case "delcovwpremium5safecode":
@@ -430,7 +453,7 @@ class Program
                 break;
 
             case "dumpmarellimem":
-                tester.DumpMarelliMem(address, length, ecuInfo, _filename);
+                tester.DumpMarelliMem(address, length, ecuInfo!, _filename);
                 return;
 
             case "dumpmem":
@@ -446,7 +469,7 @@ class Program
                 break;
 
             case "findlogins":
-                tester.FindLogins(login!.Value, ecuInfo.WorkshopCode);
+                tester.FindLogins(login!.Value, ecuInfo!.WorkshopCode);
                 break;
 
             case "getclusterid":
@@ -454,7 +477,7 @@ class Program
                 break;
 
             case "groupread":
-                tester.GroupRead(groupNumber);
+                tester.GroupReadAny(session, groupNumber);
                 break;
 
             case "loadeeprom":
@@ -492,11 +515,11 @@ class Program
                 break;
 
             case "readfaultcodes":
-                tester.ReadFaultCodes();
+                tester.ReadFaultCodesAny(session);
                 break;
 
             case "readident":
-                tester.ReadIdent();
+                tester.ReadIdentAny(session);
                 break;
 
             case "readsoftwareversion":
@@ -504,11 +527,11 @@ class Program
                 break;
 
             case "reset":
-                tester.Reset();
+                tester.ResetAny(session);
                 break;
 
             case "setsoftwarecoding":
-                tester.SetSoftwareCoding(softwareCoding, workshopCode);
+                tester.SetSoftwareCodingAny(session, softwareCoding, workshopCode);
                 break;
 
             case "writeedc15eeprom":
@@ -781,9 +804,11 @@ COMMAND =
     FindLogins LOGIN
         LOGIN = Known good login (0-65535)
     GetSKC
-    GroupRead GROUP
+    GroupRead GROUP [fastinit]
         GROUP = Group number (0-255)
         (Group 0: Raw controller data)
+        fastinit = Connect with an ISO 14230 fast init (only a later CAN-init EDC16 that
+                   ignores a cold slow init needs this)
     DumpEdc15Flash [SPEED] [FILENAME]
         SPEED = Low | Medium | High (default Medium)
         FILENAME = Optional output filename

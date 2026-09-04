@@ -11,7 +11,7 @@ using System.Threading;
 
 namespace BitFab.KW1281Test;
 
-internal class Tester
+internal partial class Tester
 {
     private readonly IKwpCommon _kwpCommon;
     private readonly IKW1281Dialog _kwp1281;

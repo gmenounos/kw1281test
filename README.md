@@ -85,9 +85,11 @@ COMMAND =
         START = Start address in decimal (e.g. 8192) or hex (e.g. 0x2000)
         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. 0x10000)
     GetSKC
-    GroupRead GROUP
+    GroupRead GROUP [fastinit]
         GROUP = Group number (0-255)
         (Group 0: Raw controller data)
+        fastinit = Connect with an ISO 14230 fast init (only a later CAN-init EDC16
+                   that ignores a cold slow init needs this)
     LoadEdc15Eeprom [START] FILENAME
         START = Optional start address in decimal (e.g. 0) or hex (e.g. 0x0), default 0
         FILENAME = Name of file containing binary data to write into the EDC15 EEPROM
