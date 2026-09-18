@@ -1026,6 +1026,12 @@ internal class Tester
             .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
             .Replace(' ', '_').Replace(":", "");
 
+        if (identInfo.Contains("BOO") || identInfo.Contains("MM0"))
+        {
+            new MotometerBOOCluster(_kwp1281!).UnlockForEepromReadWrite();
+            return BOOClusterDumpEeprom(startAddress, length, filename);
+        }
+
         ICluster cluster = new VdoCluster(_kwp1281);
         cluster.UnlockForEepromReadWrite();
 
@@ -1138,6 +1144,9 @@ internal class Tester
                 var blockBytes = _kwp1281.ReadEeprom((ushort)addr, (byte)readLength) ?? [];
                 if (blockBytes.Count < readLength)
                 {
+                    Log.WriteLine(
+                        $"Failed to read block at address ${addr:X4} " +
+                        $"(got {blockBytes.Count}/{readLength} bytes). Replacing with 0.");
                     blockBytes.AddRange(Enumerable.Repeat((byte)0, readLength - blockBytes.Count));
                     succeeded = false;
                 }
