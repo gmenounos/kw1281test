@@ -1,43 +1,44 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <RootNamespace>BitFab.KW1281Test</RootNamespace>
-    <LangVersion>latest</LangVersion>
-    <AssemblyVersion>1.0.2.0</AssemblyVersion>
-    <FileVersion>1.0.2.0</FileVersion>
-    <Version>1.0.2</Version>
-    <Copyright>Copyright © 2026 Greg Menounos</Copyright>
-    <DebugType>embedded</DebugType>
-    <DebugSymbols>true</DebugSymbols>
-    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
-    <Authors>Greg Menounos</Authors>
-    <Company>BitFab</Company>
-    <PackageProjectUrl>https://github.com/gmenounos/kw1281test</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/gmenounos/kw1281test</RepositoryUrl>
-    <TrimMode>link</TrimMode>
-    <PublishTrimmed>true</PublishTrimmed>
-    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
-    <Nullable>enable</Nullable>
-    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<RootNamespace>BitFab.KW1281Test</RootNamespace>
+		<LangVersion>latest</LangVersion>
+		<AssemblyVersion>1.0.2.0</AssemblyVersion>
+		<FileVersion>1.0.2.0</FileVersion>
+		<Version>1.0.2</Version>
+		<Copyright>Copyright © 2026 Greg Menounos</Copyright>
+		<DebugType>embedded</DebugType>
+		<DebugSymbols>true</DebugSymbols>
+		<IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+		<Authors>Greg Menounos</Authors>
+		<Company>BitFab</Company>
+		<PackageProjectUrl>https://github.com/gmenounos/kw1281test</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/gmenounos/kw1281test</RepositoryUrl>
+		<TrimMode>link</TrimMode>
+		<PublishTrimmed>true</PublishTrimmed>
+		<SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+		<Nullable>enable</Nullable>
+		<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+		<InternalsVisibleTo>BitFab.KW1281Test.Tests</InternalsVisibleTo>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <Compile Remove="GitHub\**" />
-    <Compile Remove="Tests\**" />
-    <EmbeddedResource Remove="GitHub\**" />
-    <EmbeddedResource Remove="Tests\**" />
-    <None Remove="GitHub\**" />
-    <None Remove="Tests\**" />
-  </ItemGroup>
+	<ItemGroup>
+		<Compile Remove="GitHub\**" />
+		<Compile Remove="Tests\**" />
+		<EmbeddedResource Remove="GitHub\**" />
+		<EmbeddedResource Remove="Tests\**" />
+		<None Remove="GitHub\**" />
+		<None Remove="Tests\**" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="EDC15\Loader.bin" />
-  </ItemGroup>
+	<ItemGroup>
+		<EmbeddedResource Include="EDC15\Loader.bin" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="System.IO.Ports" Version="10.0.5" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="System.IO.Ports" Version="10.0.11" />
+	</ItemGroup>
 
 </Project>

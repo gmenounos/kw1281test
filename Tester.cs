@@ -580,10 +580,27 @@ internal class Tester
         {
             var ecuInfo = Kwp1281Wakeup();
 
-            if (ecuInfo.Text.Contains("4B0920") ||
-                ecuInfo.Text.Contains("4Z7920") ||
-                ecuInfo.Text.Contains("8D0920") ||
-                ecuInfo.Text.Contains("8Z0920"))
+            if (ecuInfo.Text.Contains("M73"))
+            {
+                ICluster cluster = new MarelliCluster(_kwp1281, ecuInfo.Text);
+
+                string dumpFileName = cluster.DumpEeprom(
+                    address: null, length: null, dumpFileName: null);
+                byte[] buf = File.ReadAllBytes(dumpFileName);
+                ushort? skc = MarelliCluster.GetSkc(buf);
+                if (skc.HasValue)
+                {
+                    Log.WriteLine($"SKC: {skc:D5}");
+                }
+                else
+                {
+                    Log.WriteLine($"Unable to determine SKC for cluster: {ecuInfo.Text}");
+                }
+            }
+            else if (ecuInfo.Text.Contains("4B0920") ||
+                     ecuInfo.Text.Contains("4Z7920") ||
+                     ecuInfo.Text.Contains("8D0920") ||
+                     ecuInfo.Text.Contains("8Z0920"))
             {
                 var family = ecuInfo.Text[..2] switch
                 {
@@ -694,23 +711,6 @@ internal class Tester
                 var buf = File.ReadAllBytes(dumpFileName!);
                 var skc = Utils.GetShort(buf, 0);
                 Log.WriteLine($"SKC: {skc:D5}");
-            }
-            else if (ecuInfo.Text.Contains("M73"))
-            {
-                ICluster cluster = new MarelliCluster(_kwp1281, ecuInfo.Text);
-
-                string dumpFileName = cluster.DumpEeprom(
-                    address: null, length: null, dumpFileName: null);
-                byte[] buf = File.ReadAllBytes(dumpFileName);
-                ushort? skc = MarelliCluster.GetSkc(buf);
-                if (skc.HasValue)
-                {
-                    Log.WriteLine($"SKC: {skc:D5}");
-                }
-                else
-                {
-                    Log.WriteLine($"Unable to determine SKC for cluster: {ecuInfo.Text}");
-                }
             }
             else if (ecuInfo.Text.Contains("BOO") || ecuInfo.Text.Contains("MM0"))
             {
@@ -1165,14 +1165,14 @@ internal class Tester
         {
             Log.WriteLine(
                 "Cluster is unlocked for memory access. Skipping Seed/Key login.");
-        }
+    }
         else
-        {
+    {
             var (isUnlocked, softwareVersion) = vdoCluster.Unlock();
             if (!isUnlocked)
-            {
+        {
                 Log.WriteLine("Unknown cluster software version. Memory access will likely fail.");
-            }
+        }
             vdoCluster.SeedKeyAuthenticate(softwareVersion);
         }
 
