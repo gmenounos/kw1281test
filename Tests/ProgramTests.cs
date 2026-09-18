@@ -40,4 +40,41 @@ public class ProgramTests
         
         Assert.IsFalse(returnValue);
     }
+
+    [TestMethod]
+    public void ExtractFastEepromFlag_FlagAbsent_LeavesArgumentsAlone()
+    {
+        var remaining = Program.ExtractFastEepromFlag(
+            ["COM1", "10400", "17", "DumpEeprom", "0", "2048"], out var fast);
+
+        Assert.IsFalse(fast);
+        Assert.AreEqual(6, remaining.Length);
+        Assert.AreEqual("COM1", remaining[0]);
+    }
+
+    [TestMethod]
+    [DataRow("-FastEeprom")]
+    [DataRow("-fasteeprom")]
+    [DataRow("--fast-eeprom")]
+    public void ExtractFastEepromFlag_FlagPresent_IsRemovedFromArguments(string flag)
+    {
+        var remaining = Program.ExtractFastEepromFlag(
+            [flag, "COM1", "10400", "17", "DumpEeprom"], out var fast);
+
+        Assert.IsTrue(fast);
+        CollectionAssert.AreEqual(
+            new[] { "COM1", "10400", "17", "DumpEeprom" }, remaining);
+    }
+
+    [TestMethod]
+    public void ExtractFastEepromFlag_FlagAfterPositionalArguments_StillFound()
+    {
+        // The flag has to work wherever it is typed, or it becomes a trap.
+        var remaining = Program.ExtractFastEepromFlag(
+            ["COM1", "10400", "17", "DumpEeprom", "-FastEeprom"], out var fast);
+
+        Assert.IsTrue(fast);
+        Assert.AreEqual(4, remaining.Length);
+        Assert.AreEqual("DumpEeprom", remaining[^1]);
+    }
 }

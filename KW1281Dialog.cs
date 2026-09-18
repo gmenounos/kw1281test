@@ -139,6 +139,23 @@ internal class KW1281Dialog : IKW1281Dialog
     /// <param name="address"></param>
     /// <param name="count"></param>
     /// <returns>The bytes or null if the bytes could not be read</returns>
+    /// <summary>
+    /// Skip the acknowledgement round-trip after each EEPROM reply: send the next request
+    /// straight away, which acknowledges the previous block by itself.
+    ///
+    /// Off by default, enabled with the -FastEeprom command line flag.
+    ///
+    /// A USB capture of a vendor tool reading the same cluster shows a block counter that
+    /// advances by 2 per read - one request, one reply - where this code advances it by 4,
+    /// because it also sends an ACK block and waits for the controller's ACK in return.
+    /// Measured on a VWK501LL cluster, a 2 KB dump went from 83 to 56 seconds and the
+    /// contents matched byte for byte.
+    ///
+    /// It stays opt-in because it has only been tried on one cluster: a controller that
+    /// does insist on the acknowledgement would break, and the flag is the way back.
+    /// </summary>
+    public static bool FastEepromRead { get; set; }
+
     public List<byte>? ReadEeprom(ushort address, byte count)
     {
         Log.WriteLine($"Sending ReadEeprom block (Address: ${address:X4}, Count: ${count:X2})");
@@ -149,7 +166,9 @@ internal class KW1281Dialog : IKW1281Dialog
             (byte)(address >> 8),
             (byte)(address & 0xFF)
         });
-        var blocks = ReceiveBlocks();
+        var blocks = FastEepromRead
+            ? [ReceiveBlock()]
+            : ReceiveBlocks();
 
         if (blocks.Count == 1 && blocks[0] is NakBlock)
         {
