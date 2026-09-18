@@ -621,6 +621,10 @@ COMMAND =
         GROUP = Group number (0-255)
         (Group 0: Raw controller data)
     ClarionVWPremium4SafeCode
+    ClearCrashData [VALUE]
+        VALUE = Byte to fill crash data area 0x00-0x4F (optional, default 0xFF)
+                Example: ClearCrashData   -> fills with 0xFF
+                         ClearCrashData 0 -> fills with 0x00
     ClearFaultCodes
     DelcoVWPremium5SafeCode
     DumpEdc15Eeprom [FILENAME]
@@ -629,8 +633,9 @@ COMMAND =
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. 0x800)
         FILENAME = Optional filename
-        For Airbag address: DumpEeprom FILENAME also works and dumps the
-        whole EEPROM (size auto-detected from ReadIdent).
+    DumpEeprom FILENAME
+        (For Airbag address only) Dumps the whole EEPROM (size auto-detected
+        from ReadIdent).
     DumpMarelliMem START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 3072) or hex (e.g. 0xC00)
         LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. 0x400)
@@ -660,10 +665,6 @@ COMMAND =
     LoadEeprom START FILENAME
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         FILENAME = Name of file containing binary data to load into EEPROM
-    ClearCrashData [VALUE]
-        VALUE = Byte to fill crash data area 0x00-0x4F (optional, default 0xFF)
-                Example: ClearCrashData    -> fills with 0xFF
-                         ClearCrashData 0  -> fills with 0x00
     MapEeprom
     ReadFaultCodes
     ReadIdent

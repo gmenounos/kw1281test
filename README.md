@@ -31,10 +31,10 @@ Or, load up the project in Visual Studio and Ctrl-Shift-B.
 
 ```
 Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
-
+                
 PORT = COM1|COM2|etc. (Windows)
-        /dev/ttyXXXX (Linux)
-        AABBCCDD (macOS/Linux FTDI cable serial number)
+    /dev/ttyXXXX (Linux)
+    AABBCCDD (macOS/Linux FTDI cable serial number)
 BAUD = 10400|9600|etc.
 ADDRESS = Controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
 COMMAND =
@@ -55,6 +55,10 @@ COMMAND =
         GROUP = Group number (0-255)
         (Group 0: Raw controller data)
     ClarionVWPremium4SafeCode
+    ClearCrashData [VALUE]
+        VALUE = Byte to fill crash data area 0x00-0x4F (optional, default 0xFF)
+                Example: ClearCrashData   -> fills with 0xFF
+                         ClearCrashData 0 -> fills with 0x00
     ClearFaultCodes
     DelcoVWPremium5SafeCode
     DumpEdc15Eeprom [FILENAME]
@@ -63,11 +67,18 @@ COMMAND =
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. 0x800)
         FILENAME = Optional filename
+    DumpEeprom FILENAME
+        (For Airbag address only) Dumps the whole EEPROM (size auto-detected
+        from ReadIdent).
     DumpMarelliMem START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 3072) or hex (e.g. 0xC00)
         LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. 0x400)
         FILENAME = Optional filename
     DumpMem START LENGTH [FILENAME]
+        START = Start address in decimal (e.g. 8192) or hex (e.g. 0x2000)
+        LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. 0x10000)
+        FILENAME = Optional filename
+    DumpRam START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 8192) or hex (e.g. 0x2000)
         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. 0x10000)
         FILENAME = Optional filename
@@ -78,6 +89,9 @@ COMMAND =
     DumpRom START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 8192) or hex (e.g. 0x2000)
         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. 0x10000)
+        FILENAME = Optional filename
+    FindLogins LOGIN
+        LOGIN = Known good login (0-65535)
     GetSKC
     GroupRead GROUP
         GROUP = Group number (0-255)
@@ -123,3 +137,4 @@ COMMAND =
     - [Olivier Fauchon](https://github.com/ofauchon)
     - [Jonathan Klamroth](https://github.com/jonnykl)
     - [Martin Sestak](https://github.com/poure-1)
+    - [Dragonslab53](https://github.com/Dragonslab53)
