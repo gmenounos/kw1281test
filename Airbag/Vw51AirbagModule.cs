@@ -1,26 +1,23 @@
-using BitFab.KW1281Test.Interface;
-using KW1281Test.Airbag;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace BitFab.KW1281Test.Airbag;
 
 public sealed class Vw51AirbagModule : IAirbagModule
 {
-    // Базовый физический адрес, с которого логический адрес 0 отображается в EEPROM.
-    // Подтверждено захватом трафика штатного инструмента: VW51 читает с 0x0800,
-    // VW61 — с 0x0D00 (0x0D00 + EepromSizeVW61(0x300) = 0x1000).
+    // Base physical address from which logical address 0 is mapped in EEPROM.
+    // Confirmed by capturing traffic from the OEM tool: VW51 reads from 0x0800,
+    // VW61 reads from 0x0D00 (0x0D00 + EepromSizeVW61(0x300) = 0x1000).
     private const int LogicalBaseAddressVW51 = 0x0800;
     private const int LogicalBaseAddressVW61 = 0x0D00;
     private const byte MaxReadLength = 8;
 
-    // Размеры EEPROM по версиям блока.
-    // VW51 и VW61 подтверждены реальным дампом с блока; 1C0909601 — оценка по
-    // максимальному адресу в ClearCrashData (0x30F), живым дампом не подтверждена.
+    // EEPROM sizes by module version.
+    // VW51 and VW61 are confirmed by a real dump from the module; 1C0909601 is an estimate
+    // based on the maximum address in ClearCrashData (0x30F), not confirmed by a live dump.
     private const int EepromSizeVW51 = 512;  // 0x200
     private const int EepromSizeVW61 = 768;  // 0x300
-    private const int EepromSizeVW_1C0909601 = 784;  // 0x310 (неподтверждено)
+    private const int EepromSizeVW_1C0909601 = 784;  // 0x310 (unconfirmed)
 
     private readonly IKW1281Dialog _kwp1281;
     private readonly string _ecuText;
@@ -31,7 +28,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
         _ecuText = ecuText ?? string.Empty;
     }
 
-    /// <summary>Версия блока: VW51, VW61 или конкретный артикул 1C0909601.</summary>
+    /// <summary>Module version: VW51, VW61, or the specific part number 1C0909601.</summary>
     public enum ModuleVersion { VW51, VW61, VW_1C0909601 }
 
     private ModuleVersion _version = ModuleVersion.VW51;
@@ -47,7 +44,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
     {
         var text = string.IsNullOrWhiteSpace(ecuIdent) ? _ecuText : ecuIdent;
 
-        // Сначала проверяем конкретный артикул — он имеет приоритет
+        // First check the specific part number — it takes priority.
         if (text.Contains("1C0909601", StringComparison.OrdinalIgnoreCase))
         {
             _version = ModuleVersion.VW_1C0909601;
@@ -81,27 +78,23 @@ public sealed class Vw51AirbagModule : IAirbagModule
         _kwp1281.Login(0x4653, 0);
 
         Log.WriteLine("VW51 airbag: send unlock block 1A 01 50 4D 00 (no response expected)");
-        _kwp1281.SendBlock(new List<byte>
-        {
+        _kwp1281.SendBlock(
+        [
             (byte)BlockTitle.WriteEeprom,
             0x01,
             0x50,
             0x4D,
             0x00
-        });
-
+        ]);
     }
 
     public byte[] DumpEeprom(int startAddress, int length)
     {
-        if (length < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(length));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(length);
 
         if (length == 0)
         {
-            return Array.Empty<byte>();
+            return [];
         }
 
         try
@@ -126,8 +119,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
                 currentAddress += chunk.Length;
             }
 
-            // Завершаем raw-сессию — без этого ECU не возвращается
-            // в нормальный режим и требует перезагрузки.
+            // End the raw session — without this the ECU does not return to normal mode and requires a reboot.
             Log.WriteLine("VW51 airbag: sending end-of-session frame 02 77 75");
             CommitWrite();
 
@@ -146,27 +138,27 @@ public sealed class Vw51AirbagModule : IAirbagModule
 
     public void ClearCrashData(byte fillValue = 0xFF)
     {
-        // Диапазоны — файловые офсеты (до ResolveAbsoluteAddress), включительно.
+        // Ranges are file offsets (before ResolveAbsoluteAddress), inclusive.
         var ranges = _version switch
         {
             ModuleVersion.VW51 =>
-                // VW51: адреса 0x000-0x04F (80 байт)
-                new[] { (0x000, 0x04F) },
+                // VW51: addresses 0x000-0x04F (80 bytes)
+                [(0x000, 0x04F)],
             ModuleVersion.VW61 =>
-                // VW61: два диапазона
-                new[] { (0x000, 0x030), (0x151, 0x1EF) },
-            // 1C0909601: 0x000-0x30F — область ошибок, 0x151-0x1EB и 0x1EE-0x1EF — краш-данные
+                // VW61: two ranges
+                [(0x000, 0x030), (0x151, 0x1EF)],
+            // 1C0909601: 0x000-0x30F — fault area, 0x151-0x1EB and 0x1EE-0x1EF — crash data
             _ => new[] { (0x000, 0x30F), (0x151, 0x1EB), (0x1EE, 0x1EF) }
         };
 
         Log.WriteLine(
             $"VW51 airbag: ClearCrashData ({_version}) — " +
             string.Join(", ", ranges.Select(r => $"0x{r.Item1:X3}-0x{r.Item2:X3}")) +
-            $", значение 0x{fillValue:X2}");
+            $", value 0x{fillValue:X2}");
 
-        // Все диапазоны пишутся в рамках ОДНОЙ сессии (один Login/raw-режим/commit) —
-        // повторный Login после SetDisconnected() падает, т.к. счётчик блоков
-        // обнуляется и заново не выставляется без полного нового подключения.
+        // All ranges are written within a single session (one Login/raw-mode/commit) —
+        // a repeated Login after SetDisconnected() fails because the block counter resets
+        // and is not restored without a full new connection.
         try
         {
             PrepareSession();
@@ -181,7 +173,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
 
                 int absoluteAddress = ResolveAbsoluteAddress(startOffset);
                 Log.WriteLine(
-                    $"  FillRange 0x{startOffset:X3}-0x{endOffset:X3} ({length} байт) = 0x{fillValue:X2}");
+                    $"  FillRange 0x{startOffset:X3}-0x{endOffset:X3} ({length} bytes) = 0x{fillValue:X2}");
                 WriteBytesAtAbsoluteAddress(absoluteAddress, data);
             }
 
@@ -203,15 +195,9 @@ public sealed class Vw51AirbagModule : IAirbagModule
 
     public void LoadEeprom(int startAddress, byte[] data)
     {
-        if (startAddress < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(startAddress));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(startAddress);
 
-        if (data == null)
-        {
-            throw new ArgumentNullException(nameof(data));
-        }
+        ArgumentNullException.ThrowIfNull(data);
 
         if (data.Length == 0)
         {
@@ -227,7 +213,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
         try
         {
             PrepareSession();
-            EnterRawReadMode(); // режим записи и чтения входят одинаково через 0x70
+            EnterRawReadMode(); // read and write mode are entered the same way through 0x70
 
             WriteBytesAtAbsoluteAddress(absoluteAddress, data);
 
@@ -248,9 +234,9 @@ public sealed class Vw51AirbagModule : IAirbagModule
     }
 
     /// <summary>
-    /// Пишет байты по абсолютному адресу. Должен вызываться уже внутри активной
-    /// raw-сессии (после PrepareSession/EnterRawReadMode), без commit/disconnect —
-    /// это позволяет писать несколько диапазонов за одну сессию (см. ClearCrashData).
+    /// Writes bytes at an absolute address. Must be called while an active raw session is
+    /// already open (after PrepareSession/EnterRawReadMode), without commit/disconnect —
+    /// this allows writing several ranges in one session (see ClearCrashData).
     /// </summary>
     private void WriteBytesAtAbsoluteAddress(int absoluteAddress, byte[] data)
     {
@@ -271,8 +257,8 @@ public sealed class Vw51AirbagModule : IAirbagModule
 
     private void CommitWrite()
     {
-        // Финализирующий фрейм: 02 77 75
-        // Без него ECU не записывает данные из буфера в EEPROM постоянно.
+        // Finalizing frame: 02 77 75
+        // Without it, the ECU does not persist data from the buffer to EEPROM.
         var request = new byte[] { 0x02, 0x77, 0x00 };
         request[2] = ComputeXor(request, 2);
         SendRawBytes(request);
@@ -292,7 +278,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
             0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
             0x00  // placeholder for XOR
         };
-        request[request.Length - 1] = ComputeXor(request, request.Length - 1);
+        request[^1] = ComputeXor(request, request.Length - 1);
 
         SendRawBytes(request);
 
@@ -312,7 +298,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
         }
 
         byte expectedChecksum = ComputeXor(response, response.Length - 1);
-        byte actualChecksum = response[response.Length - 1];
+        byte actualChecksum = response[^1];
         if (expectedChecksum != actualChecksum)
         {
             throw new InvalidOperationException(
@@ -339,7 +325,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
             $"VW51 airbag: raw unlock response ({response.Length} bytes): " +
             BitConverter.ToString(response).Replace("-", " "));
 
-        byte ackByte = response[response.Length - 1];
+        byte ackByte = response[^1];
         Log.WriteLine($"VW51 airbag: acknowledge raw unlock with 0x{ackByte:X2}");
         kwpCommon.Interface.WriteByteRaw(ackByte);
 
@@ -436,7 +422,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
         }
 
         byte expectedChecksum = ComputeXor(response, response.Length - 1);
-        byte actualChecksum = response[response.Length - 1];
+        byte actualChecksum = response[^1];
         if (expectedChecksum != actualChecksum)
         {
             throw new InvalidOperationException(
@@ -458,16 +444,13 @@ public sealed class Vw51AirbagModule : IAirbagModule
 
     private int ResolveAbsoluteAddress(int address)
     {
-        if (address < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(address));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(address);
 
         int logicalBaseAddress = _version == ModuleVersion.VW61
             ? LogicalBaseAddressVW61
             : LogicalBaseAddressVW51;
 
-        // Чтобы команда ReadEeprom 0 читала с начала блока, как в штатной программе.
+        // So that the ReadEeprom 0 command reads from the start of the module, as in the OEM tool.
         return address < logicalBaseAddress
             ? logicalBaseAddress + address
             : address;

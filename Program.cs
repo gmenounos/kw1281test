@@ -1,5 +1,5 @@
 ﻿global using static BitFab.KW1281Test.Program;
-
+using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
 using BitFab.KW1281Test.Logging;
 using System;
@@ -7,14 +7,13 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
-using BitFab.KW1281Test.EDC15;
-using System.Runtime.InteropServices;
-using System.IO;
 
 [assembly: InternalsVisibleTo("BitFab.KW1281Test.Tests")]
 
@@ -120,8 +119,8 @@ class Program
                  controllerAddress == (int)ControllerAddress.Airbag &&
                  args.Length == 5)
         {
-            // Короткая форма для Airbag: DumpEeprom FILENAME -> весь EEPROM с адреса 0.
-            // Длина определяется по версии блока (VW51/VW61/1C0909601) после ReadIdent.
+            // Short form for Airbag: DumpEeprom FILENAME -> dump the entire EEPROM from address 0.
+            // Length is determined by the module version (VW51/VW61/1C0909601) after ReadIdent.
             address = 0;
             length = uint.MaxValue;
             _filename = args[4];
@@ -172,7 +171,7 @@ class Program
         }
         else if (string.Compare(command, "ClearCrashData", ignoreCase: true) == 0)
         {
-            // Необязательный аргумент: байт для заполнения (по умолчанию 0xFF)
+            // Optional argument: fill byte (default 0xFF)
             if (args.Length >= 5)
             {
                 value = (byte)Utils.ParseUint(args[4]);
@@ -229,7 +228,7 @@ class Program
             var dateString = DateTime.Now.ToString("s").Replace(':', '-');
             _filename = $"EDC15_EEPROM_{dateString}.bin";
             
-            if (!ParseAddressesAndValues(args.Skip(4).ToList(), out addressValuePairs))
+            if (!ParseAddressesAndValues([.. args.Skip(4)], out addressValuePairs))
             {
                 ShowUsage();
                 return;

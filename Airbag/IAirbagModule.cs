@@ -1,4 +1,4 @@
-namespace KW1281Test.Airbag;
+namespace BitFab.KW1281Test.Airbag;
 
 public interface IAirbagModule
 {
@@ -7,7 +7,7 @@ public interface IAirbagModule
         out string reason
     );
 
-    /// <summary>Полный размер EEPROM модуля в байтах (зависит от определённой версии).</summary>
+    /// <summary>Full EEPROM size of the module in bytes (depends on the specific version).</summary>
     int EepromSize { get; }
 
     void PrepareSession();
@@ -23,10 +23,10 @@ public interface IAirbagModule
     );
 
     /// <summary>
-    /// Очищает данные о срабатывании подушек.
-    /// VW51: заполняет 0x000-0x04F (80 байт).
-    /// VW61: заполняет 0x000-0x030 и 0x151-0x1EF.
-    /// По умолчанию заполняет байтом 0xFF.
+    /// Clears airbag deployment data.
+    /// VW51: fills 0x000-0x04F (80 bytes).
+    /// VW61: fills 0x000-0x030 and 0x151-0x1EF.
+    /// By default fills with byte 0xFF.
     /// </summary>
-    void ClearCrashData(byte fillValue = 0xFF);
+    void ClearCrashData(byte fillValue = 0xFF); 
 }
