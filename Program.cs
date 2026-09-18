@@ -116,6 +116,16 @@ class Program
 
             address = Utils.ParseUint(args[4]);
         }
+        else if (string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 &&
+                 controllerAddress == (int)ControllerAddress.Airbag &&
+                 args.Length == 5)
+        {
+            // Короткая форма для Airbag: DumpEeprom FILENAME -> весь EEPROM с адреса 0.
+            // Длина определяется по версии блока (VW51/VW61/1C0909601) после ReadIdent.
+            address = 0;
+            length = uint.MaxValue;
+            _filename = args[4];
+        }
         else if (string.Compare(command, "DumpMarelliMem", ignoreCase: true) == 0 ||
                  string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 ||
                  string.Compare(command, "DumpMem", ignoreCase: true) == 0 ||
@@ -159,6 +169,18 @@ class Program
 
             address = Utils.ParseUint(args[4]);
             _filename = args[5];
+        }
+        else if (string.Compare(command, "ClearCrashData", ignoreCase: true) == 0)
+        {
+            // Необязательный аргумент: байт для заполнения (по умолчанию 0xFF)
+            if (args.Length >= 5)
+            {
+                value = (byte)Utils.ParseUint(args[4]);
+            }
+            else
+            {
+                value = 0xFF;
+            }
         }
         else if (string.Compare(command, "SetSoftwareCoding", ignoreCase: true) == 0)
         {
@@ -390,6 +412,10 @@ class Program
                 tester.LoadEeprom(address, _filename!);
                 break;
 
+            case "clearcrashdata":
+                tester.ClearCrashData(value);
+                break;
+
             case "mapeeprom":
                 tester.MapEeprom(_filename);
                 break;
@@ -604,6 +630,8 @@ COMMAND =
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. 0x800)
         FILENAME = Optional filename
+        For Airbag address: DumpEeprom FILENAME also works and dumps the
+        whole EEPROM (size auto-detected from ReadIdent).
     DumpMarelliMem START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 3072) or hex (e.g. 0xC00)
         LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. 0x400)
@@ -633,6 +661,10 @@ COMMAND =
     LoadEeprom START FILENAME
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         FILENAME = Name of file containing binary data to load into EEPROM
+    ClearCrashData [VALUE]
+        VALUE = Byte to fill crash data area 0x00-0x4F (optional, default 0xFF)
+                Example: ClearCrashData    -> fills with 0xFF
+                         ClearCrashData 0  -> fills with 0x00
     MapEeprom
     ReadFaultCodes
     ReadIdent

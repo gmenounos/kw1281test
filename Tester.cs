@@ -1,12 +1,14 @@
 ﻿using BitFab.KW1281Test.Cluster;
 using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
+using KW1281Test.Airbag;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
+using BitFab.KW1281Test.Airbag;
 
 namespace BitFab.KW1281Test;
 
@@ -67,8 +69,12 @@ internal class Tester
     {
         using KW1281KeepAlive keepAlive = new(_kwp1281);
 
-        ConsoleKeyInfo keyInfo;
-        do
+        // Console.ReadKey() only works on a real console; when stdin is redirected (e.g. a
+        // GUI driving this process over piped streams) it throws/hangs. In that case fall
+        // back to line-based commands over stdin ("N"/"Q") instead of raw keypresses.
+        bool interactive = !Console.IsInputRedirected;
+
+        while (true)
         {
             var response = keepAlive.ActuatorTest(0x00);
             if (response == null || response.ActuatorName == "End")
@@ -78,14 +84,36 @@ internal class Tester
             }
             Log.WriteLine($"Actuator Test: {response.ActuatorName}");
 
-            // Press any key to advance to next test or press Q to exit
-            Console.Write("Press 'N' to advance to next test or 'Q' to quit");
-            do
+            bool quit;
+            if (interactive)
             {
-                keyInfo = Console.ReadKey(intercept: true);
-            } while (keyInfo.Key != ConsoleKey.N && keyInfo.Key != ConsoleKey.Q);
-            Console.WriteLine();
-        } while (keyInfo.Key != ConsoleKey.Q);
+                // Press any key to advance to next test or press Q to exit
+                Console.Write("Press 'N' to advance to next test or 'Q' to quit");
+                ConsoleKeyInfo keyInfo;
+                do
+                {
+                    keyInfo = Console.ReadKey(intercept: true);
+                } while (keyInfo.Key != ConsoleKey.N && keyInfo.Key != ConsoleKey.Q);
+                Console.WriteLine();
+                quit = keyInfo.Key == ConsoleKey.Q;
+            }
+            else
+            {
+                // Marker line so a piped caller knows we're now blocked waiting for a command.
+                Console.WriteLine("WAITING_FOR_INPUT");
+                string? line;
+                do
+                {
+                    line = Console.In.ReadLine();
+                } while (line != null &&
+                         !line.Trim().Equals("N", StringComparison.OrdinalIgnoreCase) &&
+                         !line.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase));
+                quit = line == null || line.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (quit)
+                break;
+        }
     }
 
     public void AdaptationRead(
@@ -364,6 +392,7 @@ internal class Tester
 
     public void DumpEeprom(uint address, uint length, string? filename)
     {
+        Log.WriteLine($"[DBG] DumpEeprom entered. Controller={_controllerAddress}");
         switch (_controllerAddress)
         {
             case (int)ControllerAddress.Cluster:
@@ -374,8 +403,14 @@ internal class Tester
             case (int)ControllerAddress.CentralLocking:
                 CcmDumpEeprom((ushort)address, (ushort)length, filename);
                 break;
+
+            case (int)ControllerAddress.Airbag:
+                Log.WriteLine("[DBG] Airbag DumpEeprom branch selected");
+                DumpAirbagEeprom(address, length, filename);
+                break;
+
             default:
-                Log.WriteLine("Only supported for cluster, CCM, Central Locking and Central Electric");
+                Log.WriteLine("Only supported for cluster, CCM, Central Locking, Airbag and Central Electric");
                 break;
         }
     }
@@ -803,10 +838,126 @@ internal class Tester
             case (int)ControllerAddress.CentralLocking:
                 CcmLoadEeprom((ushort)address, filename);
                 break;
+            case (int)ControllerAddress.Airbag:
+                Log.WriteLine("[DBG] Airbag LoadEeprom branch selected");
+                LoadAirbagEeprom(address, filename);
+                break;
             default:
-                Log.WriteLine("Only supported for cluster, CCM, Central Locking and Central Electric");
+                Log.WriteLine("Only supported for cluster, CCM, Central Locking, Airbag and Central Electric");
                 break;
         }
+    }
+    public void ClearCrashData(byte fillValue = 0xFF)
+    {
+        if (_controllerAddress != (int)ControllerAddress.Airbag)
+        {
+            Log.WriteLine($"Only supported for airbag address {(int)ControllerAddress.Airbag:X2}");
+            return;
+        }
+
+        var module = CreateVw51AirbagModule();
+        if (module == null)
+            return;
+
+        try
+        {
+            module.ClearCrashData(fillValue);
+            Log.WriteLine("ClearCrashData: завершено успешно.");
+        }
+        catch (Exception ex)
+        {
+            Log.WriteLine($"ClearCrashData ошибка: {ex.Message}");
+        }
+    }
+
+    private Vw51AirbagModule? CreateVw51AirbagModule()
+    {
+        var identLines = _kwp1281.ReadIdent()
+            .Select(x => x.ToString())
+            .ToList();
+
+        var identText = string.Join(Environment.NewLine, identLines);
+
+        var module = new Vw51AirbagModule(_kwp1281, identText);
+        if (!module.IsSupportedIdent(identText, out var reason))
+        {
+            Log.WriteLine(reason);
+            return null;
+        }
+
+        return module;
+    }
+    private void DumpAirbagEeprom(uint startAddress, uint length, string? filename)
+    {
+        if (length == 0)
+        {
+            Log.WriteLine("Length is 0. Nothing to dump.");
+            return;
+        }
+
+        var module = CreateVw51AirbagModule();
+        if (module == null)
+        {
+            return;
+        }
+
+        if (length == uint.MaxValue)
+        {
+            // Короткая форма (DumpEeprom FILENAME): читаем весь EEPROM, размер
+            // определяется по версии блока, распознанной из ReadIdent.
+            length = (uint)module.EepromSize;
+            Log.WriteLine($"No length given, dumping whole EEPROM ({length} bytes).");
+        }
+
+        string fileName = string.IsNullOrWhiteSpace(filename)
+            ? $"Airbag_{_controllerAddress}_eeprom_{startAddress:X4}_{length:X4}.bin"
+            : filename;
+
+        Log.WriteLine($"Saving EEPROM to {fileName}...");
+
+        try
+        {
+            byte[] bytes = module.DumpEeprom((int)startAddress, (int)length);
+            File.WriteAllBytes(fileName, bytes);
+            Log.WriteLine($"Saved EEPROM to {fileName}.");
+        }
+        catch (Exception ex)
+        {
+            Log.WriteLine($"Airbag EEPROM dump failed: {ex.Message}");
+        }
+    }
+
+
+    private void LoadAirbagEeprom(uint address, string filename)
+    {
+        if (!File.Exists(filename))
+        {
+            Log.WriteLine($"File not found: {filename}");
+            return;
+        }
+
+        byte[] bytes = File.ReadAllBytes(filename);
+        Log.WriteLine($"Loaded {bytes.Length} bytes from {filename}");
+
+        var module = CreateVw51AirbagModule();
+        if (module == null)
+        {
+            return;
+        }
+
+        try
+        {
+            module.LoadEeprom((int)address, bytes);
+        }
+        catch (Exception ex)
+        {
+            Log.WriteLine($"Airbag EEPROM write stub: {ex.Message}");
+        }
+    }
+    private bool LoadAirbagEepromCore(uint startAddress, byte[] data)
+    {
+        Log.WriteLine("Airbag EEPROM load: stub (not implemented yet).");
+        return false;
     }
 
     public void MapEeprom(string? filename)
@@ -829,6 +980,35 @@ internal class Tester
 
     public void ReadEeprom(uint address)
     {
+        if (_controllerAddress is 15 or 21)
+        {
+            var module = CreateVw51AirbagModule();
+            if (module == null)
+            {
+                return;
+            }
+
+            try
+            {
+                byte[] bytes = module.DumpEeprom((int)address, 1);
+                if (bytes.Length == 0)
+                {
+                    Log.WriteLine("EEPROM read failed");
+                    return;
+                }
+
+                byte value = bytes[0];
+                Log.WriteLine(
+                    $"Address {address} (${address:X4}): Value {value} (${value:X2})");
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"EEPROM read failed: {ex.Message}");
+            }
+
+            return;
+        }
+
         UnlockControllerForEepromReadWrite();
 
         var blockBytes = _kwp1281.ReadEeprom((ushort)address, 1);
@@ -950,6 +1130,11 @@ internal class Tester
 
     public void WriteEeprom(uint address, byte value)
     {
+        if (_controllerAddress is 15 or 21)
+        {
+            Log.WriteLine("Airbag WriteEeprom: stub (not implemented).");
+            return;
+        }
         UnlockControllerForEepromReadWrite();
 
         _kwp1281.WriteEeprom((ushort)address, new List<byte> { value });
