@@ -1,4 +1,5 @@
-﻿using BitFab.KW1281Test.Cluster;
+﻿using BitFab.KW1281Test.Ccm;
+using BitFab.KW1281Test.Cluster;
 using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
 using System;
@@ -1076,6 +1077,80 @@ internal class Tester
 
         Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
         DumpEeprom(startAddress, length, maxReadLength: 8, dumpFileName);
+        Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
+    }
+
+    /// <summary>
+    /// Dumps a comfort module EEPROM using the five-window map, which skips the empty space
+    /// between the windows that actually hold data. Falls back to a sequential read when the
+    /// map does not apply to this controller - see <see cref="CcmDumpPlan"/>.
+    /// </summary>
+    public void DumpCcmEepromMapped(ControllerInfo ecuInfo, string? filename)
+    {
+        if (_controllerAddress != (int)ControllerAddress.CCM &&
+            _controllerAddress != (int)ControllerAddress.CentralLocking)
+        {
+            Log.WriteLine("Only supported for CCM and Central Locking");
+            return;
+        }
+
+        var plan = CcmDumpPlan.Create(
+            ecuInfo.Text, start: 0, length: CcmDumpPlan.MappedFileLength, preferFast: true);
+
+        if (!plan.IsMapped)
+        {
+            Log.WriteLine($"Reading the whole range sequentially: {plan.FastReadSkippedReason}.");
+            CcmDumpEeprom(0, (ushort)plan.FileLength, filename);
+            return;
+        }
+
+        UnlockControllerForEepromReadWrite();
+
+        var dumpFileName = filename ?? "ccm_eeprom_mapped.bin";
+        Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
+        Log.WriteLine(
+            $"Reading {plan.BytesToRead} of {plan.FileLength} bytes, the rest is left as $FF");
+
+        var dump = new byte[plan.FileLength];
+        Array.Fill(dump, (byte)0xFF);
+
+        var refusedWindows = 0;
+
+        foreach (var range in plan.Ranges)
+        {
+            for (var address = range.Address;
+                 address < range.Address + range.Length;
+                 address += 8)
+            {
+                var count = (byte)Math.Min(8, range.Address + range.Length - address);
+                var blockBytes = _kwp1281.ReadEeprom((ushort)address, count);
+
+                if (blockBytes == null)
+                {
+                    // A whole window can be missing on a perfectly healthy car: 2000/3000/
+                    // 4000/5000 are the four door modules, and a three-door has no rear ones.
+                    // Leave the rest of the window at $FF and carry on - failing the entire
+                    // dump over an absent door helps nobody.
+                    refusedWindows++;
+                    var door = CcmDumpPlan.DoorControllerForAddress(address);
+                    Log.WriteLine(door == null
+                        ? $"EEPROM ${address:X4}: refused, leaving the rest of this window as $FF"
+                        : $"EEPROM ${address:X4}: no answer from door module {door}, " +
+                          "leaving the rest of this window as $FF");
+                    break;
+                }
+
+                blockBytes.CopyTo(dump, address - plan.StartAddress);
+            }
+        }
+
+        if (refusedWindows == plan.Ranges.Count)
+        {
+            Log.WriteLine("The controller refused every window, nothing was saved.");
+            return;
+        }
+
+        File.WriteAllBytes(dumpFileName, dump);
         Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
     }
 

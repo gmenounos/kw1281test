@@ -181,6 +181,19 @@ class Program
                 return;
             }
         }
+        else if (string.Compare(command, "DumpCcmEeprom", ignoreCase: true) == 0)
+        {
+            if (args.Length < 4)
+            {
+                ShowUsage();
+                return;
+            }
+
+            if (args.Length > 4)
+            {
+                _filename = args[4];
+            }
+        }
         else if (string.Compare(command, "DumpEdc15Eeprom", ignoreCase: true) == 0)
         {
             if (args.Length < 4)
@@ -337,6 +350,10 @@ class Program
 
             case "delcovwpremium5safecode":
                 tester.DelcoVWPremium5SafeCode();
+                break;
+
+            case "dumpccmeeprom":
+                tester.DumpCcmEepromMapped(ecuInfo, _filename);
                 break;
 
             case "dumpccmrom":
@@ -598,6 +615,11 @@ COMMAND =
     ClarionVWPremium4SafeCode
     ClearFaultCodes
     DelcoVWPremium5SafeCode
+    DumpCcmEeprom [FILENAME]
+        FILENAME = Optional filename
+        (Comfort module dump that reads only the five windows holding data,
+         about ten times faster than a sequential dump of the same module.
+         Covers 1C0/1J0 959 799; other controllers are read sequentially.)
     DumpEdc15Eeprom [FILENAME]
         FILENAME = Optional filename
     DumpEeprom START LENGTH [FILENAME]
