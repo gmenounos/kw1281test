@@ -37,6 +37,9 @@ namespace BitFab.KW1281Test.Cluster
                 case 0x0D when seed[9] == 0x00:
                     secret = Secrets0D00[accessLevel];
                     break;
+                case 0x06 when seed[9] == 0x00:
+                    secret = Secrets0600[accessLevel];
+                    break;
                 default:
                     Log.WriteLine(
                         $"Unexpected seed suffix: ${seed[8]:X2} ${seed[9]:X2}");
@@ -111,6 +114,25 @@ namespace BitFab.KW1281Test.Cluster
             [0x08, 0x2b, 0x49, 0x1a],
             [0x82, 0xd1, 0x7d, 0x50],
             [0x0a, 0x5b, 0x41, 0x4f]    // AccessLevel 7
+        ];
+
+        /// <summary>
+        /// Table of secrets, one for each access level. Only AccessLevel 7 is confirmed —
+        /// brute-forced against a real seed/key pair captured from an Audi C5 cluster, then
+        /// independently verified against three more real pairs from separate sessions on the
+        /// same cluster (also the only level kw1281test ever requests). Levels 0-6 are
+        /// unknown/unused placeholders — do not trust them.
+        /// </summary>
+        private static readonly byte[][] Secrets0600 =
+        [
+            [0x00, 0x00, 0x00, 0x00],  // AccessLevel 0 (unknown/unused)
+            [0x00, 0x00, 0x00, 0x00],  // AccessLevel 1 (unknown/unused)
+            [0x00, 0x00, 0x00, 0x00],  // AccessLevel 2 (unknown/unused)
+            [0x00, 0x00, 0x00, 0x00],  // AccessLevel 3 (unknown/unused)
+            [0x00, 0x00, 0x00, 0x00],  // AccessLevel 4 (unknown/unused)
+            [0x00, 0x00, 0x00, 0x00],  // AccessLevel 5 (unknown/unused)
+            [0x00, 0x00, 0x00, 0x00],  // AccessLevel 6 (unknown/unused)
+            [0x2b, 0x3a, 0x58, 0x41]    // AccessLevel 7 (confirmed)
         ];
 
         private static readonly byte[][] Secrets0B00 =

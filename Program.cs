@@ -160,6 +160,17 @@ class Program
             address = Utils.ParseUint(args[4]);
             _filename = args[5];
         }
+        else if (string.Compare(command, "WriteEepromAudiC5", ignoreCase: true) == 0)
+        {
+            if (args.Length < 6)
+            {
+                ShowUsage();
+                return;
+            }
+
+            address = Utils.ParseUint(args[4]);
+            _filename = args[5];
+        }
         else if (string.Compare(command, "SetSoftwareCoding", ignoreCase: true) == 0)
         {
             if (args.Length < 6)
@@ -388,6 +399,10 @@ class Program
 
             case "loadeeprom":
                 tester.LoadEeprom(address, _filename!);
+                break;
+
+            case "writeepromaudic5":
+                tester.WriteEepromAudiC5(address, _filename!);
                 break;
 
             case "mapeeprom":
@@ -657,6 +672,9 @@ COMMAND =
     WriteRAM ADDRESS VALUE
         ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
         VALUE = Value in decimal (e.g. 138) or hex (e.g. 0x8A)
+    WriteEepromAudiC5 START FILENAME
+        START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
+        FILENAME = Name of file containing binary data to write into EEPROM
 """);
     }
 
