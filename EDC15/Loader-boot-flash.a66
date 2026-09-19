@@ -1,0 +1,249 @@
+; ============================================================================
+; Loader-boot-flash.a66  --  EDC15 boot-mode flash driver (from scratch).
+; Part of KWHack's own boot-mode stack; implements docs/BootMode-Protocol.md sec 5.
+;
+; Uploaded to RAM 0F600H by the Monitor's WRITE command, then invoked by the
+; Monitor's CALL command (op 0x25): the host loads 16 bytes into R8..R15, the
+; Monitor calls this entry (0F600H) with a near return frame, and on return ships
+; R8..R15 back. So ALL parameters and results live in R8..R15; this routine
+; PUSH/POPs R0..R7 as its own scratch and returns with a near RET.
+;
+; SELECTOR (R8) and register conventions (OURS):
+;   R8=0x00 PROGRAM:  R9=write seg, R10=read/poll seg, R11=dest flash offset,
+;                     R12=source RAM offset (near, e.g. 0FC00H), R13=byte count.
+;                     -> R15 = 0 ok / 1 fail (poll/verify).
+;   R8=0x01 SECTOR ERASE: R9=write seg, R10=read/poll seg, R11=sector start off,
+;                     R12=sector end off. -> R15 = 0 ok / 1 verify-fail / 0x31 timeout.
+;   R8=0x02 CHIP ERASE:   R9=write seg, R10=read/poll seg.
+;                     -> R15 = 0 ok / 0x31 timeout.
+;   R8=0x06 AUTOSELECT:   R9=write seg, R10=read/poll seg, R11=ID offset (0 or 1).
+;                     -> R9 = ID word, R15 = 0.
+;   else -> R15 = 1.
+;
+; The flash lives at CPU bus 0x800000, reached with an EXTS segment override on
+; each access. *(Chip-fixed)* Am29F400 JEDEC, x16 bus (word 555/2AA -> byte AAA/554):
+;   unlock = AA->[seg:0AAAH], 55->[seg:0554H]
+;   program= unlock, A0->[seg:0AAAH], data->[dest]
+;   serase = unlock, 80->[seg:0AAAH], unlock, 30->[sector]
+;   cerase = unlock, 80->[seg:0AAAH], unlock, 10->[seg:0AAAH]
+;   ident  = unlock, 90->[seg:0AAAH], read [seg: off<<1]
+;   reset  = F0->[seg:0]
+; *(Board-fixed)* separate write vs read/poll segments are EBC aliases of the same
+; chip (write cycles via the write seg, DQ7/readback via the read seg); the host
+; passes both and sets up the EBC (via POKE) before calling this.
+;
+; Completion is Am29F DQ7 data-polling. Program polls until read-back bit7 ==
+; written bit7, then full-word verifies. Erase polls until bit7 == 1, then sweeps
+; the range for 0FFFFH, feeding the watchdog and backstopped by a 32-bit counter
+; (R6:R7) that bails (R15=0x31) once the high half reaches 0x800 -- generous vs the
+; Am29F400's 32 s max chip erase, while a dead chip still bails rather than hangs.
+;
+; Dispatch and cross-body calls use absolute JMPA/CALLA (no relative-range limit);
+; only tight local loops use JMPR. Keil A166 authoritative ($INCLUDE REG167.INC);
+; also assembles under Tools/c166/reasm.py with the rel8-range gate. Entry = 0F600H.
+; ============================================================================
+
+$M167
+$NOLI
+$INCLUDE (REG167.INC)
+$LI
+
+BootFlash	SECTION CODE AT 0F600H
+BootFlashCode	PROC NEAR
+
+; ---- Entry: save scratch, dispatch on R8 (absolute jumps) ------------------
+HelperEntry:
+	PUSH    R0
+	PUSH    R1
+	PUSH    R2
+	PUSH    R3
+	PUSH    R4
+	PUSH    R5
+	PUSH    R6
+	PUSH    R7
+	CMP     R8, #0H
+	JMPA    CC_Z, Do_Program
+	CMP     R8, #1H
+	JMPA    CC_Z, Do_SectorErase
+	CMP     R8, #2H
+	JMPA    CC_Z, Do_ChipErase
+	CMP     R8, #6H
+	JMPA    CC_Z, Do_Autoselect
+	MOV     R15, #1H                          ; bad selector -> fall into exit
+
+HelperExit:
+	POP     R7
+	POP     R6
+	POP     R5
+	POP     R4
+	POP     R3
+	POP     R2
+	POP     R1
+	POP     R0
+	RET
+
+; ---- shared JEDEC primitives (near the top; called via CALLA) --------------
+; JedecUnlock: two unlock cycles in segment R2.  AA->[0AAAH], 55->[0554H].
+JedecUnlock:
+	MOV     R3, #0AAAH
+	MOV     R5, #0AAH
+	EXTS    R2, #1
+	MOV     [R3], R5
+	MOV     R3, #0554H
+	MOV     R5, #55H
+	EXTS    R2, #1
+	MOV     [R3], R5
+	RET
+
+; FlashReset: F0->[0] in segment R2 (return the array to read mode).
+FlashReset:
+	MOV     R6, #0H
+	MOV     R5, #0F0H
+	EXTS    R2, #1
+	MOV     [R6], R5
+	RET
+
+; ---- PROGRAM (R8=0) --------------------------------------------------------
+; R9=write seg, R10=read seg, R11=dest off, R12=src RAM off, R13=count.
+Do_Program:
+Prog_Loop:
+	CMP     R13, #0H
+	JMPR    CC_NZ, Prog_Word
+	MOV     R15, #0H                          ; all words done -> ok
+	JMPA    CC_UC, HelperExit
+Prog_Word:
+	MOV     R2, R9                            ; command segment = write seg
+	CALLA   CC_UC, FlashReset
+	CALLA   CC_UC, JedecUnlock
+	MOV     R3, #0AAAH
+	MOV     R5, #0A0H                          ; program setup
+	EXTS    R2, #1
+	MOV     [R3], R5
+	MOV     R5, [R12]                          ; source word (RAM near)
+	EXTS    R9, #1
+	MOV     [R11], R5                          ; write word to flash dest
+Prog_Poll:
+	EXTS    R10, #1
+	MOV     R4, [R11]                          ; read back (poll)
+	MOV     R6, R4
+	XOR     R6, R5
+	JNB     R6.7, Prog_Verify                  ; bit7 matches written bit7 -> done polling
+	JMPR    CC_UC, Prog_Poll
+Prog_Verify:
+	EXTS    R10, #1
+	MOV     R4, [R11]
+	CMP     R4, R5
+	JMPR    CC_NZ, Prog_Fail                   ; full word must match
+	ADD     R11, #2H                            ; advance dest
+	ADD     R12, #2H                            ; advance src
+	SUB     R13, #2H                            ; count -= 2
+	JMPR    CC_UC, Prog_Loop
+Prog_Fail:
+	MOV     R2, R9
+	CALLA   CC_UC, FlashReset
+	MOV     R15, #1H
+	JMPA    CC_UC, HelperExit
+
+; ---- SECTOR ERASE (R8=1) ---------------------------------------------------
+; R9=write seg, R10=read seg, R11=sector start off, R12=sector end off.
+Do_SectorErase:
+	MOV     R2, R9
+	CALLA   CC_UC, FlashReset
+	CALLA   CC_UC, JedecUnlock
+	MOV     R3, #0AAAH
+	MOV     R5, #80H                            ; erase setup
+	EXTS    R2, #1
+	MOV     [R3], R5
+	CALLA   CC_UC, JedecUnlock
+	MOV     R5, #30H                            ; sector-erase command
+	EXTS    R2, #1
+	MOV     [R11], R5                           ; 30 -> [write seg : sector start]
+	MOV     R6, #0H                             ; timeout counter low
+	MOV     R7, #0H                             ; timeout counter high
+SErase_Poll:
+	SRVWDT                                       ; feed the watchdog during the (up to ~1 s) erase
+	ADD     R6, #1H
+	ADDC    R7, #0H
+	CMP     R7, #800H
+	JMPR    CC_NZ, SErase_DQ7
+	MOV     R15, #31H                           ; timeout
+	JMPA    CC_UC, HelperExit
+SErase_DQ7:
+	EXTS    R10, #1
+	MOV     R4, [R11]
+	JNB     R4.7, SErase_Poll                   ; wait until bit7 == 1 (erased)
+	MOV     R3, R12                             ; R3 = end offset
+SErase_Verify:
+	EXTS    R10, #1
+	MOV     R4, [R3]
+	CMP     R4, #0FFFFH
+	JMPR    CC_NZ, SErase_Fail
+	CMP     R3, R11
+	JMPR    CC_Z, SErase_Ok
+	SUB     R3, #2H
+	JMPR    CC_UC, SErase_Verify
+SErase_Ok:
+	MOV     R15, #0H
+	JMPA    CC_UC, HelperExit
+SErase_Fail:
+	MOV     R2, R9
+	CALLA   CC_UC, FlashReset
+	MOV     R15, #1H
+	JMPA    CC_UC, HelperExit
+
+; ---- CHIP ERASE (R8=2) -----------------------------------------------------
+; R9=write seg, R10=read seg.  unlock,80,unlock,10 -> [seg:0AAAH]; DQ7 poll at 0.
+Do_ChipErase:
+	MOV     R2, R9
+	CALLA   CC_UC, FlashReset
+	CALLA   CC_UC, JedecUnlock
+	MOV     R3, #0AAAH
+	MOV     R5, #80H
+	EXTS    R2, #1
+	MOV     [R3], R5
+	CALLA   CC_UC, JedecUnlock
+	MOV     R3, #0AAAH
+	MOV     R5, #10H                            ; chip-erase command
+	EXTS    R2, #1
+	MOV     [R3], R5
+	MOV     R6, #0H                             ; timeout counter low
+	MOV     R7, #0H                             ; timeout counter high
+CErase_Poll:
+	SRVWDT                                       ; feed the watchdog during the (up to ~32 s) chip erase
+	ADD     R6, #1H
+	ADDC    R7, #0H
+	CMP     R7, #800H
+	JMPR    CC_NZ, CErase_DQ7
+	MOV     R15, #31H                           ; timeout
+	JMPA    CC_UC, HelperExit
+CErase_DQ7:
+	MOV     R3, #0H                             ; poll offset 0 (R3 scratch; R6:R7 counter intact)
+	EXTS    R10, #1
+	MOV     R4, [R3]
+	JNB     R4.7, CErase_Poll                   ; not done -> keep polling
+	MOV     R15, #0H
+	JMPA    CC_UC, HelperExit
+
+; ---- AUTOSELECT (R8=6) -----------------------------------------------------
+; R9=write seg, R10=read seg, R11=ID offset.  Returns R9 = ID word.
+Do_Autoselect:
+	MOV     R2, R9
+	CALLA   CC_UC, FlashReset
+	CALLA   CC_UC, JedecUnlock
+	MOV     R3, #0AAAH
+	MOV     R5, #90H                            ; autoselect (read ID)
+	EXTS    R2, #1
+	MOV     [R3], R5
+	MOV     R3, R11
+	SHL     R3, #1H                              ; ID byte address = off << 1 (x16 bus)
+	EXTS    R10, #1
+	MOV     R4, [R3]
+	MOV     R2, R9
+	CALLA   CC_UC, FlashReset
+	MOV     R9, R4                               ; return ID in R9
+	MOV     R15, #0H
+	JMPA    CC_UC, HelperExit
+
+BootFlashCode	ENDP
+BootFlash	ENDS
+		END

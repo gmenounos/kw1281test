@@ -9,6 +9,11 @@ namespace BitFab.KW1281Test.Blocks
             Dump();
         }
 
+        /// <summary>The raw 16-bit actuator id (the first two body bytes), or -1 if the body is
+        /// too short. Engine (EDC15/EDC16) actuator tests report ids in the shared VAG output-test
+        /// code scheme, so this lets the output-test map name them.</summary>
+        public int Id => Body.Count >= 2 ? (Body[0] << 8) | Body[1] : -1;
+
         public string ActuatorName
         {
             get

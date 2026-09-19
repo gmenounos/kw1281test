@@ -1,0 +1,706 @@
+; Custom loader. When loaded at address 40E000 and started via startRoutineByLocalIdentifier 0x02,
+; it will accept several custom KWP2000-like commands via the K-Line to allow dumping the EEPROM
+; and other special functions.
+;
+; ============================================================================================
+; MODIFIED from KWHack.Core/vendor-kw1281test/EDC15/Loader.a66
+;
+; What's added: two new commands, 0xA9 (write N bytes to EEPROM, page 0) and 0xAA (page 1). Each
+; wraps the EXISTING, completely unmodified E324/E356 single-byte-write routines in a loop
+;
+; Needs $INCLUDE (REG167.INC) on your include path -- that file ships with Keil's C166 tools
+;
+; The host-side upload path (EDC15/Edc15VM.GetLoader) recomputes the
+; loader-end-address patch (offset 0x0E/0x0F) and the trailing 4-byte checksum-correction dynamically
+; from whatever Loader.bin actually contains -- see its own comment ("the checksum of all the bytes
+; must be EFCD8631") -- so a larger compiled binary from this file does NOT need any manual checksum
+; math; GetLoader() already handles that for any length/content.
+
+$M167
+$NOLI
+$INCLUDE (REG167.INC)
+$LI
+
+All		SECTION CODE AT 0E000H
+		DB		0A5H, 0A5H, 14H, 0E0H, 00H, 00H, 3CH, 0E0H
+		DB		00H, 00H
+		DW		RoutineStart
+		DB		00H, 00H
+		DW		RoutineEnd
+		DB		00H, 00H, 02H, 47H, 13H, 00H, 00H, 01H
+		DB		00H, 02H, 00H, 03H, 00H, 04H, 00H, 05H
+		DB		00H, 06H, 00H, 07H, 00H, 08H, 00H, 09H
+		DB		00H, 0AH, 00H, 0BH, 00H, 0CH, 00H, 0DH
+		DB		00H, 0EH, 00H, 0FH, 80H, 0FH, 0A0H, 0FH
+		DB		0C0H, 0FH, 00H, 10H, 45H, 2FH, 7DH, 64H
+		DB		9BH, 0C3H
+
+; Entry
+RoutineStart	PROC FAR
+		BCLR	IEN			; Disable interrupts
+		BSET    S0REN		; Receiver enabled
+		MOV		R0,#0E7FEH	; "SP"
+
+		; Receive and dispatch message
+E04A:	CALL    E128	; Receive message
+
+		CMP     R6,#1		; Timeout?
+		JMPR    CC_Z,E0C6
+
+		CMP     R6,#2 ; Bad checksum?
+		JMPR    CC_Z,E082 ; Send NAK
+
+		MOV     R1,#0E600H ; Receive buffer
+		MOVB    RL2,[R1+#0001H] ; Service => RL2
+
+		CMPB    RL2,#0023H ; 23: Read flash
+		JMPR    CC_Z,Cmd23
+
+		CMPB    RL2,#0036H ; 36: Program flash
+		JMPR    CC_Z,Cmd36
+
+		CMPB    RL2,#00A2H ; A2: Reboot
+		JMPR    CC_Z,CmdA2
+
+		CMPB    RL2,#00A3H ; A3: Respond with 0x55
+		JMPR    CC_Z,CmdA3
+
+		CMPB    RL2,#00A4H ; A4: Set baud rate
+		JMPR    CC_Z,CmdA4
+
+		CMPB    RL2,#00A5H ; A5: Erase flash
+		JMPR    CC_Z,CmdA5
+
+		CMPB    RL2,#00A6H ; A6: Dump EEPROM
+		JMPR    CC_Z,CmdA6
+
+		CMPB    RL2,#00A7H ; A7: Write 1 byte to EEPROM (Page 0)
+		JMPR    CC_Z,CmdA7
+
+		CMPB    RL2,#00A8H ; A8: Write 1 byte to EEPROM (Page 1)
+		JMPR    CC_Z,CmdA8
+
+; === NEW: batched EEPROM write dispatch -- see E3W0/E3W1 for what these call ===
+		CMPB    RL2,#00A9H ; A9: Write N bytes to EEPROM (Page 0) -- NEW
+		JMPR    CC_Z,CmdA9
+
+		CMPB    RL2,#00AAH ; AA: Write N bytes to EEPROM (Page 1) -- NEW
+		JMPR    CC_Z,CmdAA
+; === end NEW dispatch ===
+
+E082:	CALL   	SendNAK
+		JMPR    CC_UC,E04A ; Receive and dispatch message
+
+; Read flash
+Cmd23:	CALL    E23E
+		JMPR    CC_UC,E04A ; Receive and dispatch message
+
+; Program flash
+Cmd36:	CALL    E1C4 ; Program flash
+Cmd36x:	CALL    SendAck ; Send ACK
+		JMPR    CC_UC,E04A ; Receive and dispatch message
+
+; Reboot
+CmdA2:	CALL	SendACK
+		CALL   	DELAY256
+		MOVB    RL7,#0055H
+		CALL	XmitRL7
+		SRST    ; Reboot
+
+; Respond with 0x55
+CmdA3:	MOVB    RL7,#0055H
+CmdA3x:	CALL    XmitRL7
+		JMPR    CC_UC,E04A ; Receive and dispatch message
+
+; Set baud rate (buf[2] => S0BG)
+CmdA4:	CALL    SendACK
+		CALL    Delay256
+		MOV     R2,#00H
+		MOVB    RL2,[R1+#0002H]
+		MOV     S0BG,R2
+		MOVB    RL7,#00AAH
+		JMPR    CC_UC,CmdA3x ; XmitRL7 + jump to dispatcher
+
+; Erase flash
+CmdA5:	CALL    SendACK
+		CALL    E2E6 ; Erase flash
+		JMPR    CC_UC,Cmd36x ; SendACK + jump to dispatcher
+
+; Dump EEPROM
+CmdA6:	CALL	SendACK
+		CALL   	E1C6 ; Dump EEPROM
+		JMPR    CC_UC,Cmd36x ; SendACK + jump to dispatcher
+
+; Write 1 byte to EEPROM (Page 0)
+CmdA7:	CALL	SendACK
+		CALL	EInit ; -- NEW: set up the EEPROM-bus GPIO directions before writing (see EInit)
+		CALL   	E324 ; Write 1 byte to EEPROM (Page 0)
+		JMPR    CC_UC,Cmd36x ; SendACK + jump to dispatcher
+
+; Write 1 byte to EEPROM (Page 1)
+CmdA8:	CALL	SendACK
+		CALL	EInit ; -- NEW: set up the EEPROM-bus GPIO directions before writing (see EInit)
+		CALL    E356
+		JMPR    CC_UC,Cmd36x ; SendACK + jump to dispatcher
+
+; === NEW: batched EEPROM write handlers ===
+; Write N bytes to EEPROM (Page 0). buf[2] = count (0-255; 0 is a safe no-op -- see E3W0).
+; Protocol, from the host's point of view: send [length, 0xA9, count] + checksum (normal
+; checksummed E128 path, same as every other command) -> get the first ACK (SendACK, below) ->
+; send `count` raw (address, value) pairs back-to-back, no envelope, exactly like CmdA7 already
+; expects for a single pair, just `count` of them in a row -> get the second/final ACK (Cmd36x).
+CmdA9:	CALL	SendACK
+		CALL	EInit ; -- NEW: set up the EEPROM-bus GPIO directions before writing (see EInit)
+		MOV     R4,#00H
+		MOVB    RL4,[R1+#0002H] ; count => R4 (R1 is still 0E600H -- nothing between the
+								 ; dispatch CMPB/JMPR chain above and here touches R1, same as
+								 ; every other Cmd* handler that reads straight from buf relies on)
+		CALL    E3W0
+		JMPR    CC_UC,Cmd36x ; SendACK + jump to dispatcher
+
+; Write N bytes to EEPROM (Page 1). Same shape as CmdA9, page 1.
+CmdAA:	CALL	SendACK
+		CALL	EInit ; -- NEW: set up the EEPROM-bus GPIO directions before writing (see EInit)
+		MOV     R4,#00H
+		MOVB    RL4,[R1+#0002H]
+		CALL    E3W1
+		JMPR    CC_UC,Cmd36x
+; === end NEW handlers ===
+
+; Handle timeout?
+E0C6:	MOVB    RL7,[R1]
+		ADDB    RL7,#1
+		JMPR    CC_UC,CmdA3x ; XmitRL7 + jump to dispatcher
+
+RoutineStart	ENDP
+
+; Send NAK
+SendNAK	PROC NEAR
+		MOV     [-R0],R1 ; Push R1
+		MOV     [-R0],R2 ; Push R2
+		MOV     R1,#0E600H ; Transmit buf
+		MOVB    RL2,#01H ; Length 1
+		MOVB    [R1],RL2
+		MOVB    RL2,#007FH ; Code 7F (NAK)
+		JMPR	CC_UC,SendACK2
+SendNAK	ENDP
+
+; Send ACK
+SendACK	PROC NEAR
+		MOV     [-R0],R1 ; Push R1
+		MOV     [-R0],R2 ; Push R2
+		MOV     R1,#0E600H ; Transmit buf
+		MOVB    RL2,#01H
+		MOVB    [R1],RL2
+		MOVB    RL2,#0076H ; Code 76 (transferData positive response)
+SendACK2:
+		MOVB    [R1+#0001H],RL2
+		CALL	E15E ; Send message
+		JMPR    CC_UC,E156x ; Pop R2,R1 + RET
+SendACK	ENDP
+
+; Receive message into buf (E600) - Status returned in R6 (0: Success, 1: Timeout, 2: Checksum error)
+; This code has a bug where it does not initialize R6 to 0 and doesn't call read-with-timeout so 1 will never be returned.
+E128	PROC NEAR
+		MOV		[-R0],R1 ; Push R1
+		MOV     [-R0],R2 ; Push R2
+		MOV     [-R0],R3 ; Push R3
+		MOV     R1,#0E600H ; Receive buf
+		CALL    E192 ; Receive a byte in R7
+		MOV     R2,#00H ; 0 => R2
+		MOVB    RL2,RL7 ; RL7 => RL2 (RL2 is message length)
+		MOVB    RL3,RL7 ; RL7 => RL3 (RL3 is message checksum)
+		MOVB    [R1],RL7 ; Put received byte in buf
+		ADD     R1,#1 ; Advance to next buf location
+E140:	CALL    E1A2 ; Receive a byte in R7. R6: 0 if success, 1 if timeout
+		CMP     R6,#0 ; Success?
+		JMPR    CC_NZ,E156 ; Return if error
+		MOVB    [R1],RL7 ; Put received byte in buf
+		ADDB    RL3,RL7 ; RL3 += RL7
+		ADD     R1,#1 ; Advance to next buf location
+		CMPD1   R2,#00H ; (R2-- == 0)?
+		JMPR    CC_NZ,E140 ; Loop if not
+		SUBB    RL3,RL7 ; RL3 - RL7 => RL3
+		CMPB    RL3,RL7 ; (RL3 == RL7)?
+		JMPR    CC_Z,E156 ; Return if true
+		MOV     R6,#02H ; Checksum error
+E156:	MOV     R3,[R0+] ; Pop R3
+E156x:	MOV     R2,[R0+] ; Pop R2
+E156y:	MOV     R1,[R0+] ; Pop R1
+		RET
+E128	ENDP
+
+; Send message in buf (E600)
+E15E	PROC NEAR
+		MOV		[-R0],R1 ; Push R1
+		MOV     [-R0],R2 ; Push R2
+		MOV     [-R0],R3 ; Push R3
+		MOV     R1,#0E600H ; Transmit buf
+		MOV     R2,#00H
+		MOVB    RL2,[R1] ; RL2 is length
+		MOVB    RL3,#00H ; R3 is checksum
+E16E:	MOVB    RL7,[R1+] ; message byte => RL7
+		ADDB    RL3,RL7 ; checksum += byte
+		CALL    XmitRL7
+		CMPD1   R2,#00H
+		JMPR    CC_NZ,E16E ; Loop until all characters sent
+		MOVB    RL7,RL3 ; checksum => RL7
+		CALL    XmitRL7
+		JMPR    CC_UC,E156 ; Pop R3,R2,R1 + RET
+E15E	ENDP
+
+		; Transmit byte in R7
+XmitRL7	PROC NEAR
+		MOVB	S0TBUF,RL7	; Transmit RL7
+		JMPR	CC_UC,E192x	; Receive echo in R7
+XmitRL7	ENDP
+
+		; Receive a byte in R7
+E192	PROC NEAR
+E192x:
+		SRVWDT					; Feed watchdog
+		JNB		S0RIR,E192x		; Loop until receive flag set
+		MOV     R7,S0RBUF		; R7 = received byte
+		BCLR    S0RIR			; Clear receive flag
+		RET
+E192	ENDP
+
+; Receive a byte in R7. R6: 0 if success, 1 if timeout.
+E1A2	PROC NEAR
+		MOV		[-R0],R1 ; Push R1
+		MOV     R1,#0FFFFH ; Timeout to receive a byte
+		MOV     R6,#00H ; Success => R6
+E1AA:	SRVWDT  ; Feed watchdog
+		JB      S0RIR,E1BA ; Jump if byte received
+		CMPD1   R1,#00H
+		JMPR    CC_NZ,E1AA ; Loop is not timeout
+		MOV     R6,#01H ; Timeout => R6
+		JMPR    CC_UC,E1C0
+E1BA:	MOV     R7,S0RBUF ; Byte => R7
+		BCLR    S0RIR ; Clear receive flag
+E1C0:	JMPR    CC_UC,E156y ; Pop R1 + RET
+E1A2	ENDP
+
+; Dump EEPROM
+E1C6	PROC NEAR
+		BSET	DP2.8 ; P2.8 is an output
+		BSET    P2.8 ; 1 => P2.8
+		BSET    DP2.9 ; P2.9 is an output
+		BSET    P2.9 ; 1 => P2.9
+		CALL    Delay256
+		CALL    Delay256
+		CALL    E246 ; 11 01 00 - Start bit
+		MOVB    RL7,#00ACH ; 1010 1100 (Dummy Write)
+		CALL    E2AC ; Clock (P2.9) all bits of RL7 (MSB first) to P2.8
+		CALL    E27A ; Clock (P2.9) one bit of P2.8 into R7.0
+		MOVB    RL7,#00H ; Address 0
+		CALL    E2AC ; Clock (P2.9) all bits of RL7 (MSB first) to P2.8
+		CALL    E27A ; Clock (P2.9) one bit of P2.8 into R7.0
+		CALL    E25C ; 0x 01 11
+		CALL    E246 ; 11 01 00
+		MOVB    RL7,#00ADH ; 1010 1101 (Read)
+		CALL    E2AC ; Clock (P2.9) all bits of RL7 (MSB first) to P2.8
+		CALL    E27A ; Clock (P2.9) one bit of P2.8 into R7.0
+		MOV     R5,#00H
+		MOV     R2,#01FEH ; Count = 512-2
+E20A:	MOV     R5,#07H
+E20C:	CALL    Delay256
+		CMPD1   R5,#00H
+		JMPR    CC_NZ,E20C
+		CALL    E2C6 ; Clock (P2.9) 8 bits of P2.8 into RL7 (MSB first)
+		CALL    E298 ; 0x 01 00
+		CALL    XmitRL7
+		CMPD1   R2,#00H
+		JMPR    CC_NZ,E20A
+		CALL    E2C6 ; Clock (P2.9) 8 bits of P2.8 into RL7 (MSB first)
+		CALL    XmitRL7
+		BSET    P2.9 ; 1 => P2.9
+		BSET    P2.8 ; 1 => P2.8
+		CALL    Delay7
+		BCLR    P2.9 ; 0 => P2.9
+		CALL    Delay7
+		BCLR    P2.8 ; 0 => P2.8
+		CALL    Delay7
+		JMPR	CC_UC,E25C ; 0x 01 11
+E1C6	ENDP
+
+; 11 01 00
+E246	PROC NEAR
+		BSET    P2.8 ; 1 => P2.8
+		BSET    P2.9 ; 1 => P2.9
+		CALL	Delay7
+		BCLR    P2.8 ; 0 => P2.8
+		CALL    Delay7
+		BCLR    P2.9 ; 0 => P2.9
+		CALL    Delay7
+		RET
+E246	ENDP
+
+; 0x 01 11
+E25C	PROC NEAR
+		BCLR    P2.8 ; 0 => P2.8
+		CALL	Delay7
+		BSET    P2.9 ; 1 => P2.9
+		CALL    Delay7
+		BSET    P2.8 ; 1 => P2.8
+		RET
+E25C	ENDP
+
+; x1 x0
+E26C	PROC NEAR
+		CALL	Delay7
+		BSET    P2.9 ; 1 => P2.9
+		CALL	Delay7
+		BCLR    P2.9 ; 0 => P2.9
+		RET
+E26C	ENDP
+
+; Clock (P2.9) one bit of P2.8 into R7.0
+E27A	PROC NEAR
+		MOV		R7,#00H
+		BCLR    DP2.8 ; P2.8 is an input
+		CALL    Delay7
+		BSET    P2.9 ; 1 => P2.9
+		CALL    Delay7
+		BMOV    R7.0,P2.8 ; P2.8 => R7.0
+		BCLR    P2.9 ; 0 => P2.9
+		CALL    Delay7
+		BCLR    P2.8 ; 0 => P2.8
+		BSET    DP2.8 ; P2.8 is an output
+		RET
+E27A	ENDP
+
+; 0x 01 00
+E298	PROC NEAR
+		BCLR	P2.8 ; 0 => P2.8
+		CALL    Delay7
+		BSET    P2.9 ; 1 => P2.9
+		CALL    Delay7
+		BCLR    P2.9 ; 0 => P2.9
+		CALL    Delay7
+		RET
+E298	ENDP
+
+; Clock (P2.9) all bits of RL7 (MSB first) to P2.8
+E2AC	PROC NEAR
+		MOV  	[-R0],R1 ; Push R1
+		MOV     R1,#07H ; Count = 7
+		SHL     R7,#08H
+E2B2:	SHL     R7,#01H
+		BMOV    P2.8,C ; High bit of R7 => P2.8
+		CALL    E26C ; x1 x0 (clock)
+		CMPD1   R1,#00H ; Count-- == 0?
+		JMPR    CC_NZ,E2B2 ; Repeat
+		BCLR    P2.8 ; 0 => P2.8
+		JMPR	CC_UC,PopR1
+E2AC	ENDP
+
+; Clock (P2.9) 8 bits of P2.8 into RL7 (MSB first)
+E2C6	PROC NEAR
+		MOV  	[-R0],R1 ; Push R1
+		BCLR    DP2.8 ; P2.8 is an input
+		MOV     R1,#07H ; Count = 7
+		MOV     R7,#00H
+E2CE:	BSET    P2.9 ; 1 => P2.9
+		CALL    Delay7
+		SHL     R7,#01H
+		BMOV    R7.0,P2.8 ; P2.8 => Low bit of R7
+		BCLR    P2.9 ; 0 => P2.9
+		CALL    Delay7
+		CMPD1   R1,#00H ; Count-- == 0?
+		JMPR    CC_NZ,E2CE ; Repeat
+		BSET    DP2.8 ; P2.8 is an output
+		BCLR    P2.8 ; 0 => P2.8
+		JMPR	CC_UC,PopR1
+E2C6	ENDP
+
+Delay256	PROC NEAR
+		MOV  	[-R0],R3 ; Push R3
+		MOV     R3,#0100H
+		JMPR    CC_UC,DelayLoop
+Delay256	ENDP
+
+Delay7	PROC NEAR
+		MOV  	[-R0],R3 ; Push R3
+		MOV     R3,#7
+DelayLoop:
+		SRVWDT  ; Feed watchdog
+		SUB     R3,#1
+		CMP     R3,#00H
+		JMPR    CC_NZ,DelayLoop
+		MOV     R3,[R0+] ; Pop R3
+		RET
+Delay7	ENDP
+
+; Write 1 byte to EEPROM (Page 0)
+E324	PROC NEAR
+E324x:
+		CALL	E246 ; 11 01 00 - Start bit
+		MOV     R7,#00ACH ; 1010 1100 (Write)
+		CALL	E2AC ; Clock (P2.9) all bits of RL7 (MSB first) to P2.8
+		CALL    E27A ; Clock (P2.9) one bit of P2.8 into R7.0
+		CMP     R7,#0
+		JMPR    CC_NZ,E324x
+		JMPR	CC_UC,E356y
+E324	ENDP
+
+; Write 1 byte to EEPROM (Page 1)
+E356	PROC NEAR
+E356x:
+		CALL	E246 ; 11 01 00 - Start bit
+		MOV     R7,#00AEH ; 1010 1110
+		CALL    E2AC
+		CALL    E27A
+		CMP     R7,#0
+		JMPR    CC_NZ,E356x
+E356y:
+		CALL    E192 ; Receive a byte in R7
+		CALL    E2AC
+		CALL    E27A
+		CALL    E192 ; Receive a byte in R7
+		CALL    E2AC
+		CALL    E27A
+		JMPR	CC_UC,E25C ; 0x 01 11
+E356	ENDP
+
+; === NEW: batched-write loop wrappers ===
+; Write R4 bytes to EEPROM (Page 0). Each byte is one full, complete, unmodified call to E324 --
+; the SAME start-bit -> ready-poll -> receive address -> receive value -> stop-bit transaction
+; CmdA7 already does for a single byte, just called R4 times in a row instead of once. Nothing
+; about E324/E356's own bit-banging is touched at all -- this only adds the counting loop around
+; an existing, already-proven routine, specifically to avoid re-deriving (and risking a mistake
+; in) the EEPROM bus protocol itself.
+;
+; Check-then-body (while) shape, not a do-while: R4==0 is tested BEFORE the first E324 call, so a
+; host that (by bug or misuse) sends count=0 gets a no-op,
+; rather than either skipping the check or (worse, if a decrement-then-check idiom had
+; been used with R4 initialized to a bare "count - 1" instead) underflowing 0-1 into approximately
+; 65536 iterations. Every individual instruction here (CMP/JMPR CC_Z/CALL/SUB/JMPR CC_UC) is used
+; the same way at least once elsewhere in this exact file -- see E0C6/Delay7/RoutineStart for CMP,
+; Delay7/E1C4 for SUB -- rather than introducing an unproven idiom.
+E3W0	PROC NEAR
+E3W0Chk:
+		CMP     R4,#00H
+		JMPR    CC_Z,E3W0Done ; count reached 0 -- stop (also handles count=0 as a no-op)
+		CALL    E324
+		SUB     R4,#1
+		JMPR    CC_UC,E3W0Chk
+E3W0Done:
+		RET
+E3W0	ENDP
+
+; Write R4 bytes to EEPROM (Page 1) -- identical shape to E3W0, calling E356 instead of E324.
+E3W1	PROC NEAR
+E3W1Chk:
+		CMP     R4,#00H
+		JMPR    CC_Z,E3W1Done
+		CALL    E356
+		SUB     R4,#1
+		JMPR    CC_UC,E3W1Chk
+E3W1Done:
+		RET
+E3W1	ENDP
+
+; EEPROM-bus initialization -- set the port DIRECTION registers before a write. The write routines
+; (E324/E356 and everything they call: E246/E2AC/E27A) only ever toggle the P2.8 (data) and P2.9
+; (clock) pin VALUES; they assume the DIRECTION registers DP2.8/DP2.9 are already outputs. The ONLY
+; routine in this loader that sets those directions is the dump routine E1C6 (its BSET DP2.8 /
+; BSET DP2.9 preamble). So a write that isn't preceded by a dump leaves DP2.9 (clock) as a reset-
+; default INPUT -- the clock line never drives the chip, E324 spins forever in its ready-poll, and
+; the host times out (confirmed on hardware). This mirrors E1C6's exact preamble (same four BSETs
+; and the two Delay256 settles) so every write path is self-sufficient and no longer needs a dump
+; in front of it. Called once per write command from CmdA7/CmdA8/CmdA9/CmdAA.
+EInit	PROC NEAR
+		BSET	DP2.8 ; P2.8 (data) is an output
+		BSET    P2.8  ; idle high, same as E1C6
+		BSET    DP2.9 ; P2.9 (clock) is an output
+		BSET    P2.9  ; idle high, same as E1C6
+		CALL    Delay256
+		CALL    Delay256
+		RET
+EInit	ENDP
+; === end NEW ===
+
+; Program flash
+E1C4	PROC NEAR
+		MOV     [-R0],R1 ; Push R1
+		MOV     [-R0],R2 ; Push R2
+		MOV     [-R0],R3 ; Push R3
+		MOV     [-R0],R4 ; Push R4
+		MOV     R3,#0E600H ; Buf
+		MOV     R2,#00H
+		MOVB    RL2,[R3+#0002H] ; Address high
+		MOVB    RH1,[R3+#0003H] ; Address medium
+		MOVB    RL1,[R3+#0004H] ; Address low
+		MOV     R4,#00H
+		MOVB    RL4,[R3] ; Count
+		SUB     R4,#4
+		SHR     R4,#01H
+		SUB     R4,#1
+		ADD     R3,#5
+E1EA:	SRVWDT  ; Feed watchdog
+		MOVB    RL7,[R3+]
+		MOVB    RH7,[R3+]
+		CALL    E208 ; Program flash (R1: Address, R7: Data)
+		ADD     R1,#2
+		ADDC    R2,#0
+		CMPD1   R4,#00H
+		JMPR    CC_NZ,E1EA
+PopR4:	MOV     R4,[R0+] ; Pop R4
+PopR3:	MOV     R3,[R0+] ; Pop R3
+PopR2:	MOV     R2,[R0+] ; Pop R2
+PopR1:	MOV     R1,[R0+] ; Pop R1
+		RET
+E1C4	ENDP
+
+; Program flash (R1: Address, R7: Data)
+E208	PROC NEAR
+		MOV     [-R0],R1 ; Push R1
+		MOV     [-R0],R7 ; Push R7
+		MOV     R1,#0AAAAH ; Address AAA
+		MOVB    RL7,#00AAH ; Data AA
+		CALL    E374 ; Write extended data byte (source is RL7)
+		MOV     R1,#5555H ; Address 555
+		MOVB    RL7,#0055H ; Data 55
+		CALL    E374 ; Write extended data byte (source is RL7)
+		MOV     R1,#0AAAAH ; Address AAA
+		MOVB    RL7,#00A0H ; Data A0
+		CALL    E374 ; Write extended data byte (source is RL7)
+		MOV     R7,[R0+] ; Pop R7
+		MOV     R1,[R0+] ; Pop R1
+		CALL    E384 ; Write extended data word (source is R7)
+		CALL    E354 ; Wait until operation is complete
+		RET
+E208	ENDP
+
+; Read flash
+E23E	PROC NEAR
+		MOV     [-R0],R1 ; Push R1
+		MOV     [-R0],R2 ; Push R2
+		MOV     [-R0],R3 ; Push R3
+		MOV     [-R0],R4 ; Push R4
+		MOV     [-R0],R5 ; Push R5
+		MOV     R3,#0E600H ; Buf
+		MOV     R2,#00H
+		MOVB    RL2,[R3+#0002H] ; Address high
+		MOVB    RH1,[R3+#0003H] ; Address medium
+		MOVB    RL1,[R3+#0004H] ; Address low
+		MOV     R4,#00H
+		MOVB    RL4,[R3+#0005H] ; Count
+		ADDB    RL4,#1
+		MOVB    [R3],RL4
+		ADD     R3,#1
+		MOVB    RL7,#0036H
+		MOVB    [R3],RL7
+		ADD     R3,#1
+		SUBB    RL4,#1
+E270:	CALL    E290 ; Read extended data (returned in RL7)
+		MOVB    [R3],RL7
+		ADD     R3,#1
+		ADD     R1,#1
+		ADDC    R2,#0
+		CMPD1   R4,#00H
+		JMPR    CC_NZ,E270
+		CALL    E15E ; Send message in buf (E600)
+		MOV     R5,[R0+] ; Pop R5
+		JMPR	CC_UC,PopR4
+E23E	ENDP
+
+; Read extended data (returned in RL7)
+E290	PROC NEAR
+		MOV     [-R0],R1 ; Push R1
+		SRVWDT  ; Feed watchdog
+		CALL    E2A4 ; Set Data Page Pointer 0 based on R2
+		AND     R1,#3FFFH
+		MOVB    RL7,[R1]
+		JMPR	CC_UC,PopR1
+E290	ENDP
+
+; Set Data Page Pointer 0 based on R1, R2
+E2A4	PROC NEAR
+		MOV     [-R0],R1 ; Push R1
+		MOV     [-R0],R2 ; Push R2
+		SHL     R2,#02H
+		AND     R2,#00FCH
+		ROL     R1,#02H
+		AND     R1,#3
+		OR      R2,R1
+		MOV     DPP0,R2 ; R2 => Data Page Pointer 0
+		JMPR	CC_UC,PopR2
+E2A4	ENDP
+
+; Erase flash
+E2E6	PROC NEAR
+		MOV     [-R0],R1 ; Push R1
+		MOV     [-R0],R2 ; Push R2
+		MOV     [-R0],R3 ; Push R3
+		MOV     [-R0],R7 ; Push R7
+		MOV     R3,#0E600H ; Buf
+		MOV     R2,#0020H
+		MOV     R1,#0AAAAH ; Address AAA
+		MOVB    RL7,#00AAH ; Data AA
+		CALL    E374 ; Write extended data byte (source is RL7)
+		MOV     R1,#5555H ; Address 555
+		MOVB    RL7,#0055H ; Data 55
+		CALL    E374 ; Write extended data byte (source is RL7)
+		MOV     R1,#0AAAAH ; Address AAA
+		MOVB    RL7,#0080H ; Data 80
+		CALL    E374 ; Write extended data byte (source is RL7)
+		MOV     R1,#0AAAAH ; Address AAA
+		MOVB    RL7,#00AAH ; Data AA
+		CALL    E374 ; Write extended data byte (source is RL7)
+		MOV     R1,#5555H ; Address 555
+		MOVB    RL7,#0055H ; Data 55
+		CALL    E374 ; Write extended data byte (source is RL7)
+		MOV     R1,#0AAAAH ; Address AAA
+		MOVB    RL7,#0010H ; Data 10
+		CALL    E374 ; Write extended data byte (source is RL7)
+		CALL    Delay256
+		MOVB    RL7,#0080H
+		CALL    E354 ; Wait until erase operation is complete
+		MOV     R7,[R0+] ; Pop R7
+		JMPA	CC_UC,PopR3 ; was JMPR -- out of relative range once the new A9/AA code
+							; pushed this past JMPR's +/-range; JMPA is an absolute jump,
+							; behaves identically, just not range-limited.
+E2E6	ENDP
+
+; Wait until operation is complete
+E354	PROC NEAR
+		MOV     [-R0],R2 ; Push R2
+		MOV     [-R0],R7 ; Push R7
+		SUB     R2,#0018H
+		MOVB    RH7,RL7
+		ANDB    RH7,#0080H
+E362:	CALL    E290 ; Read extended data (returned in RL7)
+		ANDB    RL7,#0080H
+		CMPB    RL7,RH7
+		JMPR    CC_NZ,E362
+		MOV     R7,[R0+] ; Pop R7
+		MOV     R2,[R0+] ; Pop R2
+		RET
+E354	ENDP
+
+; Write extended data byte (source is RL7)
+E374	PROC NEAR
+		MOV     [-R0],R1 ; Push R1
+		CALL    E2A4 ; Set Data Page Pointer 0 based on R2
+		AND     R1,#3FFFH
+		MOVB    [R1],RL7
+		JMPR	CC_UC,E384x ; Pop R1 + RET
+E374	ENDP
+
+; Write extended data word (source is R7)
+E384	PROC NEAR
+		MOV     [-R0],R1 ; Push R1
+		CALL    E2A4 ; Set Data Page Pointer 0 based on R2
+		AND     R1,#3FFFH
+		MOV     [R1],R7
+E384x:	MOV     R1,[R0+] ; Pop R1
+		RET
+E384	ENDP
+
+RoutineEnd:
+
+All		ENDS
+
+END

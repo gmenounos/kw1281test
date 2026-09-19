@@ -1,6 +1,7 @@
 ﻿using BitFab.KW1281Test.Interface;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime;
 using System.Threading;
 
@@ -10,7 +11,40 @@ namespace BitFab.KW1281Test
     {
         IInterface Interface { get; }
 
-        int WakeUp(byte controllerAddress, bool evenParity = false, bool failQuietly = false);
+        /// <param name="isStopRequested">
+        /// Optional; polled between this method's own internal retry attempts (see the
+        /// implementation's doc comment) so a global Stop doesn't have to wait out this wakeup's
+        /// entire up-to-3-tries/1-second-sleep-each retry ceiling before it's noticed -- only the
+        /// single attempt already in flight when Stop was pressed. Defaults to null (never
+        /// checked) so existing callers that don't care about interactive stopping are unaffected.
+        /// </param>
+        /// <param name="stopRetryingOnSyncByte">
+        /// Optional; given the <see cref="LastSyncByte"/> just read on a failed attempt, returns true
+        /// to STOP the internal retry loop immediately instead of burning the remaining tries and
+        /// their 1-second sleeps. For a DETERMINISTIC condition that won't change on retry -- e.g. an
+        /// EDC15 soft-brick answering 9600 with a consistent $95/$B5, which the caller then handles by
+        /// switching to recovery mode -- retrying is pure wasted time. Null (the default) preserves the
+        /// full 3-try behavior for every existing caller and every other kind of failure.
+        /// </param>
+        int WakeUp(
+            byte controllerAddress, bool evenParity = false, bool failQuietly = false,
+            Func<bool>? isStopRequested = null, Func<int, bool>? stopRetryingOnSyncByte = null);
+
+        /// <summary>
+        /// One ISO 14230 fast-init attempt to <paramref name="targetAddress"/>: a 25 ms break-low
+        /// pulse, then StartCommunication at Twup, at 10400 baud. Returns the KWP2000 protocol
+        /// version, or 0 if no StartCommunication response was seen. Bit-banged over USB-serial it
+        /// is probabilistic, so callers retry; the break pulse works on FTDI and CH340 KKL cables.
+        /// </summary>
+        int TryFastInit(byte targetAddress);
+
+        /// <summary>
+        /// The raw sync byte read on the most recent <see cref="WakeUp"/> attempt (the value seen
+        /// where $55 was expected), or -1 if no byte was read. Lets a caller distinguish a specific
+        /// ECU-state signature -- e.g. an EDC15 soft-brick answering 9600 with a consistent $95/$B5 --
+        /// from ordinary noise, which <see cref="WakeUp"/> itself flattens into a generic failure.
+        /// </summary>
+        int LastSyncByte { get; }
 
         byte ReadByte();
 
@@ -20,6 +54,58 @@ namespace BitFab.KW1281Test
         /// <param name="b">The byte to write.</param>
         void WriteByte(byte b);
 
+        /// <summary>
+        /// Write every byte in <paramref name="bytes"/> and discard all of their echoes, in groups
+        /// of <paramref name="subBatchSize"/> bytes at a time (one <see cref="Interface.IInterface.
+        /// WriteBytesRaw"/> call + one <see cref="Interface.IInterface.ReadBytes"/> call per group)
+        /// rather than <paramref name="bytes"/>.Length individual <see cref="WriteByte"/> round
+        /// trips. See <see cref="EDC15.Edc15FlashVM.SendFlashWriteChunk"/> for the full history.
+        ///
+        /// <para>This used to write+drain the ENTIRE array as a single group (no sub-batching at
+        /// all). A real-hardware capture (KWHack21.log) taken against that version showed a write
+        /// getting considerably further than before (past 50%, up from 32%) but with a markedly
+        /// higher rate of the loader NAK'ing individual chunks with a checksum error (0x7F where
+        /// 0x76 was expected) -- a real rejection by the loader's own message-checksum check
+        /// (see Loader.a66's E128/E082), not a framing/misalignment bug in this method. See
+        /// <see cref="EDC15.Edc15FlashVM.WriteRaw"/>'s doc comment for the corrected understanding of
+        /// WHY grouping helps at all (pipelining transmit/echo across a group instead of forcing a
+        /// full round trip per byte) -- the same logic applies here to explain why an unbounded group
+        /// size made NAKs worse: at some group size, whatever's actually marginal about this
+        /// particular K-line connection (cable/grounding/noise -- unconfirmed) apparently can't keep
+        /// up with an uninterrupted burst that long, without needing to invoke UART pacing at all.</para>
+        ///
+        /// <para>Tuning history: 16 (KWHack21.log's follow-up) got a full write to succeed
+        /// (KWHack24.log) at maxAttempts=5, with only ~2.2% of chunks needing even one retry and just
+        /// one chunk needing a second. That safety margin was spent on speed -- raised to 64, which
+        /// (KWHack25.log) not only held up but improved: write time dropped from 9m47s to 3m28s, with
+        /// 27/~2098 chunks needing one retry and, notably, ZERO needing a second (down from 1 at 16) --
+        /// no sign this connection's NAK rate is sensitive to group size in the 16-64 range, at least
+        /// on the hardware tested so far. Raised again to 128, which also held up -- at that point the
+        /// user confirmed it was time to drop sub-batching entirely (and separately noted the earlier
+        /// first-read-attempt failures, from around when this ladder started, had also stopped
+        /// recurring -- consistent with those being unrelated transient connection hiccups rather than
+        /// anything caused by this method's tuning). Defaulted to <see cref="int.MaxValue"/> rather
+        /// than literally removing the sub-batching mechanism: with every real chunk this app ever
+        /// builds far smaller than that (the largest, flash-write chunks, top out around 256 bytes --
+        /// see <see cref="EDC15.Edc15FlashVM.WriteFlashBlock"/>'s 0xF9 cap), this always sends the
+        /// whole buffer as one group in practice, while leaving the knob in place (and its full tuning
+        /// history documented here) in case a future real-hardware regression ever needs it dialed
+        /// back down again rather than reinventing this from scratch.</para>
+        /// </summary>
+        void WriteBytes(byte[] bytes, int subBatchSize = int.MaxValue);
+
+        /// <summary>
+        /// Reads exactly <paramref name="count"/> bytes into <paramref name="buffer"/> (from index
+        /// 0) as one operation via <see cref="Interface.IInterface.ReadBytes"/>, rather than
+        /// <paramref name="count"/> individual <see cref="ReadByte"/> calls. Unlike
+        /// <see cref="WriteBytes"/>, this has no sub-batching/backpressure concern to worry about:
+        /// the caller is purely draining data the ECU already decided to send (e.g.
+        /// <see cref="EDC15.Edc15FlashVM.ReadFlashDataPacket"/>'s data loop) -- nothing this app does
+        /// on the read side can outrun or get ahead of the ECU's own transmission, so there's no
+        /// backpressure for a smaller read to preserve. Safe to read in one full-size call.
+        /// </summary>
+        void ReadBytes(byte[] buffer, int count);
+
         void ReadComplement(byte b);
     }
 
@@ -27,11 +113,41 @@ namespace BitFab.KW1281Test
     {
         public IInterface Interface { get; }
 
-        public int WakeUp(byte controllerAddress, bool evenParity, bool failQuietly)
+        /// <inheritdoc />
+        public int LastSyncByte { get; private set; } = -1;
+
+        public int WakeUp(
+            byte controllerAddress, bool evenParity, bool failQuietly,
+            Func<bool>? isStopRequested = null, Func<int, bool>? stopRetryingOnSyncByte = null)
         {
-            // Disable garbage collection int this time-critical method
-            var noGC = GC.TryStartNoGCRegion(1024 * 1024);
-            if (!noGC)
+            LastSyncByte = -1;
+            // Disable garbage collection int this time-critical method. On Mono (which is what
+            // Android apps run on) this API isn't implemented at all -- it throws
+            // NotImplementedException rather than just returning false like CoreCLR does when it
+            // can't honor the request -- so this needs a try/catch, not just the false check below.
+            //
+            // The two failure modes are deliberately NOT treated the same: NotImplementedException
+            // means Mono/Android, where this is simply never possible -- every single wakeup would
+            // otherwise log the same "unable to disable GC" warning unconditionally, which isn't a
+            // real signal of anything since there was never a chance of it working there to begin
+            // with. A plain `false` with no exception is CoreCLR (Desktop) declining a specific
+            // request it's otherwise capable of honoring, which IS worth surfacing.
+            bool noGC;
+            bool gcRegionApiUnsupported = false;
+            try
+            {
+                noGC = GC.TryStartNoGCRegion(1024 * 1024);
+            }
+            catch (NotImplementedException)
+            {
+                noGC = false;
+                gcRegionApiUnsupported = true;
+            }
+            catch (Exception)
+            {
+                noGC = false;
+            }
+            if (!noGC && !gcRegionApiUnsupported)
             {
                 Log.WriteLine("Warning: Unable to disable GC so timing may be compromised.");
             }
@@ -51,6 +167,28 @@ namespace BitFab.KW1281Test
                     catch (Exception ex)
                     {
                         Log.WriteLine(ex.Message);
+
+                        // A caller can mark the sync byte just read as a DETERMINISTIC condition that
+                        // won't change on retry (e.g. an EDC15 soft-brick answers 9600 with a
+                        // consistent $95/$B5 -- confirmed reliable on the first probe). When it does,
+                        // stop immediately and rethrow so the caller can act on it (switch to recovery
+                        // mode) instead of burning the remaining tries and their 1-second sleeps. Any
+                        // other failure (including ordinary transient noise) still gets the full retry.
+                        if (stopRetryingOnSyncByte?.Invoke(LastSyncByte) == true)
+                        {
+                            throw;
+                        }
+
+                        // Checked here, before committing to another attempt (and its 1-second
+                        // sleep), rather than only where the caller's own outer retry loop checks
+                        // between whole Connect attempts -- this wakeup already burns up to 3
+                        // tries on its own, and without this a Stop press mid-wakeup wouldn't be
+                        // noticed until all of them (plus whatever else the current Connect
+                        // attempt goes on to try) had run their course.
+                        if (i < maxTries && isStopRequested?.Invoke() == true)
+                        {
+                            throw new OperationCanceledException("Stopped during wakeup retry.");
+                        }
 
                         if (i < maxTries)
                         {
@@ -77,9 +215,27 @@ namespace BitFab.KW1281Test
             }
             finally
             {
-                if (GCSettings.LatencyMode == GCLatencyMode.NoGCRegion)
+                // Only end the region if WE actually started one. Don't gate this on
+                // GCSettings.LatencyMode == GCLatencyMode.NoGCRegion: that's racy. A No-GC
+                // region auto-exits (LatencyMode flips back on its own) the moment total
+                // allocations exceed the 1MB budget reserved above -- which a large read
+                // during wakeup can easily do -- so the mode check can read false even
+                // though we successfully started a region, or read true and then have the
+                // region exit between the check and the call. Either way EndNoGCRegion()
+                // throws InvalidOperationException ("NoGCRegion mode must be set") when no
+                // region is currently active. Guard on the noGC bool (did WE start one) and
+                // swallow that specific exception in case it already auto-exited.
+                if (noGC)
                 {
-                    GC.EndNoGCRegion();
+                    try
+                    {
+                        GC.EndNoGCRegion();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // Region already auto-exited because allocations exceeded the
+                        // reserved budget. Nothing to end; not an error.
+                    }
                 }
                 Interface.ReadTimeout = Interface.DefaultTimeoutMilliseconds;
             }
@@ -102,6 +258,7 @@ namespace BitFab.KW1281Test
             var logLines = new List<string>();
 
             var syncByte = Interface.ReadByte();
+            LastSyncByte = syncByte;
 
             if (syncByte != 0x55)
             {
@@ -143,6 +300,7 @@ namespace BitFab.KW1281Test
             return protocolVersion;
         }
 
+
         public byte ReadByte()
         {
             return Interface.ReadByte();
@@ -151,6 +309,34 @@ namespace BitFab.KW1281Test
         public void WriteByte(byte b)
         {
             WriteByteAndDiscardEcho(b);
+        }
+
+        public void WriteBytes(byte[] bytes, int subBatchSize = int.MaxValue)
+        {
+            if (bytes.Length == 0)
+            {
+                return;
+            }
+
+            subBatchSize = Math.Max(1, subBatchSize);
+            var offset = 0;
+            while (offset < bytes.Length)
+            {
+                var count = Math.Min(subBatchSize, bytes.Length - offset);
+                var group = new byte[count];
+                Array.Copy(bytes, offset, group, 0, count);
+
+                Interface.WriteBytesRaw(group);
+                var echoes = new byte[count];
+                Interface.ReadBytes(echoes, count);
+
+                offset += count;
+            }
+        }
+
+        public void ReadBytes(byte[] buffer, int count)
+        {
+            Interface.ReadBytes(buffer, count);
         }
 
         public void ReadComplement(byte b)
@@ -222,6 +408,100 @@ namespace BitFab.KW1281Test
                 throw new InvalidOperationException($"Wrote 0x{b:X2} to port but echo was 0x{echo:X2}");
             }
 #endif
+        }
+
+        // ISO 14230 Twup: StartCommunication first bit falls 50 ms after the low pulse starts.
+        private const double FastInitTwupSeconds = 0.050;
+
+        public int TryFastInit(byte targetAddress)
+        {
+            Interface.SetBaudRate(10400);
+            var savedTimeout = Interface.ReadTimeout;
+            Interface.ReadTimeout = (int)TimeSpan.FromSeconds(2).TotalMilliseconds;
+            try
+            {
+                Interface.SetBreak(false);
+                Thread.Sleep(300);                   // W5: bus idle high >= 300 ms
+
+                // 25 ms low pulse; the stopwatch starts at the falling edge so StartCommunication
+                // lands at Twup after the pulse start. Busy-wait keeps the edges tight.
+                var sw = Stopwatch.StartNew();
+                Interface.SetBreak(true);
+                FastInitBusyWaitUntil(sw, 0.025);
+                Interface.SetBreak(false);
+                Interface.ClearReceiveBuffer();
+
+                FastInitBusyWaitUntil(sw, FastInitTwupSeconds);
+
+                Interface.ClearReceiveBuffer();
+                var req = new byte[] { 0x81, targetAddress, 0xF1, 0x81 };
+                byte checksum = 0;
+                foreach (var b in req) checksum += b;
+                var frame = new byte[req.Length + 1];
+                Array.Copy(req, frame, req.Length);
+                frame[req.Length] = checksum;
+                Interface.WriteBytesRaw(frame);
+
+                // Scan the echo + reply for the StartCommunication positive response (SID 0xC1 then
+                // two keyword bytes); scanning for 0xC1 skips our echo and any pulse garbage.
+                var buf = FastInitReadBurst(48, 400, 30);
+                var idx = Array.IndexOf(buf, (byte)0xC1);
+                if (idx < 0 || idx + 2 >= buf.Length)
+                {
+                    return 0;
+                }
+                int kwLsb = buf[idx + 1];
+                int kwMsb = buf[idx + 2];
+                var version = ((kwMsb & 0x7F) << 7) + (kwLsb & 0x7F);
+                return version >= 2000 ? version : 0x2000;
+            }
+            finally
+            {
+                Interface.ReadTimeout = savedTimeout;
+            }
+        }
+
+        private static void FastInitBusyWaitUntil(Stopwatch sw, double seconds)
+        {
+            var targetTicks = (long)(seconds * Stopwatch.Frequency);
+            while (sw.ElapsedTicks < targetTicks) { }
+        }
+
+        // Read the half-duplex echo + reply into one buffer until gapTimeoutMs of silence or
+        // maxBytes, so the caller can scan for the reply without aligning to the echo boundary.
+        private byte[] FastInitReadBurst(int maxBytes, int firstTimeoutMs, int gapTimeoutMs)
+        {
+            var outBuf = new List<byte>(maxBytes);
+            var savedTimeout = Interface.ReadTimeout;
+            try
+            {
+                Interface.ReadTimeout = firstTimeoutMs;
+                try
+                {
+                    outBuf.Add(Interface.ReadByte());
+                }
+                catch (TimeoutException)
+                {
+                    return outBuf.ToArray();
+                }
+                Interface.ReadTimeout = gapTimeoutMs;
+                while (outBuf.Count < maxBytes)
+                {
+                    try
+                    {
+                        outBuf.Add(Interface.ReadByte());
+                    }
+                    catch (TimeoutException)
+                    {
+                        break;
+                    }
+                }
+            }
+            finally
+            {
+                Interface.ReadTimeout = savedTimeout;
+            }
+            return outBuf.ToArray();
         }
 
         public KwpCommon(IInterface @interface)

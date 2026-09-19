@@ -1,0 +1,274 @@
+; ============================================================================
+; Loader-boot-monitor.a66  --  EDC15 boot-mode stage-2 command monitor.
+;
+; Received byte-by-byte into RAM by Loader-boot-stage1.a66 and entered at its load base
+; (0F800H -- below stage-1 at 0FA40H so stage-1 isn't overwritten while loading,
+; and above the flash helper at 0F600H). Speaks the project-native monitor
+; protocol over ASC0 at 28800 baud, half-duplex with K-line local echo (every
+; byte we transmit is echoed back to our own RX and must be consumed -- TxByte).
+;
+; STATUS BYTES:  0xB0 READY (banner) 0xB1 ACK  0xB2 OK  0xBE ERR  0xBF NAK
+; COMMANDS (little-endian; addr=3 bytes, count=2 bytes):
+;   0x20 PING                      -> ACK, OK
+;   0x21 PEEK  addr                -> ACK, wordLo, wordHi, OK
+;   0x22 POKE  addr, word          -> ACK, OK/ERR   (writes, reads back, verifies)
+;   0x23 READ  addr, count         -> ACK, <count bytes>, XOR, OK
+;   0x24 WRITE addr, count, data.. -> ACK, XOR, OK/ERR (byte write + readback verify)
+;   0x25 CALL  addr, 16 ctx bytes  -> ACK, <16 ctx bytes>, OK  (R8..R15 in/out)
+;   0x26 EINIT                     -> ACK, OK
+;   0x27 RESET                     -> ACK, then SRST
+;   (anything else)                -> NAK
+;
+; REGISTER CONVENTIONS (our choice):
+;   R0   RL0 = RxByte result ; RH0 = TxByte source
+;   R1   24-bit address low 16 ; RL2 = address high 8 (RH2=0). SetWindow post-incs.
+;   R3   count, or PEEK/POKE word
+;   R4   RL4 data byte ; RH4 readback
+;   R5   RL5 running XOR ; RH5 command hold, then WRITE sticky-error flag
+;   R6   DPP2 near pointer / GPR-bank pointer
+;   R7   SetWindow temp / loop counter / trampoline temp
+;   R8..R15  CALL context bank (at CP+0x10); untouched by the monitor otherwise
+;
+; Reaching 24-bit space from 16-bit pointers uses DPP2 as a moving 16 KB window
+; at 08000H (SetWindow) -- a C167 mechanism, not a design choice.
+;
+; LAYOUT: the primitives and terminal replies sit in the MIDDLE, between the
+; first four command handlers and the last four, so every JMPR/CALLR reaches its
+; target within the C166 relative range with no absolute jumps needed.
+;
+; Toolchain: Keil A166 authoritative ($INCLUDE REG167.INC); also assembles under
+; Tools/c166/reasm.py with the rel8-range gate. If Keil ever flags a JMPR/CALLR
+; out of range, change that one to JMPA/CALLA (absolute; no logic change).
+; ============================================================================
+
+$M167
+$NOLI
+$INCLUDE (REG167.INC)
+$LI
+
+BootMon		SECTION CODE AT 0F800H
+BootMonCode	PROC NEAR
+
+; ---- Entry: announce READY, then run the command loop ----------------------
+MonEntry:
+	BCLR    S0RIR
+	BCLR    S0TIR
+	MOVB    RH0, #0B0H                      ; READY banner
+	CALLR   TxByte
+
+MainLoop:
+	CALLR   RxByte                          ; command byte -> RL0
+	MOVB    RH5, RL0                         ; hold command in RH5
+
+	CMPB    RH5, #20H                        ; --- 0x20 PING ---
+	JMPR    CC_NZ, Op_Peek
+	MOVB    RH0, #0B1H
+	CALLR   TxByte                          ; ACK
+	JMPR    CC_UC, SendOK
+
+Op_Peek:
+	CMPB    RH5, #21H                        ; --- 0x21 PEEK ---
+	JMPR    CC_NZ, Op_Poke
+	MOVB    RH0, #0B1H
+	CALLR   TxByte                          ; ACK
+	CALLR   RecvAddr
+	CALLR   SetWindow
+	MOV     R3, [R6]                         ; read word at addr
+	MOVB    RH0, RL3
+	CALLR   TxByte                          ; word low
+	MOVB    RH0, RH3
+	CALLR   TxByte                          ; word high
+	JMPR    CC_UC, SendOK
+
+Op_Poke:
+	CMPB    RH5, #22H                        ; --- 0x22 POKE ---
+	JMPR    CC_NZ, Op_Read
+	MOVB    RH0, #0B1H
+	CALLR   TxByte                          ; ACK
+	CALLR   RecvAddr
+	CALLR   RecvCount                        ; word -> R3
+	CALLR   SetWindow
+	MOV     [R6], R3                         ; write word (no read-back verify: many SFRs, e.g. the
+	JMPR    CC_UC, SendOK                    ; EBC config registers, don't read back what was written)
+
+Op_Read:
+	CMPB    RH5, #23H                        ; --- 0x23 READ ---
+	JMPR    CC_NZ, Op_Write
+	MOVB    RH0, #0B1H
+	CALLR   TxByte                          ; ACK
+	MOVB    RL5, #0H                         ; XOR = 0
+	CALLR   RecvAddr
+	CALLR   RecvCount                        ; count -> R3
+Rd_Loop:
+	CMPD1   R3, #0H                          ; while count != 0 (count--)
+	JMPR    CC_NZ, Rd_Byte
+	MOVB    RH0, RL5
+	CALLR   TxByte                          ; trailing XOR
+	JMPR    CC_UC, SendOK
+Rd_Byte:
+	CALLR   SetWindow
+	MOVB    RH0, [R6]
+	XORB    RL5, RH0
+	CALLR   TxByte
+	JMPR    CC_UC, Rd_Loop
+
+; ============================ MIDDLE BLOCK ==================================
+; Terminal replies + the shared loop trampoline + all primitives live here so
+; both the handlers above and those below reach them within relative range.
+
+SendErr:
+	MOVB    RH0, #0BEH
+	CALLR   TxByte
+	JMPR    CC_UC, MainLoop
+SendOK:
+	MOVB    RH0, #0B2H
+	CALLR   TxByte
+BackToLoop:
+	JMPR    CC_UC, MainLoop
+
+; TxByte: transmit RH0 on ASC0, then consume the K-line echo of it.
+TxByte:
+	MOVB    S0TBUF, RH0
+TxByte_Wait:
+	JNB     S0RIR, TxByte_Wait
+	BCLR    S0RIR
+	BCLR    S0TIR
+	RET
+
+; RxByte: feed the watchdog, spin until a byte arrives -> RL0.
+RxByte:
+	SRVWDT
+RxByte_Wait:
+	JNB     S0RIR, RxByte_Wait
+	BCLR    S0RIR
+	MOVB    RL0, S0RBUF
+	RET
+
+; RecvAddr: read 3 bytes -> R1 (low, mid) and RL2 (high); RH2 = 0.
+RecvAddr:
+	CALLR   RxByte
+	MOVB    RL1, RL0
+	CALLR   RxByte
+	MOVB    RH1, RL0
+	CALLR   RxByte
+	MOVB    RL2, RL0
+	MOVB    RH2, #0H
+	RET
+
+; RecvCount: read 2 bytes -> R3 (16-bit LE).
+RecvCount:
+	CALLR   RxByte
+	MOVB    RL3, RL0
+	CALLR   RxByte
+	MOVB    RH3, RL0
+	RET
+
+; SetWindow: map the 24-bit address R2:R1 through DPP2, returning near pointer
+; R6 = 08000H | (addr & 3FFFH); post-increments R2:R1 so callers walk addresses.
+SetWindow:
+	MOV     R6, R1
+	MOV     R7, R2
+	SHR     R6, #0EH                          ; R6 = R1 >> 14
+	SHL     R7, #2H                           ; R7 = R2 << 2
+	OR      R7, R6                            ; page = addr >> 14
+	MOV     DPP2, R7
+	MOV     R6, R1
+	ADD     R1, #1H                           ; addr++ (24-bit)
+	ADDC    R2, #0H
+	AND     R6, #3FFFH                        ; offset within page
+	OR      R6, #8000H                        ; near pointer into the DPP2 window
+	RET
+; ========================== END MIDDLE BLOCK ================================
+; (BootMonCode PROC continues; ENDP is at the end of the section.)
+
+Op_Write:
+	CMPB    RH5, #24H                        ; --- 0x24 WRITE ---
+	JMPR    CC_NZ, Op_Call
+	MOVB    RH0, #0B1H
+	CALLR   TxByte                          ; ACK
+	MOVB    RL5, #0H                         ; XOR = 0
+	MOVB    RH5, #0H                         ; sticky verify-error flag = 0
+	CALLR   RecvAddr
+	CALLR   RecvCount                        ; count -> R3
+Wr_Loop:
+	CMPD1   R3, #0H                          ; while count != 0 (count--)
+	JMPR    CC_NZ, Wr_Byte
+	MOVB    RH0, RL5
+	CALLR   TxByte                          ; trailing XOR
+	CMPB    RH5, #0H
+	JMPR    CC_NZ, SendErr                   ; any byte failed readback -> ERR
+	JMPR    CC_UC, SendOK
+Wr_Byte:
+	CALLR   RxByte                          ; data -> RL0
+	MOVB    RL4, RL0
+	XORB    RL5, RL4                         ; XOR accumulate
+	CALLR   SetWindow
+	MOVB    [R6], RL4                        ; byte write
+	MOVB    RH4, [R6]                         ; read back
+	CMPB    RH4, RL4                         ; verify
+	JMPR    CC_NZ, Wr_Fail
+	JMPR    CC_UC, Wr_Loop
+Wr_Fail:
+	MOVB    RH5, #1H                         ; latch error, keep consuming data (stay framed)
+	JMPR    CC_UC, Wr_Loop
+
+Op_Call:
+	CMPB    RH5, #25H                        ; --- 0x25 CALL ---
+	JMPR    CC_NZ, Op_Einit
+	MOVB    RH0, #0B1H
+	CALLR   TxByte                          ; ACK
+	CALLR   RecvAddr                          ; target offset -> R1 (same segment)
+	MOV     R6, CP
+	ADD     R6, #10H                          ; R6 -> &R8 (context bank at CP+0x10)
+	MOV     R7, #0H
+Call_RxCtx:
+	CALLR   RxByte
+	MOVB    [R6], RL0                         ; store ctx byte into R8..R15
+	ADD     R6, #1H
+	CMPI1   R7, #0FH                          ; 16 bytes
+	JMPR    CC_NZ, Call_RxCtx
+	CALLR   Call_Tramp                        ; invoke callee at R1, return to Call_Ret
+Call_Ret:
+	MOV     R6, CP
+	ADD     R6, #10H                          ; R6 -> &R8 again
+	MOV     R7, #0H
+Call_TxCtx:
+	MOVB    RH0, [R6]                         ; send back R8..R15 image
+	CALLR   TxByte
+	ADD     R6, #1H
+	CMPI1   R7, #0FH
+	JMPR    CC_NZ, Call_TxCtx
+	JMPR    CC_UC, SendOK
+
+; Call_Tramp: the CALLR above pushed Call_Ret as the return address. Re-push it
+; as the callee's return frame, push the target offset (R1), and RET so IP:=target.
+; The callee (flash helper) ends with RET, popping Call_Ret -> back to Call_Ret.
+Call_Tramp:
+	POP     R7                               ; R7 = Call_Ret (return addr just pushed)
+	PUSH    R7                               ; callee's return address
+	PUSH    R1                               ; callee entry offset
+	RET                                       ; IP := target
+
+Op_Einit:
+	CMPB    RH5, #26H                        ; --- 0x26 EINIT ---
+	JMPR    CC_NZ, Op_Reset
+	MOVB    RH0, #0B1H
+	CALLR   TxByte                          ; ACK
+	EINIT
+	JMPR    CC_UC, SendOK
+
+Op_Reset:
+	CMPB    RH5, #27H                        ; --- 0x27 RESET ---
+	JMPR    CC_NZ, Op_Bad
+	MOVB    RH0, #0B1H
+	CALLR   TxByte                          ; ACK
+	SRST                                      ; software reset (no return)
+
+Op_Bad:
+	MOVB    RH0, #0BFH
+	CALLR   TxByte                          ; NAK
+	JMPR    CC_UC, BackToLoop
+
+BootMonCode	ENDP
+BootMon		ENDS
+		END

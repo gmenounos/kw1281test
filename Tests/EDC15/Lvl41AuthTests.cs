@@ -5,7 +5,7 @@ using System.Globalization;
 namespace BitFab.KW1281Test.Tests.EDC15;
 
 /// <summary>
-/// Characterization (golden) tests for <c>Edc15VM.LVL41Auth</c>, the EDC15
+/// Characterization (golden) tests for <c>Edc15KeyAlgorithms.ComputeLvl41Key</c>, the EDC15
 /// security-access (level 0x41) seed→key algorithm. The golden file is generated
 /// from the *current* implementation on the first run and then locks the behavior
 /// in, so any later refactor that changes the output fails the build.
@@ -90,7 +90,7 @@ public class Lvl41AuthTests
 
         byte[] seed = [(byte)(seedWord >> 24), (byte)(seedWord >> 16), (byte)(seedWord >> 8), (byte)seedWord];
         byte[] expected = [(byte)(keyWord >> 24), (byte)(keyWord >> 16), (byte)(keyWord >> 8), (byte)keyWord];
-        Edc15VM.LVL41Auth(Key, Key3, seed).ShouldBe(expected, $"seed 0x{seedWord:X8}");
+        Edc15KeyAlgorithms.ComputeLvl41Key(Key, Key3, seed).ShouldBe(expected, $"seed 0x{seedWord:X8}");
     }
 
     [TestMethod]
@@ -100,7 +100,7 @@ public class Lvl41AuthTests
     [DataRow(0x80, 0x00, 0x00, 0x00)]
     public void AlwaysReturnsFourBytes(int b0, int b1, int b2, int b3)
     {
-        Edc15VM.LVL41Auth(Key, Key3, [(byte)b0, (byte)b1, (byte)b2, (byte)b3]).Length.ShouldBe(4);
+        Edc15KeyAlgorithms.ComputeLvl41Key(Key, Key3, [(byte)b0, (byte)b1, (byte)b2, (byte)b3]).Length.ShouldBe(4);
     }
 
     [TestMethod]
@@ -110,8 +110,8 @@ public class Lvl41AuthTests
     public void IsDeterministic(int b0, int b1, int b2, int b3)
     {
         byte[] seed = [(byte)b0, (byte)b1, (byte)b2, (byte)b3];
-        var r1 = Edc15VM.LVL41Auth(Key, Key3, seed);
-        var r2 = Edc15VM.LVL41Auth(Key, Key3, seed);
+        var r1 = Edc15KeyAlgorithms.ComputeLvl41Key(Key, Key3, seed);
+        var r2 = Edc15KeyAlgorithms.ComputeLvl41Key(Key, Key3, seed);
         r1.SequenceEqual(r2).ShouldBeTrue("LVL41Auth must be a pure function of its inputs");
     }
 }
