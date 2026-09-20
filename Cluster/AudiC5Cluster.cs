@@ -13,6 +13,16 @@ internal class AudiC5Cluster : ICluster
 {
     public void UnlockForEepromReadWrite()
     {
+        Log.WriteLine("Sending custom \"Unlock Additional Commands\" block");
+        _kw1281Dialog.SendBlock([0x1B, 0x80, 0x01, 0x02, 0x03, 0x04]);
+        var unlockBlock = _kw1281Dialog.ReceiveBlock();
+        if (unlockBlock is not AckBlock)
+        {
+            // Real VVDI2 traces show the cluster NAKing this same challenge yet the tool
+            // proceeds straight to the password login anyway, so don't treat this as fatal.
+            Log.WriteLine($"Warning: Expected ACK block but received: {unlockBlock}");
+        }
+
         string[] passwords =
         [
             "loginas9",
@@ -60,6 +70,32 @@ internal class AudiC5Cluster : ICluster
         ArgumentNullException.ThrowIfNull(length);
         ArgumentNullException.ThrowIfNull(dumpFileName);
 
+        Login();
+
+        Log.WriteLine($"Dumping EEPROM to {dumpFileName}");
+        DumpEeprom(address.Value, length.Value, maxReadLength: 0x08, dumpFileName);
+
+        _kw1281Dialog.SetDisconnected();
+
+        return dumpFileName;
+    }
+
+    private const int MaxAccessLevel = 7;
+
+    private void Login()
+    {
+        SendHello();
+        LoginWithPassword();
+
+        var accessLevel = GetAccessLevel();
+        if (accessLevel is not null && accessLevel != MaxAccessLevel)
+        {
+            UnlockViaSeedKey();
+        }
+    }
+
+    private void SendHello()
+    {
         WriteBlock([Constants.Hello]);
 
         var blockBytes = ReadBlock();
@@ -68,7 +104,10 @@ internal class AudiC5Cluster : ICluster
         {
             Log.WriteLine($"Warning: Expected block of type ${Constants.Hello:X2}");
         }
+    }
 
+    private void LoginWithPassword()
+    {
         string[] passwords =
         [
             "19xDR8xS",
@@ -77,12 +116,11 @@ internal class AudiC5Cluster : ICluster
             "w10serie",
         ];
 
-        var succeeded = false;
         foreach (var password in passwords)
         {
             Log.WriteLine("Sending login request");
 
-            blockBytes = [Constants.Login, 0x9D];
+            var blockBytes = new List<byte> { Constants.Login, 0x9D };
             blockBytes.AddRange(Encoding.ASCII.GetBytes(password));
             WriteBlock(blockBytes);
 
@@ -91,30 +129,72 @@ internal class AudiC5Cluster : ICluster
 
             if (BlockTitle(blockBytes) == Constants.Ack)
             {
-                succeeded = true;
-                break;
+                Log.WriteLine("Succeeded");
+                return;
             }
-            else
-            {
-                Log.WriteLine($"Warning: Expected block of type ${Constants.Ack:X2}");
-            }
+
+            Log.WriteLine($"Warning: Expected block of type ${Constants.Ack:X2}");
         }
 
-        if (!succeeded)
+        throw new InvalidOperationException("Unable to login to cluster");
+    }
+
+    private int? GetAccessLevel()
+    {
+        Log.WriteLine("Sending \"Get Access Level\" request");
+        WriteBlock([Constants.Login, 0x96, 0x04]);
+        var blockBytes = ReadBlock();
+        Log.WriteLine($"Received block:{Utils.Dump(blockBytes)}");
+
+        if (BlockTitle(blockBytes) == Constants.Login && blockBytes.Count > 3)
         {
-            throw new InvalidOperationException("Unable to login to cluster");
+            int accessLevel = blockBytes[3];
+            Log.WriteLine($"Access level is {accessLevel}.");
+            return accessLevel;
         }
-        else
+
+        Log.WriteLine("Warning: Access level is unknown.");
+        return null;
+    }
+
+    private void UnlockViaSeedKey()
+    {
+        Log.WriteLine("Sending \"Seed Request\" request");
+        WriteBlock([Constants.Login, 0x96, 0x01]);
+        var blockBytes = ReadBlock();
+        Log.WriteLine($"Received block:{Utils.Dump(blockBytes)}");
+
+        if (BlockTitle(blockBytes) != Constants.Login || blockBytes.Count != 14)
         {
-            Log.WriteLine("Succeeded");
+            Log.WriteLine("Warning: Unexpected response to seed request. EEPROM access will likely fail.");
+            return;
         }
 
-        Log.WriteLine($"Dumping EEPROM to {dumpFileName}");
-        DumpEeprom(address.Value, length.Value, maxReadLength: 0x10, dumpFileName);
+        var seed = blockBytes.Skip(3).Take(10).ToArray();
+        var key = VdoKeyFinder.FindKey(seed, MaxAccessLevel);
 
-        _kw1281Dialog.SetDisconnected();
+        Log.WriteLine("Sending \"Key Response\" request");
+        var keyBlockBytes = new List<byte> { Constants.Login, 0x96, 0x02 };
+        keyBlockBytes.AddRange(key);
+        WriteBlock(keyBlockBytes);
 
-        return dumpFileName;
+        blockBytes = ReadBlock();
+        Log.WriteLine($"Received block:{Utils.Dump(blockBytes)}");
+        if (BlockTitle(blockBytes) != Constants.Ack)
+        {
+            Log.WriteLine("Warning: Key was not accepted. EEPROM access will likely fail.");
+        }
+
+        // An ACK above only confirms the block was well-formed, not that the key was actually
+        // correct, so re-query to see whether access level genuinely changed.
+        //
+        // Note: this key-computation algorithm has been verified correct against multiple real
+        // (seed, key) pairs captured from a genuine unlocking tool talking to a cluster stuck
+        // below max access level, but a kw1281test-submitted key has not yet been observed to
+        // actually raise access level on real hardware - only the genuine tool's own
+        // submissions have. If reads still fail after this despite a correct key, the cluster
+        // is likely gated by some additional precondition outside this exchange.
+        GetAccessLevel();
     }
 
     private void DumpEeprom(
@@ -165,7 +245,9 @@ internal class AudiC5Cluster : ICluster
 
         if (BlockTitle(blockBytes) != Constants.ReadEeprom)
         {
-            throw new InvalidOperationException($"Expected block of type ${Constants.ReadEeprom:X2}");
+            Log.WriteLine(
+                $"Warning: Expected block of type ${Constants.ReadEeprom:X2} but got ${BlockTitle(blockBytes):X2} (address ${addr:X4})");
+            return [];
         }
 
         var expectedLength = readLength + 4;
@@ -187,6 +269,7 @@ internal class AudiC5Cluster : ICluster
     private void WriteBlock(IReadOnlyCollection<byte> bodyBytes)
     {
         byte checksum = 0x00;
+        var sentBytes = new List<byte>(bodyBytes.Count + 3);
 
         WriteBlockByte(Constants.StartOfBlock);
         WriteBlockByte((byte)(bodyBytes.Count + 3)); // Block length
@@ -196,12 +279,15 @@ internal class AudiC5Cluster : ICluster
         }
 
         _kw1281Dialog.KwpCommon.WriteByte(checksum);
+        sentBytes.Add(checksum);
+        Log.WriteLine($"Sending block:{Utils.Dump(sentBytes)}");
         return;
 
         void WriteBlockByte(byte b)
         {
             _kw1281Dialog.KwpCommon.WriteByte(b);
             checksum ^= b;
+            sentBytes.Add(b);
         }
     }
 

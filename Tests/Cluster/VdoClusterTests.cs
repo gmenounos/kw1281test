@@ -89,6 +89,29 @@ namespace BitFab.KW1281Test.Tests.Cluster
         }
 
         [TestMethod]
+        [DataRow(
+            new byte[] { 0x22, 0xDB, 0x00, 0x73, 0x64, 0x6C, 0x33, 0x37, 0x06, 0x00 },
+            new byte[] { 0x07, 0xBE, 0x59, 0x00, 0xBE, 0x00, 0xA0 })]
+        [DataRow(
+            new byte[] { 0x98, 0xD9, 0xC6, 0xAB, 0x4D, 0xE6, 0xEE, 0x73, 0x06, 0x00 },
+            new byte[] { 0x07, 0xA1, 0x27, 0x00, 0x50, 0x00, 0xF2 })]
+        [DataRow(
+            new byte[] { 0x3D, 0x6D, 0x05, 0xD3, 0xE5, 0xF3, 0xFD, 0x11, 0x06, 0x00 },
+            new byte[] { 0x07, 0xC0, 0x92, 0x00, 0xBB, 0x00, 0x55 })]
+        [DataRow(
+            new byte[] { 0x82, 0xE2, 0x8C, 0xBB, 0x0B, 0xFF, 0xCD, 0x72, 0x06, 0x00 },
+            new byte[] { 0x07, 0xA6, 0xE7, 0x00, 0x31, 0x00, 0x2A })]
+        public void FindKey_AudiC5Seed0600_MatchesRealCapturedKey(byte[] seed, byte[] expectedKey)
+        {
+            // Real seed/key pairs captured from separate Audi C5 cluster VVDI2 sessions —
+            // all four from the same physical cluster (this secret is per-unit, not
+            // per-firmware; a different physical cluster of the same family may need its own).
+            var key = VdoKeyFinder.FindKey(seed, accessLevel: 7);
+
+            key.ShouldBe(expectedKey);
+        }
+
+        [TestMethod]
         public void ClusterUnlockCodes_ContainsNoDuplicates()
         {
             var seenCodes = new HashSet<string>();
