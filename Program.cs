@@ -169,6 +169,7 @@ class Program
             address = Utils.ParseUint(args[4]);
             _filename = args[5];
         }
+#if false
         else if (string.Compare(command, "ClearCrashData", ignoreCase: true) == 0)
         {
             // Optional argument: fill byte (default 0xFF)
@@ -181,6 +182,7 @@ class Program
                 value = 0xFF;
             }
         }
+#endif
         else if (string.Compare(command, "SetSoftwareCoding", ignoreCase: true) == 0)
         {
             if (args.Length < 6)
@@ -411,9 +413,11 @@ class Program
                 tester.LoadEeprom(address, _filename!);
                 break;
 
+#if false
             case "clearcrashdata":
                 tester.ClearCrashData(value);
                 break;
+#endif
 
             case "mapeeprom":
                 tester.MapEeprom(_filename);
@@ -621,10 +625,6 @@ COMMAND =
         GROUP = Group number (0-255)
         (Group 0: Raw controller data)
     ClarionVWPremium4SafeCode
-    ClearCrashData [VALUE]
-        VALUE = Byte to fill crash data area 0x00-0x4F (optional, default 0xFF)
-                Example: ClearCrashData   -> fills with 0xFF
-                         ClearCrashData 0 -> fills with 0x00
     ClearFaultCodes
     DelcoVWPremium5SafeCode
     DumpEdc15Eeprom [FILENAME]

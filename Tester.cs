@@ -844,6 +844,7 @@ internal class Tester
                 break;
         }
     }
+
     public void ClearCrashData(byte fillValue = 0xFF)
     {
         if (_controllerAddress != (int)ControllerAddress.Airbag)
@@ -854,7 +855,9 @@ internal class Tester
 
         var module = CreateVw51AirbagModule();
         if (module == null)
+        {
             return;
+        }
 
         try
         {
