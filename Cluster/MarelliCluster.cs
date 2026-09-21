@@ -242,20 +242,24 @@ namespace BitFab.KW1281Test.Cluster
             "1C0920905",    // Beetle 1C0920905F M73 V03
             "1C0920906",    // Beetle 1C0920906A M73 V03
             "8N1919880E KOMBI+WEGFAHRS. M73 D23",   // Audi TT
-            "8N1920930",    // Audi TT 8N1920930B M73 D23
+            "8N1920930B KOMBI+WEGFAHRS. M73 D23",   // Audi TT
         ];
 
         private bool HasSmallEeprom() => _smallEepromEcus.Any(model => _ecuInfo.Contains(model));
 
         private readonly string[] _largeEepromEcus =
         [
+            "1C0920821",    // KOMBI+WEGFAHRS. M73 V08 (Beetle 2003)
             "1C0920921",    // Beetle 1C0920921G M73 V08
             "1C0920941",    // Beetle 1C0920941LX M73 V03
             "1C0920951",    // Beetle 1C0920951A M73 V02
             "8D0920900R",   // KOMBI+WEGFAHRS. M73 D54 (Audi A4 B5 2001)
-            "8L0920900B",   // KOMBI+WEGFAHRS. M73 D13, Audi A3 8L 2002 (ASZ diesel engine)
+            "8L0920900B",   // KOMBI+WEGFAHRS. M73 D13 (Audi A3 8L 2002, ASZ diesel engine)
             "8L0920900E",   // KOMBI+WEGFAHRS. M73 D56
             "8N1919880E KOMBI+WEGFAHRS. M73 D26",   // Audi TT
+            "8N1920880D  KOMBI+WEGFAHRS. M73 D10",  // Audi TT
+            "8N1920880H  KOMBI+WEGFAHRS. M73 D56",  // Audi TT
+            "8N1920930J KOMBI+WEGFAHRS. M73 D56",   // Audi TT
             "8N1920980",    // Audi TT 8N1920980E M73 D14
             "8N2919910A",   // KOMBI+WEGFAHRS. M73 D29, Audi TT
             "8N2920930",    // Audi TT 8N2920930C M73 D55

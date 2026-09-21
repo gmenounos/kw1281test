@@ -1,5 +1,5 @@
 ﻿global using static BitFab.KW1281Test.Program;
-
+using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
 using BitFab.KW1281Test.Logging;
 using System;
@@ -7,14 +7,13 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
-using BitFab.KW1281Test.EDC15;
-using System.Runtime.InteropServices;
-using System.IO;
 
 [assembly: InternalsVisibleTo("BitFab.KW1281Test.Tests")]
 
@@ -105,7 +104,8 @@ class Program
 
         if (string.Compare(command, "ReadEeprom", ignoreCase: true) == 0 ||
             string.Compare(command, "ReadRAM", ignoreCase: true) == 0 ||
-            string.Compare(command, "ReadROM", ignoreCase: true) == 0)
+            string.Compare(command, "ReadROM", ignoreCase: true) == 0 ||
+            string.Compare(command, "WriteRAM", ignoreCase: true) == 0)
         {
             if (args.Length < 5)
             {
@@ -114,6 +114,16 @@ class Program
             }
 
             address = Utils.ParseUint(args[4]);
+        }
+        else if (string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 &&
+                 controllerAddress == (int)ControllerAddress.Airbag &&
+                 args.Length == 5)
+        {
+            // Short form for Airbag: DumpEeprom FILENAME -> dump the entire EEPROM from address 0.
+            // Length is determined by the module version (VW51/VW61/1C0909601) after ReadIdent.
+            address = 0;
+            length = uint.MaxValue;
+            _filename = args[4];
         }
         else if (string.Compare(command, "DumpMarelliMem", ignoreCase: true) == 0 ||
                  string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 ||
@@ -159,6 +169,20 @@ class Program
             address = Utils.ParseUint(args[4]);
             _filename = args[5];
         }
+#if false
+        else if (string.Compare(command, "ClearCrashData", ignoreCase: true) == 0)
+        {
+            // Optional argument: fill byte (default 0xFF)
+            if (args.Length >= 5)
+            {
+                value = (byte)Utils.ParseUint(args[4]);
+            }
+            else
+            {
+                value = 0xFF;
+            }
+        }
+#endif
         else if (string.Compare(command, "SetSoftwareCoding", ignoreCase: true) == 0)
         {
             if (args.Length < 6)
@@ -206,7 +230,7 @@ class Program
             var dateString = DateTime.Now.ToString("s").Replace(':', '-');
             _filename = $"EDC15_EEPROM_{dateString}.bin";
             
-            if (!ParseAddressesAndValues(args.Skip(4).ToList(), out addressValuePairs))
+            if (!ParseAddressesAndValues([.. args.Skip(4)], out addressValuePairs))
             {
                 ShowUsage();
                 return;
@@ -389,6 +413,12 @@ class Program
                 tester.LoadEeprom(address, _filename!);
                 break;
 
+#if false
+            case "clearcrashdata":
+                tester.ClearCrashData(value);
+                break;
+#endif
+
             case "mapeeprom":
                 tester.MapEeprom(_filename);
                 break;
@@ -431,6 +461,10 @@ class Program
 
             case "writeeeprom":
                 tester.WriteEeprom(address, value);
+                break;
+
+            case "writeram":
+                tester.WriteRam(address, value);
                 break;
 
             case "dumpeepromaudia4b5clusterfirstgen":
@@ -608,6 +642,9 @@ COMMAND =
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. 0x800)
         FILENAME = Optional filename
+    DumpEeprom FILENAME
+        (For Airbag address only) Dumps the whole EEPROM (size auto-detected
+        from ReadIdent).
     DumpMarelliMem START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 3072) or hex (e.g. 0xC00)
         LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. 0x400)
@@ -656,6 +693,9 @@ COMMAND =
         ADDRESS = EEPROM address in decimal (0-511) or hex (0x00-0x1FF)
         VALUE = Value to be stored in decimal (0-255) or hex (0x00-0xFF)
     WriteEeprom ADDRESS VALUE
+        ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
+        VALUE = Value in decimal (e.g. 138) or hex (e.g. 0x8A)
+    WriteRAM ADDRESS VALUE
         ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
         VALUE = Value in decimal (e.g. 138) or hex (e.g. 0x8A)
     DumpEepromAudiA4B5ClusterFirstGen [FILENAME]

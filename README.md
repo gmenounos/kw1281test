@@ -6,10 +6,10 @@ If you have a legacy Ross-Tech USB cable, you can probably use that cable by
 installing the Virtual COM Port drivers: https://www.ross-tech.com/vag-com/usb/virtual-com-port.php
 Functionality includes reading/writing the EEPROMs of VW MKIV Golf/Jetta/Beetle/Passat instrument clusters and Comfort Control Modules, reading and clearing fault codes, changing the software coding of modules, performing an actuator test of various modules and retrieving the SAFE code of the Delco Premium V radio.
 
-The tool is written in C#, targetting .NET 7.0 and runs under Windows 10/11 (most serial ports), macOS and Linux (macOS/Linux need an FTDI serial port and D2xx drivers). It may also run under
-Windows 7.
+The tool is written in C#, targetting .NET 10.0 and runs under Windows 10/11 (most serial ports), macOS and Linux (macOS/Linux need an FTDI serial port and D2xx drivers). It may also run under
+Windows 10/11.
 
-You can download a precompiled version for Windows, macOS and Linux (x64) from the Releases page: https://github.com/gmenounos/kw1281test/releases/
+You can download a precompiled version for Windows, macOS and Linux from the Releases page: https://github.com/gmenounos/kw1281test/releases/
 
 Otherwise, here's how to build it yourself:
 
@@ -31,10 +31,10 @@ Or, load up the project in Visual Studio and Ctrl-Shift-B.
 
 ```
 Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
-
+                
 PORT = COM1|COM2|etc. (Windows)
-        /dev/ttyXXXX (Linux)
-        AABBCCDD (macOS/Linux FTDI cable serial number)
+    /dev/ttyXXXX (Linux)
+    AABBCCDD (macOS/Linux FTDI cable serial number)
 BAUD = 10400|9600|etc.
 ADDRESS = Controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
 COMMAND =
@@ -63,11 +63,18 @@ COMMAND =
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. 0x800)
         FILENAME = Optional filename
+    DumpEeprom FILENAME
+        (For Airbag address only) Dumps the whole EEPROM (size auto-detected
+        from ReadIdent).
     DumpMarelliMem START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 3072) or hex (e.g. 0xC00)
         LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. 0x400)
         FILENAME = Optional filename
     DumpMem START LENGTH [FILENAME]
+        START = Start address in decimal (e.g. 8192) or hex (e.g. 0x2000)
+        LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. 0x10000)
+        FILENAME = Optional filename
+    DumpRam START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 8192) or hex (e.g. 0x2000)
         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. 0x10000)
         FILENAME = Optional filename
@@ -78,6 +85,9 @@ COMMAND =
     DumpRom START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 8192) or hex (e.g. 0x2000)
         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. 0x10000)
+        FILENAME = Optional filename
+    FindLogins LOGIN
+        LOGIN = Known good login (0-65535)
     GetSKC
     GroupRead GROUP
         GROUP = Group number (0-255)
@@ -102,8 +112,11 @@ COMMAND =
     ToggleRB4Mode
     WriteEdc15Eeprom ADDRESS1 VALUE1 [ADDRESS2 VALUE2 ... ADDRESSn VALUEn]
         ADDRESS = EEPROM address in decimal (0-511) or hex (0x00-0x1FF)
-    VALUE = Value to be stored in decimal (0-255) or hex (0x00-0xFF)
+        VALUE = Value to be stored in decimal (0-255) or hex (0x00-0xFF)
     WriteEeprom ADDRESS VALUE
+        ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
+        VALUE = Value in decimal (e.g. 138) or hex (e.g. 0x8A)
+    WriteRAM ADDRESS VALUE
         ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
         VALUE = Value in decimal (e.g. 138) or hex (e.g. 0x8A)
 ```
@@ -120,3 +133,4 @@ COMMAND =
     - [Olivier Fauchon](https://github.com/ofauchon)
     - [Jonathan Klamroth](https://github.com/jonnykl)
     - [Martin Sestak](https://github.com/poure-1)
+    - [Dragonslab53](https://github.com/Dragonslab53)

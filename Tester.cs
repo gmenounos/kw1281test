@@ -1,4 +1,5 @@
-﻿using BitFab.KW1281Test.Cluster;
+﻿using BitFab.KW1281Test.Airbag;
+using BitFab.KW1281Test.Cluster;
 using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
 using System;
@@ -15,7 +16,6 @@ internal class Tester
     private readonly IKwpCommon _kwpCommon;
     private readonly IKW1281Dialog _kwp1281;
     private readonly int _controllerAddress;
-
 
     public Tester(IInterface @interface, int controllerAddress)
     {
@@ -67,8 +67,12 @@ internal class Tester
     {
         using KW1281KeepAlive keepAlive = new(_kwp1281);
 
-        ConsoleKeyInfo keyInfo;
-        do
+        // Console.ReadKey() only works on a real console; when stdin is redirected (e.g. a
+        // GUI driving this process over piped streams) it throws/hangs. In that case fall
+        // back to line-based commands over stdin ("N"/"Q") instead of raw keypresses.
+        bool interactive = !Console.IsInputRedirected;
+
+        while (true)
         {
             var response = keepAlive.ActuatorTest(0x00);
             if (response == null || response.ActuatorName == "End")
@@ -78,14 +82,38 @@ internal class Tester
             }
             Log.WriteLine($"Actuator Test: {response.ActuatorName}");
 
-            // Press any key to advance to next test or press Q to exit
-            Console.Write("Press 'N' to advance to next test or 'Q' to quit");
-            do
+            bool quit;
+            if (interactive)
             {
-                keyInfo = Console.ReadKey(intercept: true);
-            } while (keyInfo.Key != ConsoleKey.N && keyInfo.Key != ConsoleKey.Q);
-            Console.WriteLine();
-        } while (keyInfo.Key != ConsoleKey.Q);
+                // Press any key to advance to next test or press Q to exit
+                Console.Write("Press 'N' to advance to next test or 'Q' to quit");
+                ConsoleKeyInfo keyInfo;
+                do
+                {
+                    keyInfo = Console.ReadKey(intercept: true);
+                } while (keyInfo.Key != ConsoleKey.N && keyInfo.Key != ConsoleKey.Q);
+                Console.WriteLine();
+                quit = keyInfo.Key == ConsoleKey.Q;
+            }
+            else
+            {
+                // Marker line so a piped caller knows we're now blocked waiting for a command.
+                Console.WriteLine("WAITING_FOR_INPUT");
+                string? line;
+                do
+                {
+                    line = Console.In.ReadLine();
+                } while (line != null &&
+                         !line.Trim().Equals("N", StringComparison.OrdinalIgnoreCase) &&
+                         !line.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase));
+                quit = line == null || line.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (quit)
+            {
+                break;
+            }
+        }
     }
 
     public void AdaptationRead(
@@ -367,15 +395,20 @@ internal class Tester
         switch (_controllerAddress)
         {
             case (int)ControllerAddress.Cluster:
-                DumpClusterEeprom((ushort)address, (ushort)length, filename);
+                ClusterDumpEeprom((ushort)address, (ushort)length, filename);
                 break;
             case (int)ControllerAddress.CCM:
             case (int)ControllerAddress.CentralElectric:
             case (int)ControllerAddress.CentralLocking:
-                DumpCcmEeprom((ushort)address, (ushort)length, filename);
+                CcmDumpEeprom((ushort)address, (ushort)length, filename);
                 break;
+
+            case (int)ControllerAddress.Airbag:
+                DumpAirbagEeprom(address, length, filename);
+                break;
+
             default:
-                Log.WriteLine("Only supported for cluster, CCM, Central Locking and Central Electric");
+                Log.WriteLine("Only supported for cluster, CCM, Central Locking, Airbag and Central Electric");
                 break;
         }
     }
@@ -465,7 +498,7 @@ internal class Tester
             return;
         }
 
-        DumpClusterMem(address, length, filename);
+        ClusterDumpMem(address, length, filename);
     }
 
     public void DumpRam(uint startAddr, uint length, string? filename)
@@ -608,10 +641,27 @@ internal class Tester
         {
             var ecuInfo = Kwp1281Wakeup();
 
-            if (ecuInfo.Text.Contains("4B0920") ||
-                ecuInfo.Text.Contains("4Z7920") ||
-                ecuInfo.Text.Contains("8D0920") ||
-                ecuInfo.Text.Contains("8Z0920"))
+            if (ecuInfo.Text.Contains("M73"))
+            {
+                ICluster cluster = new MarelliCluster(_kwp1281, ecuInfo.Text);
+
+                string dumpFileName = cluster.DumpEeprom(
+                    address: null, length: null, dumpFileName: null);
+                byte[] buf = File.ReadAllBytes(dumpFileName);
+                ushort? skc = MarelliCluster.GetSkc(buf);
+                if (skc.HasValue)
+                {
+                    Log.WriteLine($"SKC: {skc:D5}");
+                }
+                else
+                {
+                    Log.WriteLine($"Unable to determine SKC for cluster: {ecuInfo.Text}");
+                }
+            }
+            else if (ecuInfo.Text.Contains("4B0920") ||
+                     ecuInfo.Text.Contains("4Z7920") ||
+                     ecuInfo.Text.Contains("8D0920") ||
+                     ecuInfo.Text.Contains("8Z0920"))
             {
                 var family = ecuInfo.Text[..2] switch
                 {
@@ -657,7 +707,7 @@ internal class Tester
                     if (partNumberGroups[1] == "919") // Non-CAN
                     {
                         startAddress = 0x1FA;
-                        dumpFileName = DumpClusterEeprom(startAddress, length: 6, filename: null);
+                        dumpFileName = ClusterDumpEeprom(startAddress, length: 6, filename: null);
                         buf = File.ReadAllBytes(dumpFileName);
                         skc = Utils.GetBcd(buf, 0);
                         ushort skc2 = Utils.GetBcd(buf, 2);
@@ -670,7 +720,7 @@ internal class Tester
                     else if (partNumberGroups[1] == "920") // CAN
                     {
                         startAddress = 0x90;
-                        dumpFileName = DumpClusterEeprom(startAddress, length: 0x7C, filename: null);
+                        dumpFileName = ClusterDumpEeprom(startAddress, length: 0x7C, filename: null);
                         buf = File.ReadAllBytes(dumpFileName);
                         skc = VdoCluster.GetSkc(buf, startAddress);
                     }
@@ -723,30 +773,13 @@ internal class Tester
                 var skc = Utils.GetShort(buf, 0);
                 Log.WriteLine($"SKC: {skc:D5}");
             }
-            else if (ecuInfo.Text.Contains("M73"))
-            {
-                ICluster cluster = new MarelliCluster(_kwp1281, ecuInfo.Text);
-
-                string dumpFileName = cluster.DumpEeprom(
-                    address: null, length: null, dumpFileName: null);
-                byte[] buf = File.ReadAllBytes(dumpFileName);
-                ushort? skc = MarelliCluster.GetSkc(buf);
-                if (skc.HasValue)
-                {
-                    Log.WriteLine($"SKC: {skc:D5}");
-                }
-                else
-                {
-                    Log.WriteLine($"Unable to determine SKC for cluster: {ecuInfo.Text}");
-                }
-            }
             else if (ecuInfo.Text.Contains("BOO") || ecuInfo.Text.Contains("MM0"))
             {
                 ICluster cluster = new MotometerBOOCluster(_kwp1281!);
 
                 cluster.UnlockForEepromReadWrite();
 
-                var dumpFileName = DumpBOOClusterEeprom(
+                var dumpFileName = BOOClusterDumpEeprom(
                     startAddress: 0, length: 0x10, filename: null);
 
                 var buf = File.ReadAllBytes(dumpFileName);
@@ -859,16 +892,134 @@ internal class Tester
         switch (_controllerAddress)
         {
             case (int)ControllerAddress.Cluster:
-                LoadClusterEeprom((ushort)address, filename);
+                ClusterLoadEeprom((ushort)address, filename);
                 break;
             case (int)ControllerAddress.CCM:
             case (int)ControllerAddress.CentralElectric:
             case (int)ControllerAddress.CentralLocking:
-                LoadCcmEeprom((ushort)address, filename);
+                CcmLoadEeprom((ushort)address, filename);
+                break;
+            case (int)ControllerAddress.Airbag:
+                LoadAirbagEeprom(address, filename);
                 break;
             default:
-                Log.WriteLine("Only supported for cluster, CCM, Central Locking and Central Electric");
+                Log.WriteLine("Only supported for cluster, CCM, Central Locking, Airbag and Central Electric");
                 break;
+        }
+    }
+
+    public void ClearCrashData(byte fillValue = 0xFF)
+    {
+        if (_controllerAddress != (int)ControllerAddress.Airbag)
+        {
+            Log.WriteLine($"Only supported for airbag address {(int)ControllerAddress.Airbag:X2}");
+            return;
+        }
+
+        var module = CreateVw51AirbagModule();
+        if (module == null)
+        {
+            return;
+        }
+
+        try
+        {
+            module.ClearCrashData(fillValue);
+            Log.WriteLine("ClearCrashData: completed successfully.");
+        }
+        catch (Exception ex)
+        {
+            Log.WriteLine($"ClearCrashData error: {ex}");
+        }
+    }
+
+    private Vw51AirbagModule? CreateVw51AirbagModule()
+    {
+        var identLines = _kwp1281.ReadIdent()
+            .Select(x => x.ToString())
+            .ToList();
+
+        var identText = string.Join(Environment.NewLine, identLines);
+
+        var module = new Vw51AirbagModule(_kwp1281, identText);
+        if (!module.IsSupportedIdent(identText, out var reason))
+        {
+            Log.WriteLine(reason);
+            return null;
+        }
+
+        return module;
+    }
+
+    private void DumpAirbagEeprom(uint startAddress, uint length, string? filename)
+    {
+        if (length == 0)
+        {
+            Log.WriteLine("Length is 0. Nothing to dump.");
+            return;
+        }
+
+        var module = CreateVw51AirbagModule();
+        if (module == null)
+        {
+            return;
+        }
+
+        if (length == uint.MaxValue)
+        {
+            // Short form (DumpEeprom FILENAME): read the entire EEPROM; size is determined
+            // by the module version identified from ReadIdent.
+            length = (uint)module.EepromSize;
+            Log.WriteLine($"No length given, dumping whole EEPROM ({length} bytes).");
+        }
+
+        string fileName = string.IsNullOrWhiteSpace(filename)
+            ? $"Airbag_{_controllerAddress}_eeprom_{startAddress:X4}_{length:X4}.bin"
+            : filename;
+
+        Log.WriteLine($"Saving EEPROM to {fileName}...");
+
+        try
+        {
+            byte[] bytes = module.DumpEeprom((int)startAddress, (int)length);
+            File.WriteAllBytes(fileName, bytes);
+            Log.WriteLine($"Saved EEPROM to {fileName}.");
+        }
+        catch (Exception ex)
+        {
+            Log.WriteLine($"Airbag EEPROM dump failed: {ex}");
+        }
+    }
+
+    private void LoadAirbagEeprom(uint startAddress, string filename)
+    {
+        if (!File.Exists(filename))
+        {
+            Log.WriteLine($"File not found: {filename}");
+            return;
+        }
+
+        byte[] data = File.ReadAllBytes(filename);
+        Log.WriteLine($"Loaded {data.Length} bytes from {filename}");
+
+        LoadAirbagEeprom(startAddress, data);
+    }
+
+    private void LoadAirbagEeprom(uint startAddress, byte[] data)
+    {
+        var module = CreateVw51AirbagModule();
+        if (module == null)
+        {
+            return;
+        }
+
+        try
+        {
+            module.LoadEeprom((int)startAddress, data);
+        }
+        catch (Exception ex)
+        {
+            Log.WriteLine($"LoadAirbagEeprom: {ex}");
         }
     }
 
@@ -877,12 +1028,12 @@ internal class Tester
         switch (_controllerAddress)
         {
             case (int)ControllerAddress.Cluster:
-                MapClusterEeprom(filename);
+                ClusterMapEeprom(filename);
                 break;
             case (int)ControllerAddress.CCM:
             case (int)ControllerAddress.CentralElectric:
             case (int)ControllerAddress.CentralLocking:
-                MapCcmEeprom(filename);
+                CcmMapEeprom(filename);
                 break;
             default:
                 Log.WriteLine("Only supported for cluster, CCM, Central Locking and Central Electric");
@@ -892,6 +1043,35 @@ internal class Tester
 
     public void ReadEeprom(uint address)
     {
+        if (_controllerAddress is (int)ControllerAddress.Airbag)
+        {
+            var module = CreateVw51AirbagModule();
+            if (module == null)
+            {
+                return;
+            }
+
+            try
+            {
+                byte[] bytes = module.DumpEeprom((int)address, 1);
+                if (bytes.Length == 0)
+                {
+                    Log.WriteLine("EEPROM read failed");
+                    return;
+                }
+
+                byte value = bytes[0];
+                Log.WriteLine(
+                    $"Address {address} (${address:X4}): Value {value} (${value:X2})");
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"EEPROM read failed: {ex}");
+            }
+
+            return;
+        }
+
         UnlockControllerForEepromReadWrite();
 
         var blockBytes = _kwp1281.ReadEeprom((ushort)address, 1);
@@ -1013,14 +1193,57 @@ internal class Tester
 
     public void WriteEeprom(uint address, byte value)
     {
+        if (_controllerAddress is (int)ControllerAddress.Airbag)
+        {
+            LoadAirbagEeprom(address, [value]);
+            return;
+        }
+
         UnlockControllerForEepromReadWrite();
 
-        _kwp1281.WriteEeprom((ushort)address, new List<byte> { value });
+        _kwp1281.WriteEeprom((ushort)address, [value]);
+    }
+
+    public void WriteRam(uint address, byte value)
+    {
+        switch (_controllerAddress)
+        {
+            case (int)ControllerAddress.Cluster:
+                ClusterWriteRam((ushort)address, value);
+                break;
+            default:
+                Log.WriteLine("Only supported for cluster");
+                break;
+        }
+
     }
 
     // End top-level commands
 
-    private string DumpBOOClusterEeprom(ushort startAddress, ushort length, string? filename)
+    private void ClusterWriteRam(ushort address, byte value)
+    {
+        // TODO: Verify cluster is VDO
+
+        var vdoCluster = new VdoCluster(_kwp1281);
+        if (!vdoCluster.RequiresSeedKey())
+        {
+            Log.WriteLine(
+                "Cluster is unlocked for memory access. Skipping Seed/Key login.");
+    }
+        else
+    {
+            var (isUnlocked, softwareVersion) = vdoCluster.Unlock();
+            if (!isUnlocked)
+        {
+                Log.WriteLine("Unknown cluster software version. Memory access will likely fail.");
+        }
+            vdoCluster.SeedKeyAuthenticate(softwareVersion);
+        }
+
+        vdoCluster.WriteRam(address, value);
+    }
+
+    private string BOOClusterDumpEeprom(ushort startAddress, ushort length, string? filename)
     {
         var identInfo = _kwp1281.ReadIdent().First().ToString()
             .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
@@ -1045,7 +1268,7 @@ internal class Tester
         return dumpFileName;
     }
 
-    private string DumpClusterEeprom(
+    private string ClusterDumpEeprom(
         ushort startAddress, ushort length, string? filename)
     {
         var identInfo = _kwp1281.ReadIdent().First().ToString()
@@ -1064,7 +1287,7 @@ internal class Tester
         return dumpFileName;
     }
 
-    private void MapCcmEeprom(string? filename)
+    private void CcmMapEeprom(string? filename)
     {
         UnlockControllerForEepromReadWrite();
 
@@ -1083,7 +1306,7 @@ internal class Tester
         File.WriteAllBytes(dumpFileName, bytes.ToArray());
     }
 
-    private void MapClusterEeprom(string? filename)
+    private void ClusterMapEeprom(string? filename)
     {
         var cluster = new VdoCluster(_kwp1281);
 
@@ -1094,7 +1317,7 @@ internal class Tester
         File.WriteAllBytes(mapFileName, map.ToArray());
     }
 
-    private void DumpCcmEeprom(ushort startAddress, ushort length, string? filename)
+    private void CcmDumpEeprom(ushort startAddress, ushort length, string? filename)
     {
         UnlockControllerForEepromReadWrite();
 
@@ -1124,22 +1347,22 @@ internal class Tester
 
             case ControllerAddress.Cluster:
                 // TODO:UnlockCluster() is only needed for EEPROM read, not memory read
-                var cluster = new VdoCluster(_kwp1281);
-                var (isUnlocked, softwareVersion) = cluster.Unlock();
+                var vdoCluster = new VdoCluster(_kwp1281);
+                var (isUnlocked, softwareVersion) = vdoCluster.Unlock();
                 if (!isUnlocked)
                 {
                     Log.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
                 }
 
-                if (!cluster.RequiresSeedKey())
+                if (!vdoCluster.RequiresSeedKey())
                 {
                     Log.WriteLine(
                         "Cluster is unlocked for ROM/EEPROM access. Skipping Seed/Key login.");
                     return;
                 }
 
-                cluster.SeedKeyAuthenticate(softwareVersion);
-                if (cluster.RequiresSeedKey())
+                vdoCluster.SeedKeyAuthenticate(softwareVersion);
+                if (vdoCluster.RequiresSeedKey())
                 {
                     Log.WriteLine("Failed to unlock cluster.");
                 }
@@ -1204,7 +1427,7 @@ internal class Tester
         }
     }
 
-    private void LoadCcmEeprom(ushort address, string filename)
+    private void CcmLoadEeprom(ushort address, string filename)
     {
         _ = _kwp1281.ReadIdent();
 
@@ -1223,7 +1446,7 @@ internal class Tester
         WriteEeprom(address, bytes, 8);
     }
 
-    private void LoadClusterEeprom(ushort address, string filename)
+    private void ClusterLoadEeprom(ushort address, string filename)
     {
         _ = _kwp1281.ReadIdent();
 
@@ -1242,28 +1465,30 @@ internal class Tester
         WriteEeprom(address, bytes, 16);
     }
 
-    private void DumpClusterMem(uint startAddress, uint length, string? filename)
+    private void ClusterDumpMem(uint startAddress, uint length, string? filename)
     {
-        var cluster = new VdoCluster(_kwp1281);
-        if (!cluster.RequiresSeedKey())
+        // TODO: Verify cluster is VDO
+
+        var vdoCluster = new VdoCluster(_kwp1281);
+        if (!vdoCluster.RequiresSeedKey())
         {
             Log.WriteLine(
                 "Cluster is unlocked for memory access. Skipping Seed/Key login.");
         }
         else
         {
-            var (isUnlocked, softwareVersion) = cluster.Unlock();
+            var (isUnlocked, softwareVersion) = vdoCluster.Unlock();
             if (!isUnlocked)
             {
                 Log.WriteLine("Unknown cluster software version. Memory access will likely fail.");
             }
-            cluster.SeedKeyAuthenticate(softwareVersion);
+            vdoCluster.SeedKeyAuthenticate(softwareVersion);
         }
 
         var dumpFileName = filename ?? $"cluster_mem_0x{startAddress:X6}.bin";
         Log.WriteLine($"Saving memory dump to {dumpFileName}");
 
-        cluster.DumpMem(dumpFileName, startAddress, length);
+        vdoCluster.DumpMem(dumpFileName, startAddress, length);
 
         Log.WriteLine($"Saved memory dump to {dumpFileName}");
     }
