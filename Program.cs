@@ -169,7 +169,6 @@ class Program
             address = Utils.ParseUint(args[4]);
             _filename = args[5];
         }
-#if false
         else if (string.Compare(command, "ClearCrashData", ignoreCase: true) == 0)
         {
             // Optional argument: fill byte (default 0xFF)
@@ -182,7 +181,6 @@ class Program
                 value = 0xFF;
             }
         }
-#endif
         else if (string.Compare(command, "SetSoftwareCoding", ignoreCase: true) == 0)
         {
             if (args.Length < 6)
@@ -413,11 +411,9 @@ class Program
                 tester.LoadEeprom(address, _filename!);
                 break;
 
-#if false
             case "clearcrashdata":
                 tester.ClearCrashData(value);
                 break;
-#endif
 
             case "mapeeprom":
                 tester.MapEeprom(_filename);
