@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 
 namespace BitFab.KW1281Test.Airbag;
@@ -19,6 +19,21 @@ public sealed class Vw51AirbagModule : IAirbagModule
     private const int EepromSizeVW61 = 768;  // 0x300
     private const int EepromSizeVW_1C0909601 = 784;  // 0x310 (unconfirmed)
 
+    // The fault log is a table of four-byte slots. Byte 0 of a slot is an internal fault
+    // number rather than a DTC - (index << 2) | status - and bytes 1-3 are a condition
+    // stamp whose last byte is the value of the write marker that lives in the row after
+    // the table. The real DTC numbers live in firmware, not in EEPROM.
+    //
+    // Filling past the end of the table erases that marker, and the module then rebuilds
+    // the log with a zero stamp and invents records whose indices its own firmware cannot
+    // map. Those all decode to 0xFFFF and surface as a single DTC 65535. Verified on a live
+    // 1C0909605A with a dump after every step: 0x000-0x03F is clean and the module rebuilds
+    // the log itself; 0x000-0x04F produces 65535; restoring 0x000-0x04F from a backup
+    // clears it and returns the dump to baseline byte-for-byte. Erasing the marker alone,
+    // with the log intact, does nothing - it is the combination that breaks.
+    private const int FaultLogEndVW51 = 0x03F;
+    private const int FaultLogEndVW61 = 0x02F;
+
     private readonly IKW1281Dialog _kwp1281;
     private readonly string _ecuText;
 
@@ -33,7 +48,9 @@ public sealed class Vw51AirbagModule : IAirbagModule
 
     private ModuleVersion _version = ModuleVersion.VW51;
 
-    public int EepromSize => _version switch
+    public int EepromSize => GetEepromSize(_version);
+
+    internal static int GetEepromSize(ModuleVersion version) => version switch
     {
         ModuleVersion.VW61 => EepromSizeVW61,
         ModuleVersion.VW_1C0909601 => EepromSizeVW_1C0909601,
@@ -136,24 +153,125 @@ public sealed class Vw51AirbagModule : IAirbagModule
         }
     }
 
-    public void ClearCrashData(byte fillValue = 0xFF)
+    /// <summary>
+    /// The areas each module version fills. Offsets are file offsets (before
+    /// ResolveAbsoluteAddress) and both bounds are inclusive. Kept out of ClearCrashData so
+    /// that the "never touch a protected track, never run past the end of EEPROM" invariant
+    /// is covered by a unit test rather than only by a module on the bench.
+    /// </summary>
+    internal static (int Start, int End)[] GetClearRanges(ModuleVersion version) => version switch
     {
-        // Ranges are file offsets (before ResolveAbsoluteAddress), inclusive.
-        var ranges = _version switch
+        // VW51: fault log plus crash record, 0x000-0x03F. Row 0x040-0x04F must NOT be
+        // touched - see GetProtectedTracks.
+        //
+        // The VW51 crash record lives at 0x033-0x038, inside this same range, so the command
+        // still does its job. The bench module used for testing has FF there, which is why
+        // the hardware test never exercised it; two other 1C0909605A dumps carry
+        // 0F B0 CF 05 4D 9F and 01 AE 08. This is also why the widely repeated advice to
+        // "change four rows" is right for a real reason: four rows are the log plus the
+        // crash record, and the fifth row is the write marker.
+        ModuleVersion.VW51 => [(0x000, FaultLogEndVW51)],
+
+        // VW61: fault log plus crash records.
+        //
+        // The crash record is 22 bytes at 0x1EA-0x1FF, duplicated at 0x200-0x215. Confirmed
+        // by three dumps from modules with a real crash (two 1C0909605C and one 1C0909605F):
+        // in all three the two halves are byte-identical. A second crash is appended after
+        // it - in one dump the records reach 0x228, with a 0x01 byte at 0x24F - so the upper
+        // bound is 0x24F, just below the identification block that starts at 0x250 on every
+        // module.
+        //
+        // 0x160-0x169 is deliberately NOT in this list even though it looks like a crash
+        // record (a value stored twice in a row plus two more bytes). It is a required
+        // record present on every healthy module regardless of any crash, and it is a
+        // per-part-number constant: all three 1C0909605C dumps here, with three different
+        // serial numbers, hold an identical D9 F3 00 CC D9 F3 00 CC 05 30. A bench
+        // 1C0909605C arrived with that record missing and reported a permanent 65535;
+        // restoring those ten bytes cleared it for good and the module went from reporting
+        // three DTCs to seven.
+        //
+        // 0x1AD-0x1C0 only appears on 1C0909605F; on both 605C dumps it is empty. Kept in
+        // case it is that part number's layout.
+        ModuleVersion.VW61 => [(0x000, FaultLogEndVW61), (0x1AD, 0x1C0), (0x1E9, 0x24F)],
+
+        // 1C0909601: 0x151-0x1EB and 0x1EE-0x1EF are crash data. The first range used to be
+        // 0x000-0x30F, which is the ENTIRE EEPROM of this version (0x310 bytes) - such a
+        // fill wipes the software coding, the workshop code and the equipment block along
+        // with everything else.
+        //
+        // The crash bounds are left as found, unlike VW61 above: for THIS part number the
+        // author of the original write-up reports success with exactly these, the layout is
+        // different (0x310 EEPROM, 93C66), and there are no dumps of it here. The
+        // 0x1EC-0x1ED gap is the "two version bytes" people in that same discussion warn
+        // about, and dumps confirm the warning literally: two VW51 dumps hold the ASCII
+        // digits "01" (30 31) and "04" (30 34) there, so wiping them corrupts the version
+        // string.
+        _ => [(0x000, FaultLogEndVW61), (0x151, 0x1EB), (0x1EE, 0x1EF)]
+    };
+
+    /// <summary>
+    /// Tracks that the write marker walks along. A track rather than a single byte because
+    /// the marker IS a position: tomorrow it sits in the neighbouring cell. Observed on live
+    /// modules - on VW51 the fault-log marker sat at 0x049 on one unit, 0x04B on another and
+    /// 0x04E on a third; on VW61 it sat at 0x037 and moved to 0x038 across a power cycle,
+    /// while a second marker walked 0x150 -> 0x151 -> 0x152 -> 0x153.
+    ///
+    /// The VW61 track runs to 0x169 rather than covering the marker cells alone, because the
+    /// same span also holds the fault log's stamp counters at 0x156-0x15F (bytes 1-2 of every
+    /// log stamp are read from 0x157-0x158) and the required record at 0x160-0x169. Filling
+    /// from 0x156 on a live module zeroed every log stamp and brought 65535 straight back.
+    ///
+    /// No tracks are declared for 1C0909601: that part number's layout is not confirmed by
+    /// any dump here, and inventing bounds would be worse than admitting the check cannot
+    /// help for it.
+    /// </summary>
+    internal static (int Start, int End)[] GetProtectedTracks(ModuleVersion version) =>
+        version switch
         {
-            ModuleVersion.VW51 =>
-                // VW51: addresses 0x000-0x04F (80 bytes)
-                [(0x000, 0x04F)],
-            ModuleVersion.VW61 =>
-                // VW61: two ranges
-                [(0x000, 0x030), (0x151, 0x1EF)],
-            // 1C0909601: 0x000-0x30F — fault area, 0x151-0x1EB and 0x1EE-0x1EF — crash data
-            _ => new[] { (0x000, 0x30F), (0x151, 0x1EB), (0x1EE, 0x1EF) }
+            ModuleVersion.VW51 => [(0x040, 0x04F)],
+            ModuleVersion.VW61 => [(0x030, 0x03F), (0x140, 0x169)],
+            _ => []
         };
 
+    internal static void ValidateClearRanges(
+        (int Start, int End)[] ranges, ModuleVersion version)
+    {
+        var eepromSize = GetEepromSize(version);
+        var tracks = GetProtectedTracks(version);
+
+        foreach (var (start, end) in ranges)
+        {
+            foreach (var (trackStart, trackEnd) in tracks)
+            {
+                if (start <= trackEnd && end >= trackStart)
+                {
+                    throw new InvalidOperationException(
+                        $"Range 0x{start:X3}-0x{end:X3} overlaps the protected track " +
+                        $"0x{trackStart:X3}-0x{trackEnd:X3}; filling it makes the module " +
+                        "report a permanent 65535 that only a dump restore clears.");
+                }
+            }
+
+            if (end >= eepromSize)
+            {
+                throw new InvalidOperationException(
+                    $"Range 0x{start:X3}-0x{end:X3} runs past the end of the " +
+                    $"{eepromSize}-byte EEPROM of a {version} module.");
+            }
+        }
+    }
+
+    public void ClearCrashData(byte fillValue = 0xFF)
+    {
+        var ranges = GetClearRanges(_version);
+
+        // Validate before opening the session: better to refuse up front than to stop
+        // halfway through a fill and leave the module in a state its firmware never expects.
+        ValidateClearRanges(ranges, _version);
+
         Log.WriteLine(
-            $"VW51 airbag: ClearCrashData ({_version}) — " +
-            string.Join(", ", ranges.Select(r => $"0x{r.Item1:X3}-0x{r.Item2:X3}")) +
+            $"VW51 airbag: ClearCrashData ({_version}) - " +
+            string.Join(", ", ranges.Select(r => $"0x{r.Start:X3}-0x{r.End:X3}")) +
             $", value 0x{fillValue:X2}");
 
         // All ranges are written within a single session (one Login/raw-mode/commit) —
