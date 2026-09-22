@@ -135,3 +135,4 @@ COMMAND =
     - [Martin Sestak](https://github.com/poure-1)
     - [Dragonslab53](https://github.com/Dragonslab53)
     - [DiagProf](https://github.com/DiagProf)
+    - [magna413](https://github.com/magna413)
