@@ -1,7 +1,6 @@
 ﻿using BitFab.KW1281Test.Blocks;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -37,15 +36,17 @@ internal class VdoCluster : ICluster
     }
 
     public string DumpEeprom(
-        uint? optionalAddress, uint? optionalLength, string? optionalFileName)
+        uint? address, uint? length, string? dumpFileName)
     {
-        var address = optionalAddress ?? 0;
-        var length = optionalLength ?? 0x800;
-        var filename = optionalFileName ?? $"VDO_0x{address:X6}_eeprom.bin";
+        address ??= 0;
+        length ??= 0x800;
+        dumpFileName ??= $"VDO_0x{address:X4}_eeprom.bin";
 
-        DumpEeprom((ushort)address, (ushort)length, maxReadLength: 16, filename);
+        Utils.WriteDump(
+            (addr, len) => _kwp1281.ReadEeprom((ushort)addr, len),
+            (ushort)address, (ushort)length, maxReadLength: 16, dumpFileName);
 
-        return filename;
+        return dumpFileName;
     }
 
     /// <summary>
@@ -156,35 +157,11 @@ internal class VdoCluster : ICluster
 
     public void DumpMem(string dumpFileName, uint startAddress, uint length)
     {
-        const byte blockSize = 15;
-
-        bool succeeded = true;
-        using (var fs = File.Create(dumpFileName, blockSize, FileOptions.WriteThrough))
-        {
-            for (var addr = startAddress; addr < startAddress + length; addr += blockSize)
-            {
-                var readLength = (byte)Math.Min(startAddress + length - addr, blockSize);
-                var blockBytes = CustomReadMemory(addr, readLength);
-                if (blockBytes.Count != readLength)
-                {
-                    succeeded = false;
-                    blockBytes.AddRange(
-                        Enumerable.Repeat((byte)0, readLength - blockBytes.Count));
-                    Log.WriteLine($"{readLength - blockBytes.Count} missing");
-                }
-                fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
-                fs.Flush();
-            }
-        }
-
-        if (!succeeded)
-        {
-            Log.WriteLine();
-            Log.WriteLine("**********************************************************************");
-            Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-            Log.WriteLine("**********************************************************************");
-            Log.WriteLine();
-        }
+        Utils.WriteDump(
+            (addr, len) => CustomReadMemory(addr, len),
+            startAddress, length,
+            maxReadLength: 15,
+            dumpFileName);
     }
 
     private List<Block> SendCustom(List<byte> blockCustomBytes)
@@ -768,37 +745,6 @@ internal class VdoCluster : ICluster
         }
 
         return Utils.DumpBytes(block.Body);
-    }
-
-    private void DumpEeprom(
-        ushort startAddr, ushort length, byte maxReadLength, string fileName)
-    {
-        bool succeeded = true;
-
-        using (var fs = File.Create(fileName, maxReadLength, FileOptions.WriteThrough))
-        {
-            for (uint addr = startAddr; addr < (startAddr + length); addr += maxReadLength)
-            {
-                byte readLength = (byte)Math.Min(startAddr + length - addr, maxReadLength);
-                List<byte>? blockBytes = _kwp1281.ReadEeprom((ushort)addr, readLength);
-                if (blockBytes == null)
-                {
-                    blockBytes = Enumerable.Repeat((byte)0, readLength).ToList();
-                    succeeded = false;
-                }
-                fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
-                fs.Flush();
-            }
-        }
-
-        if (!succeeded)
-        {
-            Log.WriteLine();
-            Log.WriteLine("**********************************************************************");
-            Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-            Log.WriteLine("**********************************************************************");
-            Log.WriteLine();
-        }
     }
 
     public void WriteRam(ushort address, byte value)

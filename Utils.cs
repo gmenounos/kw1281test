@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace BitFab.KW1281Test;
@@ -211,6 +213,70 @@ internal static class Utils
         else
         {
             return (byte)(b & 0x7F);
+        }
+    }
+
+    public static void WriteDump(
+        Func<uint, byte, List<byte>?> readBlock,
+        uint startAddr,
+        uint length,
+        byte maxReadLength,
+        string fileName)
+    {
+        var succeeded = true;
+
+        using var fs = File.Create(fileName, maxReadLength, FileOptions.WriteThrough);
+
+        for (uint addr = startAddr; addr < (startAddr + length); addr += maxReadLength)
+        {
+            var readLength = (byte)Math.Min(startAddr + length - addr, maxReadLength);
+            var blockBytes = readBlock(addr, readLength) ?? [];
+
+            if (blockBytes.Count < readLength)
+            {
+                blockBytes.AddRange(Enumerable.Repeat((byte)0, readLength - blockBytes.Count));
+                succeeded = false;
+            }
+            else if (blockBytes.Count > readLength)
+            {
+                Log.WriteLine($"Warning: Address 0x{addr:X6}: Read {blockBytes.Count} bytes but expected {readLength}.");
+                blockBytes = blockBytes[..readLength];
+            }
+
+            fs.Write([.. blockBytes], 0, blockBytes.Count);
+            fs.Flush();
+        }
+
+        if (!succeeded)
+        {
+            Log.WriteLine();
+            Log.WriteLine("**********************************************************************");
+            Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
+            Log.WriteLine("**********************************************************************");
+            Log.WriteLine();
+        }
+    }
+
+    public static void LoadDump(
+        Func<ushort, List<byte>, bool> writeBlock,
+        uint startAddr, byte[] bytes, uint maxWriteLength)
+    {
+        var succeeded = true;
+        var length = bytes.Length;
+        for (uint addr = startAddr; addr < (startAddr + length); addr += maxWriteLength)
+        {
+            var writeLength = (byte)Math.Min(startAddr + length - addr, maxWriteLength);
+            if (!writeBlock(
+                (ushort)addr,
+                [.. bytes.Skip((int)(addr - startAddr)).Take(writeLength)]))
+            {
+                succeeded = false;
+            }
+        }
+
+        if (!succeeded)
+        {
+            Log.WriteLine("Write failed. You should probably try again.");
         }
     }
 }
