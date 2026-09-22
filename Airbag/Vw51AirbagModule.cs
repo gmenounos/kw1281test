@@ -176,7 +176,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
         // same offset, including modules that have never crashed. Until a dump from a
         // crashed VW51 shows that byte changing, treating it as part of the crash record
         // would be guessing, and guessing in this area is what produces 65535.
-        ModuleVersion.VW51 => [(0x000, FaultLogEnd), (0x151, 0x1BF)],
+        ModuleVersion.VW51 => [(0x000, 0x031), (0x151, 0x1BF)],
 
         // VW61: fault log plus crash records.
         //
@@ -241,7 +241,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
     internal static (int Start, int End)[] GetProtectedTracks(ModuleVersion version) =>
         version switch
         {
-            ModuleVersion.VW51 => [(0x030, 0x05B)],
+            ModuleVersion.VW51 => [(0x032, 0x05B)],
             ModuleVersion.VW61 => [(0x030, 0x03F), (0x140, 0x169)],
             _ => []
         };
