@@ -1,11 +1,11 @@
 using BitFab.KW1281Test.Blocks;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
 
 namespace BitFab.KW1281Test.Cluster;
+
 /// <summary>
 /// e.g.
 /// 8D0919033C  
@@ -35,37 +35,37 @@ namespace BitFab.KW1281Test.Cluster;
 /// </summary>
 internal class AudiA4B5VdoClusterWithoutImmo : ICluster
 {
-
-    public static bool IsSupportedIdent(IEnumerable<string> ident, out string reason)
+    public static bool IsB5Kombi(List<ControllerIdent> identList)
     {
-        reason = string.Empty;
+        string ident = ParseIdentList(identList);
 
-        if (ident == null || !ident.Any())
+        return ident.Contains("B5_K") || // UK-NSI
+            ident.Contains("B5-K"); // VDO
+    }
+
+    public static bool IsSupported(List<ControllerIdent> identList, out string reasonNotSupported)
+    {
+        string ident = ParseIdentList(identList);
+
+        if (ident.Contains("B5-K")) // VDO
         {
-            reason = "Missing identification string";
+            reasonNotSupported = string.Empty;
+            return true;
+        }
+        else if (ident.Contains("B5_K")) // UK-NSI
+        {
+            reasonNotSupported = "UK-NSI clusters are not supported";
             return false;
         }
-
-        var first = ident.First();
-
-        if (first.Contains("B5_K")) // UK-NSI
+        else
         {
-            reason = "UK-NSI clusters are not supported";
+            reasonNotSupported = "Not a VDO B5 cluster";
             return false;
         }
-
-        if (!first.Contains("B5-K")) // not VDO
-        {
-            reason = "Not a VDO B5 cluster";
-            return false;
-        }
-
-        return true;
     }
 
     public void UnlockForEepromReadWrite()
     {
-
         Log.WriteLine("Sending custom login block to switch Mode");
         _kw1281Dialog.SendBlock([0x1B, 0x00,  (byte)'M', (byte)'O', (byte)'D', (byte)'E']);
         var resultBlock = _kw1281Dialog.ReceiveBlock();
@@ -102,12 +102,22 @@ internal class AudiA4B5VdoClusterWithoutImmo : ICluster
             }
 
             succeeded = true;
+            break;
         }
 
         if (!succeeded)
         {
             throw new InvalidOperationException("Unable to login to cluster");
         }
+    }
+
+    private static string ParseIdentList(List<ControllerIdent> identList)
+    {
+        //{8D0919033C  B5-KOMBIINSTRUMENT  D08
+        //Software Coding 00083, Workshop Code: 00001}
+        return identList
+            .Select(x => x.ToString())
+            .FirstOrDefault() ?? "";
     }
 
     /// <summary>
@@ -129,75 +139,30 @@ internal class AudiA4B5VdoClusterWithoutImmo : ICluster
     }
 
     public string DumpEeprom(
-        uint? optionalAddress, uint? optionalLength, string? optionalFileName)
+        uint? address, uint? length, string? dumpFileName)
     {
-        var address = optionalAddress ?? 0;
-        var length = optionalLength ?? 0x80;
-        var filename = optionalFileName ?? $"VDO_AudiA4B5_0x{address:X4}_eeprom.bin";
-        DumpEeprom((ushort)address, (ushort)length, maxReadLength: 8, filename);
+        address ??= 0;
+        length ??= 0x80;
+        dumpFileName ??= $"VDO_AudiA4B5_0x{address:X4}_eeprom.bin";
+
+        Utils.WriteDump(
+            (addr, len) => _kw1281Dialog.ReadEeprom((ushort)addr, len),
+            (ushort)address, (ushort)length, maxReadLength: 8, dumpFileName);
         ClusterFinalizer();
         ClusterRest();
 
-        return filename;
+        return dumpFileName;
     }
 
-    private void DumpEeprom(ushort startAddr, ushort length, byte maxReadLength, string fileName)
+    public void WriteEeprom(uint? address, byte[] bytes)
     {
-        bool succeeded = true;
+        address ??= 0;
 
-        using (var fs = File.Create(fileName, maxReadLength, FileOptions.WriteThrough))
-        {
-            for (uint addr = startAddr; addr < (startAddr + length); addr += maxReadLength)
-            {
-                byte readLength = (byte)Math.Min(startAddr + length - addr, maxReadLength);
-                List<byte>? blockBytes = _kw1281Dialog.ReadEeprom((ushort)addr, readLength);
-                if (blockBytes == null)
-                {
-                    blockBytes = Enumerable.Repeat((byte)0, readLength).ToList();
-                    succeeded = false;
-                }
-                fs.Write(blockBytes.ToArray(), 0, blockBytes.Count);
-                fs.Flush();
-            }
-        }
-
-        if (!succeeded)
-        {
-            Log.WriteLine();
-            Log.WriteLine("**********************************************************************");
-            Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-            Log.WriteLine("**********************************************************************");
-            Log.WriteLine();
-        }
-    }
-
-    public void WriteEeprom(byte[] bytes)
-    {
-        WriteEeprom((ushort)0, bytes, maxWriteLength: 8);
+        Utils.LoadDump(
+            (addr, values) => _kw1281Dialog.WriteEeprom(addr, values),
+            (uint)address, bytes, maxWriteLength: 8);
         ClusterFinalizer();
         ClusterRest();
-    }
-
-    private void WriteEeprom(
-        ushort startAddr, byte[] bytes, uint maxWriteLength)
-    {
-        var succeeded = true;
-        var length = bytes.Length;
-        for (uint addr = startAddr; addr < (startAddr + length); addr += maxWriteLength)
-        {
-            var writeLength = (byte)Math.Min(startAddr + length - addr, maxWriteLength);
-            if (!_kw1281Dialog.WriteEeprom(
-                    (ushort)addr,
-                    bytes.Skip((int)(addr - startAddr)).Take(writeLength).ToList()))
-            {
-                succeeded = false;
-            }
-        }
-
-        if (!succeeded)
-        {
-            Log.WriteLine("EEPROM write failed. You should probably try again.");
-        }
     }
 
     private readonly IKW1281Dialog _kw1281Dialog;

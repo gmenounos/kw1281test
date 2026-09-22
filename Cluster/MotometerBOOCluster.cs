@@ -97,11 +97,11 @@ internal class MotometerBOOCluster : ICluster
     };
 
     public string DumpEeprom(
-        uint? optionalAddress, uint? optionalLength, string? optionalFileName)
+        uint? address, uint? length, string? dumpFileName)
     {
-        uint address = optionalAddress ?? 0;
-        uint length = optionalLength ?? 0x100;
-        string filename = optionalFileName ?? $"BOOMM0_0x{address:X6}_eeprom.bin";
+        address ??= 0;
+        length ??= 0x100;
+        dumpFileName ??= $"BOOMM0_0x{address:X6}_eeprom.bin";
 
 #if false
         var identInfo = _kwp1281.ReadIdent().First().ToString()
