@@ -71,14 +71,14 @@ public class AirbagClearRangeTests
     }
 
     [TestMethod]
-    public void Vw51FaultLogStopsBeforeTheMarkerRow()
+    public void Vw51FaultLogStopsBeforeTheTracks()
     {
         var ranges = Vw51AirbagModule.GetClearRanges(Vw51AirbagModule.ModuleVersion.VW51);
 
-        ranges.Length.ShouldBe(1);
         ranges[0].Start.ShouldBe(0x000);
-        ranges[0].End.ShouldBe(0x03F,
-            "0x040-0x04F holds the write marker and must not be filled");
+        ranges[0].End.ShouldBe(0x02F,
+            "0x030-0x03F is a counter track on some units, not log - filling through 0x03F " +
+            "still produced 65535 on a module whose row 0x030 was populated");
     }
 
     [TestMethod]

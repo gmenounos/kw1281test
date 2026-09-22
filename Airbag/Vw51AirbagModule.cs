@@ -31,8 +31,8 @@ public sealed class Vw51AirbagModule : IAirbagModule
     // the log itself; 0x000-0x04F produces 65535; restoring 0x000-0x04F from a backup
     // clears it and returns the dump to baseline byte-for-byte. Erasing the marker alone,
     // with the log intact, does nothing - it is the combination that breaks.
-    private const int FaultLogEndVW51 = 0x03F;
-    private const int FaultLogEndVW61 = 0x02F;
+    // Both versions share the same layout here: 12 four-byte slots, then tracks.
+    private const int FaultLogEnd = 0x02F;
 
     private readonly IKW1281Dialog _kwp1281;
     private readonly string _ecuText;
@@ -161,16 +161,22 @@ public sealed class Vw51AirbagModule : IAirbagModule
     /// </summary>
     internal static (int Start, int End)[] GetClearRanges(ModuleVersion version) => version switch
     {
-        // VW51: fault log plus crash record, 0x000-0x03F. Row 0x040-0x04F must NOT be
-        // touched - see GetProtectedTracks.
+        // VW51: fault log 0x000-0x02F, crash data 0x151-0x1BF.
         //
-        // The VW51 crash record lives at 0x033-0x038, inside this same range, so the command
-        // still does its job. The bench module used for testing has FF there, which is why
-        // the hardware test never exercised it; two other 1C0909605A dumps carry
-        // 0F B0 CF 05 4D 9F and 01 AE 08. This is also why the widely repeated advice to
-        // "change four rows" is right for a real reason: four rows are the log plus the
-        // crash record, and the fifth row is the write marker.
-        ModuleVersion.VW51 => [(0x000, FaultLogEndVW51)],
+        // The log ends at 0x02F, the same as VW61 - the two versions share this layout.
+        // An earlier revision of this fix ended it at 0x03F and still produced 65535 on
+        // gmenounos' 1C0909605A, because row 0x030-0x03F is a track, not log: his dump has
+        // 00 | 0B B5 56 | 0B B5 8E at 0x032-0x038 and another 1C0909605A has 00 ... 01 AE 08
+        // there. My bench module has FF in that row, which is exactly why filling through
+        // 0x03F looked clean on it and broke his.
+        //
+        // The crash bounds come from Tod at TDItuning, who reports 0x000-0x03F as DTC area
+        // and 0x150-0x1BF as the crash data (time, speed and so on) for every VW51. I start
+        // at 0x151 rather than 0x150: all seven VW51 dumps I have hold 0x00 at 0x150, at the
+        // same offset, including modules that have never crashed. Until a dump from a
+        // crashed VW51 shows that byte changing, treating it as part of the crash record
+        // would be guessing, and guessing in this area is what produces 65535.
+        ModuleVersion.VW51 => [(0x000, FaultLogEnd), (0x151, 0x1BF)],
 
         // VW61: fault log plus crash records.
         //
@@ -192,7 +198,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
         //
         // 0x1AD-0x1C0 only appears on 1C0909605F; on both 605C dumps it is empty. Kept in
         // case it is that part number's layout.
-        ModuleVersion.VW61 => [(0x000, FaultLogEndVW61), (0x1AD, 0x1C0), (0x1E9, 0x24F)],
+        ModuleVersion.VW61 => [(0x000, FaultLogEnd), (0x1AD, 0x1C0), (0x1E9, 0x24F)],
 
         // 1C0909601: 0x151-0x1EB and 0x1EE-0x1EF are crash data. The first range used to be
         // 0x000-0x30F, which is the ENTIRE EEPROM of this version (0x310 bytes) - such a
@@ -206,15 +212,22 @@ public sealed class Vw51AirbagModule : IAirbagModule
         // about, and dumps confirm the warning literally: two VW51 dumps hold the ASCII
         // digits "01" (30 31) and "04" (30 34) there, so wiping them corrupts the version
         // string.
-        _ => [(0x000, FaultLogEndVW61), (0x151, 0x1EB), (0x1EE, 0x1EF)]
+        _ => [(0x000, FaultLogEnd), (0x151, 0x1EB), (0x1EE, 0x1EF)]
     };
 
     /// <summary>
     /// Tracks that the write marker walks along. A track rather than a single byte because
     /// the marker IS a position: tomorrow it sits in the neighbouring cell. Observed on live
-    /// modules - on VW51 the fault-log marker sat at 0x049 on one unit, 0x04B on another and
-    /// 0x04E on a third; on VW61 it sat at 0x037 and moved to 0x038 across a power cycle,
+    /// modules - on VW51 the fault-log marker sat at 0x049, 0x04B, 0x04D and 0x04E on four
+    /// different units; on VW61 it sat at 0x037 and moved to 0x038 across a power cycle,
     /// while a second marker walked 0x150 -> 0x151 -> 0x152 -> 0x153.
+    ///
+    /// The VW51 track runs 0x030-0x05B because everything in it moves or is needed: the row
+    /// at 0x030-0x03F holds a counter whose tag byte walks (00 | 0B B5 56 | 0B B5 8E on one
+    /// unit, 00 ... 01 AE 08 on another), 0x040-0x04F is the marker row, and 0x050-0x05B
+    /// holds the stamp counters - bytes 1-2 of every log stamp are read from there, and the
+    /// 0x00 tag walks within the row too (0x052 on one unit, 0x057 on another). Identity
+    /// bytes used by the unlock handshake begin at 0x05C.
     ///
     /// The VW61 track runs to 0x169 rather than covering the marker cells alone, because the
     /// same span also holds the fault log's stamp counters at 0x156-0x15F (bytes 1-2 of every
@@ -228,7 +241,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
     internal static (int Start, int End)[] GetProtectedTracks(ModuleVersion version) =>
         version switch
         {
-            ModuleVersion.VW51 => [(0x040, 0x04F)],
+            ModuleVersion.VW51 => [(0x030, 0x05B)],
             ModuleVersion.VW61 => [(0x030, 0x03F), (0x140, 0x169)],
             _ => []
         };
