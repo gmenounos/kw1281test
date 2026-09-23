@@ -72,6 +72,13 @@ class Program
         Log.WriteLine($".NET Version: {Environment.Version}");
         Log.WriteLine($"Culture: {CultureInfo.InstalledUICulture}");
 
+        args = ExtractFastEepromFlag(args, out var fastEeprom);
+        KW1281Dialog.FastEepromRead = fastEeprom;
+        if (fastEeprom)
+        {
+            Log.WriteLine("Fast EEPROM read enabled: skipping the acknowledgement after each reply.");
+        }
+
         if (args.Length < 4)
         {
             ShowUsage();
@@ -519,6 +526,29 @@ class Program
     ///     ADDRESS = EEPROM address in decimal (0-511) or hex ($00-$1FF)
     ///     VALUE = Value to be stored at address in decimal (0-255) or hex ($00-$FF)
     /// </summary>
+    /// <summary>
+    /// Pulls the optional -FastEeprom flag out of the command line, wherever it appears,
+    /// and returns the remaining arguments so the positional parsing is unaffected.
+    /// </summary>
+    internal static string[] ExtractFastEepromFlag(string[] args, out bool fastEeprom)
+    {
+        var remaining = new List<string>(args.Length);
+        fastEeprom = false;
+
+        foreach (var arg in args)
+        {
+            if (string.Equals(arg, "-FastEeprom", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(arg, "--fast-eeprom", StringComparison.OrdinalIgnoreCase))
+            {
+                fastEeprom = true;
+                continue;
+            }
+            remaining.Add(arg);
+        }
+
+        return remaining.ToArray();
+    }
+
     internal static bool ParseAddressesAndValues(
         List<string> addressesAndValues,
         out List<KeyValuePair<ushort, byte>> addressValuePairs)
@@ -606,7 +636,11 @@ class Program
     private static void ShowUsage()
     {
         Log.WriteLine("""
-Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
+Usage: KW1281Test [-FastEeprom] PORT BAUD ADDRESS COMMAND [args]
+
+-FastEeprom = Skip the acknowledgement round-trip after each EEPROM reply, the way
+    vendor tools read it. Roughly a third faster; leave it off if a
+    controller replies with errors.
                 
 PORT = COM1|COM2|etc. (Windows)
     /dev/ttyXXXX (Linux)
