@@ -253,6 +253,7 @@ namespace BitFab.KW1281Test.Cluster
             "1C0920821",    // KOMBI+WEGFAHRS. M73 V08 (Beetle 2003)
             "1C0920851M",   // KOMBI+WEGFAHRS. M73 V02 (Beetle)
             "1C0920921",    // Beetle 1C0920921G M73 V08
+            "1C0920940C",   // KOMBI+WEGFAHRS. M73 V05
             "1C0920941",    // Beetle 1C0920941LX M73 V03
             "1C0920951",    // Beetle 1C0920951A M73 V02
             "8D0920900R",   // KOMBI+WEGFAHRS. M73 D54 (Audi A4 B5 2001)
