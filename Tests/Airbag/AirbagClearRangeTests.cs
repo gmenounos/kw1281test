@@ -71,18 +71,16 @@ public class AirbagClearRangeTests
     }
 
     [TestMethod]
-    public void Vw51ClearsTheLogAndTheFlagBytesButNotTheCounterTag()
+    public void Vw51ClearsTheLogButNotTheTrackThatFollowsIt()
     {
         var ranges = Vw51AirbagModule.GetClearRanges(Vw51AirbagModule.ModuleVersion.VW51);
 
         ranges[0].Start.ShouldBe(0x000);
-        ranges[0].End.ShouldBe(0x031,
-            "the log runs to 0x02F and 0x030-0x031 are the flag bytes the module dims when " +
-            "it notices the log changed; leaving them dimmed is what produced the 65535");
+        ranges[0].End.ShouldBe(0x02F,
+            "0x030-0x03F is a track: the flag bytes at 0x030-0x031 are repaired by reading " +
+            "them first, never by filling, and 0x032 onwards is the counter whose tag walks");
 
-        // 0x032 onwards is the counter whose tag byte walks - filling it is what broke a
-        // module whose row 0x030 was populated.
-        ranges.ShouldAllBe(r => r.End < 0x032 || r.Start > 0x05B);
+        ranges.ShouldAllBe(r => r.End < 0x030 || r.Start > 0x05B);
     }
 
     [TestMethod]

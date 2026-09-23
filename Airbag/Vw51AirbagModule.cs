@@ -176,7 +176,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
         // same offset, including modules that have never crashed. Until a dump from a
         // crashed VW51 shows that byte changing, treating it as part of the crash record
         // would be guessing, and guessing in this area is what produces 65535.
-        ModuleVersion.VW51 => [(0x000, 0x031), (0x151, 0x1BF)],
+        ModuleVersion.VW51 => [(0x000, FaultLogEnd), (0x151, 0x1BF)],
 
         // VW61: fault log plus crash records.
         //
@@ -241,10 +241,63 @@ public sealed class Vw51AirbagModule : IAirbagModule
     internal static (int Start, int End)[] GetProtectedTracks(ModuleVersion version) =>
         version switch
         {
-            ModuleVersion.VW51 => [(0x032, 0x05B)],
+            ModuleVersion.VW51 => [(0x030, 0x05B)],
             ModuleVersion.VW61 => [(0x030, 0x03F), (0x140, 0x169)],
             _ => []
         };
+
+    /// <summary>
+    /// Bytes the module dims bits in when it notices its fault log changed underneath it.
+    /// They have to end up FF, or the module raises an internal fault and reports 65535
+    /// after the next power cycle.
+    ///
+    /// They must NOT be filled blindly, though: the module counts a write to these cells as
+    /// an event whether or not the value changes, and writing FF over FF is enough to
+    /// provoke the same 65535. Both halves of that are observed, on one module and one set
+    /// of dump contents:
+    ///
+    ///   dump with 0x031 = FF, cells left alone   -> clean
+    ///   dump with 0x031 = FF, FF written to them -> 65535
+    ///   dump with 0x031 = E6, cells left alone   -> 65535
+    ///   dump with 0x031 = E6, FF written to them -> clean
+    ///
+    /// So the rule is read first, write only what is actually dimmed.
+    /// </summary>
+    private static int[] GetFlagBytes(ModuleVersion version) => version switch
+    {
+        ModuleVersion.VW51 => [0x030, 0x031],
+        _ => []
+    };
+
+    /// <summary>
+    /// Restores the flag bytes to FF, touching only the ones that are not FF already.
+    /// Must run inside an open raw session, before the commit frame.
+    /// </summary>
+    private void RepairFlagBytes(ModuleVersion version)
+    {
+        foreach (var offset in GetFlagBytes(version))
+        {
+            var absoluteAddress = ResolveAbsoluteAddress(offset);
+            var current = ReadRawChunk(absoluteAddress, 1);
+
+            if (current.Length != 1)
+            {
+                Log.WriteLine(
+                    $"  Flag 0x{offset:X3}: could not read it back, leaving it alone.");
+                continue;
+            }
+
+            if (current[0] == 0xFF)
+            {
+                Log.WriteLine($"  Flag 0x{offset:X3} is already 0xFF, not writing to it.");
+                continue;
+            }
+
+            Log.WriteLine(
+                $"  Flag 0x{offset:X3} = 0x{current[0]:X2}, restoring it to 0xFF.");
+            WriteBytesAtAbsoluteAddress(absoluteAddress, [0xFF]);
+        }
+    }
 
     internal static void ValidateClearRanges(
         (int Start, int End)[] ranges, ModuleVersion version)
@@ -307,6 +360,8 @@ public sealed class Vw51AirbagModule : IAirbagModule
                     $"  FillRange 0x{startOffset:X3}-0x{endOffset:X3} ({length} bytes) = 0x{fillValue:X2}");
                 WriteBytesAtAbsoluteAddress(absoluteAddress, data);
             }
+
+            RepairFlagBytes(_version);
 
             Log.WriteLine("VW51 airbag: sending commit frame 02 77 75");
             CommitWrite();
