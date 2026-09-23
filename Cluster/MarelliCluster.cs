@@ -250,6 +250,7 @@ namespace BitFab.KW1281Test.Cluster
         private readonly string[] _largeEepromEcus =
         [
             "1C0920821",    // KOMBI+WEGFAHRS. M73 V08 (Beetle 2003)
+            "1C0920851M",   // KOMBI+WEGFAHRS. M73 V02 (Beetle)
             "1C0920921",    // Beetle 1C0920921G M73 V08
             "1C0920941",    // Beetle 1C0920941LX M73 V03
             "1C0920951",    // Beetle 1C0920951A M73 V02
