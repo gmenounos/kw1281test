@@ -119,11 +119,11 @@ public sealed class Vw51AirbagModule : IAirbagModule
             PrepareSession();
             EnterRawReadMode();
 
-            int absoluteAddress = ResolveAbsoluteAddress(startAddress);
+            var absoluteAddress = ResolveAbsoluteAddress(startAddress);
 
             var result = new byte[length];
             int written = 0;
-            int currentAddress = absoluteAddress;
+            var currentAddress = absoluteAddress;
 
             while (written < length)
             {
@@ -353,9 +353,11 @@ public sealed class Vw51AirbagModule : IAirbagModule
                 int length = endOffset - startOffset + 1;
                 var data = new byte[length];
                 for (int i = 0; i < length; i++)
+                {
                     data[i] = fillValue;
+                }
 
-                int absoluteAddress = ResolveAbsoluteAddress(startOffset);
+                var absoluteAddress = ResolveAbsoluteAddress(startOffset);
                 Log.WriteLine(
                     $"  FillRange 0x{startOffset:X3}-0x{endOffset:X3} ({length} bytes) = 0x{fillValue:X2}");
                 WriteBytesAtAbsoluteAddress(absoluteAddress, data);
@@ -390,7 +392,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
             throw new ArgumentException("EEPROM write buffer is empty.", nameof(data));
         }
 
-        int absoluteAddress = ResolveAbsoluteAddress(startAddress);
+        var absoluteAddress = ResolveAbsoluteAddress(startAddress);
 
         Log.WriteLine(
             $"VW51 airbag: LoadEeprom start=0x{startAddress:X4}, " +
@@ -428,7 +430,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
     {
         for (int i = 0; i < data.Length; i++)
         {
-            int byteAbsoluteAddress = absoluteAddress + i;
+            var byteAbsoluteAddress = absoluteAddress + i;
             byte page = (byte)(byteAbsoluteAddress >> 8);
             byte index = (byte)(byteAbsoluteAddress & 0xFF);
             byte value = data[i];
@@ -632,7 +634,7 @@ public sealed class Vw51AirbagModule : IAirbagModule
     {
         ArgumentOutOfRangeException.ThrowIfNegative(address);
 
-        int logicalBaseAddress = _version == ModuleVersion.VW61
+        var logicalBaseAddress = _version == ModuleVersion.VW61
             ? LogicalBaseAddressVW61
             : LogicalBaseAddressVW51;
 
