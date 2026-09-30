@@ -165,34 +165,18 @@ internal class MotometerBOOCluster : ICluster
     };
 
     public string DumpEeprom(
-        uint? optionalAddress, uint? optionalLength, string? optionalFileName)
+        uint? address, uint? length, string? dumpFileName)
     {
-        uint address = optionalAddress ?? 0;
-        uint length = optionalLength ?? 0x100;
-        string filename = optionalFileName ?? $"BOOMM0_0x{address:X6}_eeprom.bin";
+        address ??= 0;
+        length ??= 0x100;
 
-#if false
-        var identInfo = _kwp1281.ReadIdent().First().ToString()
-            .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
-            .Replace(' ', '_');
+        dumpFileName ??= $"BOOMM0_0x{address:X4}_eeprom.bin";
 
-        var dumpFileName = filename ?? $"{identInfo}_0x{startAddress:X4}_eeprom.bin";
-        foreach (var c in Path.GetInvalidFileNameChars())
-        {
-            dumpFileName = dumpFileName.Replace(c, 'X');
-        }
-        foreach (var c in Path.GetInvalidPathChars())
-        {
-            dumpFileName = dumpFileName.Replace(c, 'X');
-        }
-
-        Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
-        DumpEeprom(startAddress, length, maxReadLength: 16, dumpFileName);
-        Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
+        Utils.WriteDump(
+            (addr, len) => _kwp1281.ReadEeprom((ushort)addr, len),
+            (uint)address, (uint)length, maxReadLength: 16, dumpFileName);
 
         return dumpFileName;
-#endif
-        throw new NotImplementedException();
     }
 
     private string GetClusterInfo()
