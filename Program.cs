@@ -9,6 +9,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.IO.Ports;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -607,7 +608,7 @@ class Program
         catch (Exception ex) when (
             ex is FileNotFoundException or UnauthorizedAccessException or IOException)
         {
-            var availablePorts = System.IO.Ports.SerialPort.GetPortNames();
+            var availablePorts = SerialPort.GetPortNames();
             Log.WriteLine($"Unable to open port {portName}: {ex.Message}");
             Log.WriteLine(
                 availablePorts.Length > 0
