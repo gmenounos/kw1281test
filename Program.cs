@@ -431,7 +431,7 @@ class Program
                 break;
 
             case "readeeprom":
-                tester.ReadEeprom(address!.Value);
+                tester.ReadEeprom(address!.Value, ecuInfo);
                 break;
 
             case "readram":
@@ -467,7 +467,7 @@ class Program
                 break;
 
             case "writeeeprom":
-                tester.WriteEeprom(address!.Value, value);
+                tester.WriteEeprom(address!.Value, value, ecuInfo);
                 break;
 
             case "writeram":

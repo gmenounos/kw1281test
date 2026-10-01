@@ -367,7 +367,7 @@ internal class Tester
                 break;
 
             case (int)ControllerAddress.Airbag:
-                DumpAirbagEeprom(address, (int?)length, filename);
+                DumpAirbagEeprom(address, (int?)length, ecuInfo, filename);
                 break;
 
             default:
@@ -768,7 +768,7 @@ internal class Tester
                 CcmLoadEeprom((ushort)address, bytes);
                 break;
             case (int)ControllerAddress.Airbag:
-                LoadAirbagEeprom((int)address, bytes);
+                LoadAirbagEeprom((int)address, bytes, ecuInfo);
                 break;
             default:
                 Log.WriteLine("Only supported for cluster, CCM, Central Locking, Airbag and Central Electric");
@@ -776,7 +776,7 @@ internal class Tester
         }
     }
 
-    public void ClearCrashData(byte fillValue = 0xFF)
+    public void ClearCrashData(ControllerInfo ecuInfo, byte fillValue = 0xFF)
     {
         if (_controllerAddress != (int)ControllerAddress.Airbag)
         {
@@ -784,7 +784,7 @@ internal class Tester
             return;
         }
 
-        var module = CreateVw51AirbagModule();
+        var module = CreateVw51AirbagModule(ecuInfo);
         if (module == null)
         {
             return;
@@ -801,13 +801,9 @@ internal class Tester
         }
     }
 
-    private Vw51AirbagModule? CreateVw51AirbagModule()
+    private Vw51AirbagModule? CreateVw51AirbagModule(ControllerInfo ecuInfo)
     {
-        var identLines = _kwp1281.ReadIdent()
-            .Select(x => x.ToString())
-            .ToList();
-
-        var identText = string.Join(Environment.NewLine, identLines);
+        var identText = Utils.FirstIdentLine(ecuInfo);
 
         var module = new Vw51AirbagModule(_kwp1281, identText);
         if (!module.IsSupportedIdent(identText, out var reason))
@@ -819,7 +815,8 @@ internal class Tester
         return module;
     }
 
-    private void DumpAirbagEeprom(uint? startAddress, int? length, string? filename)
+    private void DumpAirbagEeprom(
+        uint? startAddress, int? length, ControllerInfo ecuInfo, string? filename)
     {
         if (length == 0)
         {
@@ -827,7 +824,7 @@ internal class Tester
             return;
         }
 
-        var module = CreateVw51AirbagModule();
+        var module = CreateVw51AirbagModule(ecuInfo);
         if (module == null)
         {
             return;
@@ -861,9 +858,9 @@ internal class Tester
         }
     }
 
-    private void LoadAirbagEeprom(int startAddress, byte[] data)
+    private void LoadAirbagEeprom(int startAddress, byte[] data, ControllerInfo ecuInfo)
     {
-        var module = CreateVw51AirbagModule();
+        var module = CreateVw51AirbagModule(ecuInfo);
         if (module == null)
         {
             return;
@@ -897,11 +894,11 @@ internal class Tester
         }
     }
 
-    public void ReadEeprom(uint address)
+    public void ReadEeprom(uint address, ControllerInfo ecuInfo)
     {
         if (_controllerAddress is (int)ControllerAddress.Airbag)
         {
-            var module = CreateVw51AirbagModule();
+            var module = CreateVw51AirbagModule(ecuInfo);
             if (module == null)
             {
                 return;
@@ -1047,11 +1044,11 @@ internal class Tester
         cluster.ToggleRB4Mode();
     }
 
-    public void WriteEeprom(uint address, byte value)
+    public void WriteEeprom(uint address, byte value, ControllerInfo ecuInfo)
     {
         if (_controllerAddress is (int)ControllerAddress.Airbag)
         {
-            LoadAirbagEeprom((int)address, [value]);
+            LoadAirbagEeprom((int)address, [value], ecuInfo);
             return;
         }
 
@@ -1106,9 +1103,9 @@ internal class Tester
 
         ICluster cluster;
 
-        if (AudiA4B5VdoClusterWithoutImmo.IsB5Kombi(ecuInfo))
+        if (AudiA4B5VdoClusterWithoutImmo.IsB5Kombi(ident))
         {
-            if (!AudiA4B5VdoClusterWithoutImmo.IsSupported(ecuInfo, out string reasonNotSupported))
+            if (!AudiA4B5VdoClusterWithoutImmo.IsSupported(ident, out string reasonNotSupported))
             {
                 Log.WriteLine(reasonNotSupported);
                 throw new UnableToProceedException();
@@ -1237,9 +1234,11 @@ internal class Tester
 
     private void ClusterLoadEeprom(ushort address, byte[] bytes, ControllerInfo ecuInfo)
     {
-        if (AudiA4B5VdoClusterWithoutImmo.IsB5Kombi(ecuInfo))
+        var ident = Utils.FirstIdentLine(ecuInfo);
+
+        if (AudiA4B5VdoClusterWithoutImmo.IsB5Kombi(ident))
         {
-            if (!AudiA4B5VdoClusterWithoutImmo.IsSupported(ecuInfo, out string reasonNotSupported))
+            if (!AudiA4B5VdoClusterWithoutImmo.IsSupported(ident, out string reasonNotSupported))
             {
                 Log.WriteLine(reasonNotSupported);
                 throw new UnableToProceedException();

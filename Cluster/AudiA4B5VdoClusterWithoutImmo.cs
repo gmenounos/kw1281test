@@ -35,18 +35,14 @@ namespace BitFab.KW1281Test.Cluster;
 /// </summary>
 internal class AudiA4B5VdoClusterWithoutImmo : ICluster
 {
-    public static bool IsB5Kombi(ControllerInfo ecuInfo)
+    public static bool IsB5Kombi(string ident)
     {
-        string ident = Utils.FirstIdentLine(ecuInfo);
-
         return ident.Contains("B5_K") || // UK-NSI
             ident.Contains("B5-K"); // VDO
     }
 
-    public static bool IsSupported(ControllerInfo ecuInfo, out string reasonNotSupported)
+    public static bool IsSupported(string ident, out string reasonNotSupported)
     {
-        string ident = Utils.FirstIdentLine(ecuInfo);
-
         if (ident.Contains("B5-K")) // VDO
         {
             reasonNotSupported = string.Empty;
