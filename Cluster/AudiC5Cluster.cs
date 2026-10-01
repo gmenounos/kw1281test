@@ -1,11 +1,10 @@
+using BitFab.KW1281Test.Blocks;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using BitFab.KW1281Test.Blocks;
 
 namespace BitFab.KW1281Test.Cluster;
 
@@ -56,9 +55,9 @@ internal class AudiC5Cluster : ICluster
 
     public string DumpEeprom(uint? address, uint? length, string? dumpFileName)
     {
-        ArgumentNullException.ThrowIfNull(address);
-        ArgumentNullException.ThrowIfNull(length);
-        ArgumentNullException.ThrowIfNull(dumpFileName);
+        address ??= 0;
+        length ??= 0x800;
+        dumpFileName ??= $"AudiC5_0x{address:X4}_eeprom.bin";
 
         WriteBlock([Constants.Hello]);
 
@@ -66,7 +65,7 @@ internal class AudiC5Cluster : ICluster
         Log.WriteLine($"Received block:{Utils.Dump(blockBytes)}");
         if (BlockTitle(blockBytes) != Constants.Hello)
         {
-            Log.WriteLine($"Warning: Expected block of type ${Constants.Hello:X2}");
+            Log.WriteLine($"Warning: Expected block of type 0x{Constants.Hello:X2}");
         }
 
         string[] passwords =
@@ -96,7 +95,7 @@ internal class AudiC5Cluster : ICluster
             }
             else
             {
-                Log.WriteLine($"Warning: Expected block of type ${Constants.Ack:X2}");
+                Log.WriteLine($"Warning: Expected block of type 0x{Constants.Ack:X2}");
             }
         }
 
@@ -110,43 +109,13 @@ internal class AudiC5Cluster : ICluster
         }
 
         Log.WriteLine($"Dumping EEPROM to {dumpFileName}");
-        DumpEeprom(address.Value, length.Value, maxReadLength: 0x10, dumpFileName);
+        Utils.WriteDump(
+            (addr, len) => ReadEepromByAddress(addr, len),
+            (uint)address, (uint)length, maxReadLength: 0x10, dumpFileName);
 
         _kw1281Dialog.SetDisconnected();
 
         return dumpFileName;
-    }
-
-    private void DumpEeprom(
-        uint startAddr, uint length, byte maxReadLength, string fileName)
-    {
-        using var fs = File.Create(fileName, bufferSize: maxReadLength, FileOptions.WriteThrough);
-
-        var succeeded = true;
-        for (var addr = startAddr; addr < startAddr + length; addr += maxReadLength)
-        {
-            var readLength = (byte)Math.Min(startAddr + length - addr, maxReadLength);
-            var blockBytes = ReadEepromByAddress(addr, readLength);
-
-            if (blockBytes.Count != readLength)
-            {
-                succeeded = false;
-                blockBytes.AddRange(
-                    Enumerable.Repeat((byte)0, readLength - blockBytes.Count));
-            }
-
-            fs.Write(blockBytes.ToArray(), offset: 0, blockBytes.Count);
-            fs.Flush();
-        }
-
-        if (!succeeded)
-        {
-            Log.WriteLine();
-            Log.WriteLine("**********************************************************************");
-            Log.WriteLine("*** Warning: Some bytes could not be read and were replaced with 0 ***");
-            Log.WriteLine("**********************************************************************");
-            Log.WriteLine();
-        }
     }
 
     private List<byte> ReadEepromByAddress(uint addr, byte readLength)
@@ -165,7 +134,7 @@ internal class AudiC5Cluster : ICluster
 
         if (BlockTitle(blockBytes) != Constants.ReadEeprom)
         {
-            throw new InvalidOperationException($"Expected block of type ${Constants.ReadEeprom:X2}");
+            throw new InvalidOperationException($"Expected block of type 0x{Constants.ReadEeprom:X2}");
         }
 
         var expectedLength = readLength + 4;
@@ -173,7 +142,7 @@ internal class AudiC5Cluster : ICluster
         if (blockBytes.Count != expectedLength)
         {
             Log.WriteLine(
-        $"Warning: Expected block length ${expectedLength:X2} but length is ${actualLength:X2}");
+                $"Warning: Expected block length 0x{expectedLength:X2} but length is 0x{actualLength:X2}");
         }
 
         return blockBytes.Skip(3).Take(actualLength - 4).ToList();
@@ -221,12 +190,12 @@ internal class AudiC5Cluster : ICluster
 
             if (header != Constants.StartOfBlock)
             {
-                throw new InvalidOperationException($"Expected $D1 header byte but got ${header:X2}");
+                throw new InvalidOperationException($"Expected 0xD1 header byte but got 0x{header:X2}");
             }
 
             if (checksum != 0x00)
             {
-                throw new InvalidOperationException($"Expected $00 block checksum but got ${checksum:X2}");
+                throw new InvalidOperationException($"Expected 0x00 block checksum but got 0x{checksum:X2}");
             }
         }
         catch (Exception e)
@@ -250,7 +219,6 @@ internal class AudiC5Cluster : ICluster
     private static class Constants
     {
         public const byte StartOfBlock = 0xD1;
-
         public const byte Ack = 0x06;
         public const byte Nak = 0x15;
         public const byte Hello = 0x49;
