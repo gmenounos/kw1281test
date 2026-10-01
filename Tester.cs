@@ -342,12 +342,12 @@ internal class Tester
         return edc15.ReadWriteEeprom(dumpFileName, addressValuePairs);
     }
 
-    public void DumpEeprom(uint? address, uint? length, string? filename)
+    public void DumpEeprom(uint? address, uint? length, ControllerInfo ecuInfo, string? filename)
     {
         switch (_controllerAddress)
         {
             case (int)ControllerAddress.Cluster:
-                _ = ClusterDumpEeprom(address, length, filename);
+                _ = ClusterDumpEeprom(address, length, ecuInfo, filename);
                 break;
 
             case (int)ControllerAddress.CCM:
@@ -564,7 +564,8 @@ internal class Tester
                     if (partNumberGroups[1] == "919") // Non-CAN
                     {
                         startAddress = 0x1FA;
-                        dumpFileName = ClusterDumpEeprom(startAddress, length: 6, dumpFileName: null);
+                        dumpFileName = ClusterDumpEeprom(
+                            startAddress, length: 6, ecuInfo, dumpFileName: null);
                         buf = File.ReadAllBytes(dumpFileName);
                         skc = Utils.GetBcd(buf, 0);
                         ushort skc2 = Utils.GetBcd(buf, 2);
@@ -577,7 +578,8 @@ internal class Tester
                     else if (partNumberGroups[1] == "920") // CAN
                     {
                         startAddress = 0x90;
-                        dumpFileName = ClusterDumpEeprom(startAddress, length: 0x7C, dumpFileName: null);
+                        dumpFileName = ClusterDumpEeprom(
+                            startAddress, length: 0x7C, ecuInfo, dumpFileName: null);
                         buf = File.ReadAllBytes(dumpFileName);
                         skc = VdoCluster.GetSkc(buf, startAddress);
                     }
@@ -636,8 +638,8 @@ internal class Tester
 
                 cluster.UnlockForEepromReadWrite();
 
-                var dumpFileName = BOOClusterDumpEeprom(
-                    startAddress: 0, length: 0x10, filename: null);
+                var dumpFileName = cluster.DumpEeprom(
+                    address: 0, length: 0x10, dumpFileName: null);
 
                 var buf = File.ReadAllBytes(dumpFileName);
                 var skc = Utils.GetBcd(buf, 0x08);
@@ -744,7 +746,7 @@ internal class Tester
         var succeeded = _kwp1281.GroupRead(groupNumber);
     }
 
-    public void LoadEeprom(uint address, string filename)
+    public void LoadEeprom(uint address, ControllerInfo ecuInfo, string filename)
     {
         if (!File.Exists(filename))
         {
@@ -758,7 +760,7 @@ internal class Tester
         switch (_controllerAddress)
         {
             case (int)ControllerAddress.Cluster:
-                ClusterLoadEeprom((ushort)address, bytes);
+                ClusterLoadEeprom((ushort)address, bytes, ecuInfo);
                 break;
             case (int)ControllerAddress.CCM:
             case (int)ControllerAddress.CentralElectric:
@@ -1097,48 +1099,26 @@ internal class Tester
         vdoCluster.WriteRam(address, value);
     }
 
-    private string BOOClusterDumpEeprom(ushort startAddress, ushort length, string? filename)
-    {
-        var identInfo = _kwp1281.ReadIdent().First().ToString()
-            .Split(Environment.NewLine).First() // Sometimes ReadIdent() can return multiple lines
-            .Replace(' ', '_')
-            .Replace('.', '_')
-            .Replace(":", "");
-
-        var dumpFileName = filename ?? $"{identInfo}_0x{startAddress:X4}_eeprom.bin";
-        foreach (var c in Path.GetInvalidFileNameChars())
-        {
-            dumpFileName = dumpFileName.Replace(c, 'X');
-        }
-        foreach (var c in Path.GetInvalidPathChars())
-        {
-            dumpFileName = dumpFileName.Replace(c, 'X');
-        }
-
-        Log.WriteLine($"Saving EEPROM dump to {dumpFileName}");
-        Utils.WriteDump(
-            (addr, len) => _kwp1281.ReadEeprom((ushort)addr, len),
-            startAddress, length, maxReadLength: 16, dumpFileName);
-        Log.WriteLine($"Saved EEPROM dump to {dumpFileName}");
-
-        return dumpFileName;
-    }
-
     private string ClusterDumpEeprom(
-        uint? startAddress, uint? length, string? dumpFileName)
+        uint? startAddress, uint? length, ControllerInfo ecuInfo, string? dumpFileName)
     {
-        var ident = _kwp1281.ReadIdent();
+        var ident = Utils.FirstIdentLine(ecuInfo);
+
         ICluster cluster;
 
-        if (AudiA4B5VdoClusterWithoutImmo.IsB5Kombi(ident))
+        if (AudiA4B5VdoClusterWithoutImmo.IsB5Kombi(ecuInfo))
         {
-            if (!AudiA4B5VdoClusterWithoutImmo.IsSupported(ident, out string reasonNotSupported))
+            if (!AudiA4B5VdoClusterWithoutImmo.IsSupported(ecuInfo, out string reasonNotSupported))
             {
                 Log.WriteLine(reasonNotSupported);
                 throw new UnableToProceedException();
             }
 
             cluster = new AudiA4B5VdoClusterWithoutImmo(_kwp1281);
+        }
+        else if (ident.Contains("BOO") || ident.Contains("MM0"))
+        {
+            cluster = new MotometerBOOCluster(_kwp1281!);
         }
         else
         {
@@ -1255,13 +1235,11 @@ internal class Tester
             address, bytes, maxWriteLength: 8);
     }
 
-    private void ClusterLoadEeprom(ushort address, byte[] bytes)
+    private void ClusterLoadEeprom(ushort address, byte[] bytes, ControllerInfo ecuInfo)
     {
-        var ident = _kwp1281.ReadIdent();
-
-        if (AudiA4B5VdoClusterWithoutImmo.IsB5Kombi(ident))
+        if (AudiA4B5VdoClusterWithoutImmo.IsB5Kombi(ecuInfo))
         {
-            if (!AudiA4B5VdoClusterWithoutImmo.IsSupported(ident, out string reasonNotSupported))
+            if (!AudiA4B5VdoClusterWithoutImmo.IsSupported(ecuInfo, out string reasonNotSupported))
             {
                 Log.WriteLine(reasonNotSupported);
                 throw new UnableToProceedException();

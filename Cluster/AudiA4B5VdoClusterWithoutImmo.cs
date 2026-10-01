@@ -35,17 +35,17 @@ namespace BitFab.KW1281Test.Cluster;
 /// </summary>
 internal class AudiA4B5VdoClusterWithoutImmo : ICluster
 {
-    public static bool IsB5Kombi(List<ControllerIdent> identList)
+    public static bool IsB5Kombi(ControllerInfo ecuInfo)
     {
-        string ident = ParseIdentList(identList);
+        string ident = Utils.FirstIdentLine(ecuInfo);
 
         return ident.Contains("B5_K") || // UK-NSI
             ident.Contains("B5-K"); // VDO
     }
 
-    public static bool IsSupported(List<ControllerIdent> identList, out string reasonNotSupported)
+    public static bool IsSupported(ControllerInfo ecuInfo, out string reasonNotSupported)
     {
-        string ident = ParseIdentList(identList);
+        string ident = Utils.FirstIdentLine(ecuInfo);
 
         if (ident.Contains("B5-K")) // VDO
         {
@@ -109,15 +109,6 @@ internal class AudiA4B5VdoClusterWithoutImmo : ICluster
         {
             throw new InvalidOperationException("Unable to login to cluster");
         }
-    }
-
-    private static string ParseIdentList(List<ControllerIdent> identList)
-    {
-        //{8D0919033C  B5-KOMBIINSTRUMENT  D08
-        //Software Coding 00083, Workshop Code: 00001}
-        return identList
-            .Select(x => x.ToString())
-            .FirstOrDefault() ?? "";
     }
 
     /// <summary>

@@ -231,9 +231,11 @@ internal static class Utils
         {
             var readLength = (byte)Math.Min(startAddr + length - addr, maxReadLength);
             var blockBytes = readBlock(addr, readLength) ?? [];
-
             if (blockBytes.Count < readLength)
             {
+                Log.WriteLine(
+                    $"Failed to read block at address ${addr:X4} " +
+                    $"(got {blockBytes.Count}/{readLength} bytes). Replacing with 0.");
                 blockBytes.AddRange(Enumerable.Repeat((byte)0, readLength - blockBytes.Count));
                 succeeded = false;
             }
@@ -278,5 +280,13 @@ internal static class Utils
         {
             Log.WriteLine("Write failed. You should probably try again.");
         }
+    }
+
+    /// <summary>
+    /// Returns the first line of the controller identification info.
+    /// </summary>
+    public static string FirstIdentLine(ControllerInfo ecuInfo)
+    {
+        return ecuInfo.Text.Split(Environment.NewLine).First();
     }
 }

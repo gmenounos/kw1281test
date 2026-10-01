@@ -390,7 +390,7 @@ class Program
                 break;
 
             case "dumpeeprom":
-                tester.DumpEeprom(address, length, _filename);
+                tester.DumpEeprom(address, length, ecuInfo, _filename);
                 break;
 
             case "dumpmarellimem":
@@ -422,7 +422,7 @@ class Program
                 break;
 
             case "loadeeprom":
-                tester.LoadEeprom(address!.Value, _filename!);
+                tester.LoadEeprom(address!.Value, ecuInfo, _filename!);
                 break;
 
             case "mapeeprom":
