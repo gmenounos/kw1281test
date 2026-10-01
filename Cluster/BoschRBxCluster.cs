@@ -14,15 +14,15 @@ class BoschRBxCluster : ICluster
     }
 
     public string DumpEeprom(
-        uint? optionalAddress, uint? optionalLength, string? optionalFileName)
+        uint? address, uint? length, string? dumpFileName)
     {
-        uint address = optionalAddress ?? 0x10400;
-        uint length = optionalLength ?? 0x400;
-        string filename = optionalFileName ?? $"RBx_0x{address:X6}_mem.bin";
+        address ??= 0x10400;
+        length ??= 0x400;
+        dumpFileName ??= $"RBx_0x{address:X6}_mem.bin";
 
-        _kwp2000.DumpMem(address, length, filename);
+        _kwp2000.DumpMem((uint)address, (uint)length, dumpFileName);
 
-        return filename;
+        return dumpFileName;
     }
 
     public bool SecurityAccess(byte accessMode)
