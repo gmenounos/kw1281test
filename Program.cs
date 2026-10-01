@@ -588,22 +588,35 @@ class Program
     {
         try
         {
+            IInterface @interface;
+
             if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
             {
                 Log.WriteLine($"Opening FTDI serial port {portName}");
-                return new FtdiInterface(portName, baudRate);
+                @interface = new FtdiInterface(portName, baudRate);
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) &&
                 portName.StartsWith("/dev/", StringComparison.CurrentCultureIgnoreCase))
             {
                 Log.WriteLine($"Opening Linux serial port {portName}");
-                return new LinuxInterface(portName, baudRate);
+                @interface = new LinuxInterface(portName, baudRate);
             }
             else
             {
                 Log.WriteLine($"Opening Generic serial port {portName}");
-                return new GenericInterface(portName, baudRate);
+                @interface = new GenericInterface(portName, baudRate);
             }
+
+            // Many KKL cables power/enable their K-line transceiver off the DTR line.
+            // Pulse it low then high so the transceiver gets a clean power-on reset
+            // before we start the wakeup sequence, regardless of whatever state a
+            // previous tool/process left the line in.
+            @interface.SetDtr(false);
+            Thread.Sleep(300);
+            @interface.SetDtr(true);
+            Thread.Sleep(300);
+
+            return @interface;
         }
         catch (Exception ex) when (
             ex is FileNotFoundException or UnauthorizedAccessException or IOException)
