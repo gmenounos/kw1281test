@@ -89,6 +89,13 @@ namespace BitFab.KW1281Test
 
         private int WakeUpNoRetry(byte controllerAddress, bool evenParity)
         {
+            // Adapters such as Ross-Tech HEX and VasyaDiagnost wake the controller up in
+            // their own firmware instead of letting us bit-bang the 5-baud address.
+            if (Interface is IAssistedWakeupInterface assistedInterface)
+            {
+                return assistedInterface.AssistedWakeUp(controllerAddress, evenParity);
+            }
+
             Thread.Sleep(300);
 
             BitBang5Baud(controllerAddress, evenParity);
