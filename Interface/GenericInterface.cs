@@ -1,4 +1,6 @@
-﻿using System.IO.Ports;
+﻿using System;
+using System.IO.Ports;
+using System.Threading;
 
 namespace BitFab.KW1281Test.Interface
 {
@@ -26,6 +28,8 @@ namespace BitFab.KW1281Test.Interface
         public void Dispose()
         {
             SetDtr(false);
+            SetRts(false);
+
             _port.Close();
         }
 

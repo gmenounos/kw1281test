@@ -50,6 +50,7 @@ namespace BitFab.KW1281Test.Interface
             if (_handle != IntPtr.Zero)
             {
                 SetDtr(false);
+                SetRts(false);
 
                 var status = _ft.Close(_handle);
                 _handle = IntPtr.Zero;

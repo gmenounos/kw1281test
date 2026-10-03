@@ -1,5 +1,6 @@
 ﻿global using static BitFab.KW1281Test.Program;
 
+using BitFab.KW1281Test.EDC15;
 using BitFab.KW1281Test.Interface;
 using BitFab.KW1281Test.Logging;
 using System;
@@ -7,14 +8,14 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
+using System.IO.Ports;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
-using BitFab.KW1281Test.EDC15;
-using System.Runtime.InteropServices;
-using System.IO;
 
 [assembly: InternalsVisibleTo("BitFab.KW1281Test.Tests")]
 
@@ -92,8 +93,8 @@ class Program
         var baudRate = int.Parse(args[1]);
         int controllerAddress = int.Parse(args[2], NumberStyles.HexNumber);
         var command = args[3];
-        uint address = 0;
-        uint length = 0;
+        uint? address = null;
+        uint? length = null;
         byte value = 0;
         int softwareCoding = 0;
         int workshopCode = 0;
@@ -115,6 +116,21 @@ class Program
             }
 
             address = Utils.ParseUint(args[4]);
+        }
+        else if (string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 &&
+            (controllerAddress is (int)ControllerAddress.Airbag or (int)ControllerAddress.Cluster) &&
+            args.Length == 5)
+        {
+            // Short form for Airbag/Cluster: DumpEeprom FILENAME -> dump the entire EEPROM
+            _filename = args[4];
+        }
+        else if ((string.Compare(command, "DumpRBxMem", ignoreCase: true) == 0 ||
+            string.Compare(command, "DumpRBxMemOdd", ignoreCase: true) == 0) &&
+            (controllerAddress is (int)ControllerAddress.Cluster) &&
+            args.Length == 5)
+        {
+            // Short form for Cluster: DumpRBxMem/DumpRBxMemOdd FILENAME -> dump the entire EEPROM
+            _filename = args[4];
         }
         else if (string.Compare(command, "DumpMarelliMem", ignoreCase: true) == 0 ||
                  string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 ||
@@ -160,6 +176,20 @@ class Program
             address = Utils.ParseUint(args[4]);
             _filename = args[5];
         }
+#if false
+        else if (string.Compare(command, "ClearCrashData", ignoreCase: true) == 0)
+        {
+            // Optional argument: fill byte (default 0xFF)
+            if (args.Length >= 5)
+            {
+                value = (byte)Utils.ParseUint(args[4]);
+            }
+            else
+            {
+                value = 0xFF;
+            }
+        }
+#endif
         else if (string.Compare(command, "SetSoftwareCoding", ignoreCase: true) == 0)
         {
             if (args.Length < 6)
@@ -203,15 +233,15 @@ class Program
                 ShowUsage();
                 return;
             }
-
-            var dateString = DateTime.Now.ToString("s").Replace(':', '-');
-            _filename = $"EDC15_EEPROM_{dateString}.bin";
-            
-            if (!ParseAddressesAndValues(args.Skip(4).ToList(), out addressValuePairs))
+           
+            if (!ParseAddressesAndValues([.. args.Skip(4)], out addressValuePairs))
             {
                 ShowUsage();
                 return;
             }
+
+            var dateString = DateTime.Now.ToString("s").Replace(':', '-');
+            _filename = $"EDC15_EEPROM_{dateString}.bin";
         }
         else if (string.Compare(command, "AdaptationRead", ignoreCase: true) == 0)
         {
@@ -331,6 +361,12 @@ class Program
                 tester.ClarionVWPremium4SafeCode();
                 break;
 
+#if false
+            case "clearcrashdata":
+                tester.ClearCrashData(value);
+                break;
+#endif
+
             case "clearfaultcodes":
                 tester.ClearFaultCodes();
                 break;
@@ -355,7 +391,7 @@ class Program
                 break;
 
             case "dumpeeprom":
-                tester.DumpEeprom(address, length, _filename);
+                tester.DumpEeprom(address, length, ecuInfo, _filename);
                 break;
 
             case "dumpmarellimem":
@@ -363,15 +399,15 @@ class Program
                 return;
 
             case "dumpmem":
-                tester.DumpMem(address, length, _filename);
+                tester.DumpMem(address!.Value, length!.Value, _filename);
                 break;
 
             case "dumpram":
-                tester.DumpRam(address, length, _filename);
+                tester.DumpRam(address!.Value, length!.Value, _filename);
                 break;
 
             case "dumprom":
-                tester.DumpRom(address, length, _filename);
+                tester.DumpRom(address!.Value, length!.Value, _filename);
                 break;
 
             case "findlogins":
@@ -387,7 +423,7 @@ class Program
                 break;
 
             case "loadeeprom":
-                tester.LoadEeprom(address, _filename!);
+                tester.LoadEeprom(address!.Value, ecuInfo, _filename!);
                 break;
 
             case "mapeeprom":
@@ -395,15 +431,15 @@ class Program
                 break;
 
             case "readeeprom":
-                tester.ReadEeprom(address);
+                tester.ReadEeprom(address!.Value, ecuInfo);
                 break;
 
             case "readram":
-                tester.ReadRam(address);
+                tester.ReadRam(address!.Value);
                 break;
 
             case "readrom":
-                tester.ReadRom(address);
+                tester.ReadRom(address!.Value);
                 break;
 
             case "readfaultcodes":
@@ -431,11 +467,11 @@ class Program
                 break;
 
             case "writeeeprom":
-                tester.WriteEeprom(address, value);
+                tester.WriteEeprom(address!.Value, value, ecuInfo);
                 break;
 
             case "writeram":
-                tester.WriteRam(address, value);
+                tester.WriteRam(address!.Value, value);
                 break;
 
             default:
@@ -550,21 +586,48 @@ class Program
     /// <returns></returns>
     private static IInterface OpenPort(string portName, int baudRate)
     {
-        if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
+        try
         {
-            Log.WriteLine($"Opening FTDI serial port {portName}");
-            return new FtdiInterface(portName, baudRate);
+            IInterface @interface;
+
+            if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
+            {
+                Log.WriteLine($"Opening FTDI serial port {portName}");
+                @interface = new FtdiInterface(portName, baudRate);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) &&
+                portName.StartsWith("/dev/", StringComparison.CurrentCultureIgnoreCase))
+            {
+                Log.WriteLine($"Opening Linux serial port {portName}");
+                @interface = new LinuxInterface(portName, baudRate);
+            }
+            else
+            {
+                Log.WriteLine($"Opening Generic serial port {portName}");
+                @interface = new GenericInterface(portName, baudRate);
+            }
+
+            // Many KKL cables power/enable their K-line transceiver off the DTR line.
+            // Pulse it low then high so the transceiver gets a clean power-on reset
+            // before we start the wakeup sequence, regardless of whatever state a
+            // previous tool/process left the line in.
+            @interface.SetDtr(false);
+            Thread.Sleep(300);
+            @interface.SetDtr(true);
+            Thread.Sleep(300);
+
+            return @interface;
         }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) &&
-            portName.StartsWith("/dev/", StringComparison.CurrentCultureIgnoreCase))
+        catch (Exception ex) when (
+            ex is FileNotFoundException or UnauthorizedAccessException or IOException)
         {
-            Log.WriteLine($"Opening Linux serial port {portName}");
-            return new LinuxInterface(portName, baudRate);
-        }
-        else
-        {
-            Log.WriteLine($"Opening Generic serial port {portName}");
-            return new GenericInterface(portName, baudRate);
+            var availablePorts = SerialPort.GetPortNames();
+            Log.WriteLine($"Unable to open port {portName}: {ex.Message}");
+            Log.WriteLine(
+                availablePorts.Length > 0
+                    ? $"Available ports: {string.Join(", ", availablePorts)}"
+                    : "No serial ports were detected on this system.");
+            throw new UnableToProceedException();
         }
     }
 
@@ -604,6 +667,9 @@ COMMAND =
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. 0x800)
         FILENAME = Optional filename
+    DumpEeprom FILENAME
+        (For Airbag/Cluster address only) Dumps the whole EEPROM (size
+         auto-detected from ReadIdent).
     DumpMarelliMem START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 3072) or hex (e.g. 0xC00)
         LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. 0x400)
