@@ -319,10 +319,8 @@ public class LinuxInterface : IInterface
 
     public void Dispose()
     {
-        // Dispose of unmanaged resources.
         Dispose(true);
 
-        // Suppress finalization.
         GC.SuppressFinalize(this);
     }
 
@@ -337,7 +335,13 @@ public class LinuxInterface : IInterface
 
         if (disposing)
         {
-            // TODO: Dispose managed state (managed objects).
+            // Dispose managed state (managed objects).
+
+            if (_fd != -1)
+            {
+                SetDtr(false);
+                SetRts(false);
+            }
         }
 
         // Free unmanaged resources (unmanaged objects) and override a finalizer below.

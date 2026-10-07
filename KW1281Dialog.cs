@@ -91,8 +91,45 @@ internal class KW1281Dialog : IKW1281Dialog
     public ControllerInfo Connect()
     {
         _isConnected = true;
+
         var blocks = ReceiveBlocks();
+
+        bool moreAvailable = blocks
+            .OfType<AsciiDataBlock>()
+            .Any(b => b.MoreDataAvailable);
+
+        if (moreAvailable)
+        {
+            var newlineBlock = GetNewlineBlock();
+
+            do
+            {
+                Log.WriteLine("Sending ReadIdent block");
+
+                SendBlock([(byte)BlockTitle.ReadIdent]);
+
+                var moreBlocks = ReceiveBlocks();
+
+                moreAvailable = moreBlocks
+                    .OfType<AsciiDataBlock>()
+                    .Any(b => b.MoreDataAvailable);
+
+                blocks.AddRange(moreBlocks);
+                blocks.Add(newlineBlock);
+            } while (moreAvailable);
+        }
+
         return new ControllerInfo(blocks.Where(b => !b.IsAckNak));
+    }
+
+    private static AsciiDataBlock GetNewlineBlock()
+    {
+        var bytes = new List<byte>();
+        bytes.AddRange([0, 0, 0]);
+        bytes.AddRange(Environment.NewLine.Select(c => (byte)c));
+        bytes.Add(0x03);
+
+        return new AsciiDataBlock(bytes);
     }
 
     public List<Block> Login(ushort code, int workshopCode)
@@ -119,7 +156,7 @@ internal class KW1281Dialog : IKW1281Dialog
         {
             Log.WriteLine("Sending ReadIdent block");
 
-            SendBlock(new List<byte> { (byte)BlockTitle.ReadIdent });
+            SendBlock([(byte)BlockTitle.ReadIdent]);
 
             var blocks = ReceiveBlocks();
             var ident = new ControllerIdent(blocks.Where(b => !b.IsAckNak));

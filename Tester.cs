@@ -396,6 +396,18 @@ internal class Tester
     /// read-back of the EEPROM for verification.
     /// </summary>
     public byte[] LoadEdc15Eeprom(
+        uint? startAddress, string inputFilename,
+        Action<byte[]>? onPostWriteReadback = null)
+    {
+        if (startAddress is null)
+        {
+            throw new ArgumentNullException(nameof(startAddress));
+        }
+
+        return LoadEdc15Eeprom(startAddress.Value, inputFilename, onPostWriteReadback);
+    }
+
+    public byte[] LoadEdc15Eeprom(
         uint startAddress, string inputFilename,
         Action<byte[]>? onPostWriteReadback = null)
     {
@@ -788,6 +800,17 @@ internal class Tester
         }
     }
 
+    public void DumpEeprom(uint? address, uint? length, ControllerInfo ecuInfo, string? filename)
+    {
+        if (address is null || length is null)
+        {
+            Log.WriteLine("Address and length are required.");
+            return;
+        }
+
+        DumpEeprom(address.Value, length.Value, filename);
+    }
+
     public void DumpEeprom(uint address, uint length, string? filename)
     {
         switch (_controllerAddress)
@@ -804,6 +827,18 @@ internal class Tester
                 Log.WriteLine("Only supported for cluster, CCM, Central Locking and Central Electric");
                 break;
         }
+    }
+
+    public void DumpMarelliMem(
+        uint? address, uint? length, ControllerInfo ecuInfo, string? filename)
+    {
+        if (address is null || length is null)
+        {
+            Log.WriteLine("Address and length are required.");
+            return;
+        }
+
+        DumpMarelliMem(address.Value, length.Value, ecuInfo, filename);
     }
 
     public void DumpMarelliMem(
@@ -903,6 +938,19 @@ internal class Tester
     /// Dumps the memory of a Bosch RB4/RB8 cluster to a file.
     /// </summary>
     /// <returns>The dump file name or null if the EEPROM was not dumped.</returns>
+    public string? DumpRBxMem(
+        uint? address, uint? length, string? filename,
+        bool evenParityWakeup = true)
+    {
+        if (address is null || length is null)
+        {
+            Log.WriteLine("Address and length are required.");
+            return null;
+        }
+
+        return DumpRBxMem(address.Value, length.Value, filename, evenParityWakeup);
+    }
+
     public string? DumpRBxMem(
         uint address, uint length, string? filename,
         bool evenParityWakeup = true)
@@ -1217,6 +1265,11 @@ internal class Tester
         var succeeded = _kwp1281.GroupRead(groupNumber);
     }
 
+    public void LoadEeprom(uint address, ControllerInfo ecuInfo, string filename)
+    {
+        LoadEeprom(address, filename);
+    }
+
     public void LoadEeprom(uint address, string filename)
     {
         switch (_controllerAddress)
@@ -1251,6 +1304,11 @@ internal class Tester
                 Log.WriteLine("Only supported for cluster, CCM, Central Locking and Central Electric");
                 break;
         }
+    }
+
+    public void ReadEeprom(uint address, ControllerInfo ecuInfo)
+    {
+        ReadEeprom(address);
     }
 
     public void ReadEeprom(uint address)
@@ -1372,6 +1430,11 @@ internal class Tester
         BoschRBxCluster cluster = new(kwp2000);
         cluster.UnlockForEepromReadWrite();
         cluster.ToggleRB4Mode();
+    }
+
+    public void WriteEeprom(uint address, byte value, ControllerInfo ecuInfo)
+    {
+        WriteEeprom(address, value);
     }
 
     public void WriteEeprom(uint address, byte value)
