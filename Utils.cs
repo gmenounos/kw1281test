@@ -101,6 +101,29 @@ internal static class Utils
     }
 
     /// <summary>
+    /// Utils.ParseUint that returns false instead of throwing on a non-numeric token -- used to tell
+    /// a numeric argument (e.g. an EEPROM START address) from a filename when scanning args.
+    /// </summary>
+    public static bool TryParseUint(string s, out uint value)
+    {
+        try
+        {
+            value = Utils.ParseUint(s);
+            return true;
+        }
+        catch (FormatException)
+        {
+            value = 0;
+            return false;
+        }
+        catch (OverflowException)
+        {
+            value = 0;
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Little-Endian
     /// </summary>
     public static ushort GetShort(ReadOnlySpan<byte> buf, int offset)

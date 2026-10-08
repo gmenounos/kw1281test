@@ -256,7 +256,7 @@ class Program
             _filename = null;
             foreach (var a in args.Skip(4))
             {
-                if (TryParseUint(a, out var start))
+                if (Utils.TryParseUint(a, out var start))
                 {
                     address = start;
                 }
@@ -270,6 +270,7 @@ class Program
                 ShowUsage();
                 return;
             }
+            address ??= 0;
         }
         else if (string.Compare(command, "AdaptationRead", ignoreCase: true) == 0)
         {
@@ -337,6 +338,20 @@ class Program
                 AutoScan(@interface);
                 return;
 
+            case "dumpedc15flash":
+                // Self-connecting (Edc15FlashVM does its own wakeup + loader upload), so it runs
+                // here, before the KW1281 wakeup below.
+                tester.DumpEdc15Flash(
+                    Edc15FlashVM.Variant.V, ParseFlashFilename(args),
+                    flashSpeed: ParseFlashSpeed(args));
+                return;
+
+            case "dumpedc15flashboot":
+                // Boot mode: a lower-level 28800-baud path that requires the ECU to be physically
+                // placed into boot mode before power-up. Edc15BootModeVM does its own handshake.
+                tester.DumpEdc15FlashBoot(args.Length > 4 ? args[4] : null);
+                return;
+
             case "dumprbxmem":
                 tester.DumpRBxMem(address, length, _filename);
                 tester.EndCommunication();
@@ -352,44 +367,25 @@ class Program
                 tester.EndCommunication();
                 return;
 
-            case "togglerb4mode":
-                tester.ToggleRB4Mode();
-                tester.EndCommunication();
-                return;
-
-            case "dumpedc15flash":
-                // Self-connecting (Edc15FlashVM does its own wakeup + loader upload), so it runs
-                // here, before the KW1281 wakeup below.
-                tester.DumpEdc15Flash(
-                    Edc15FlashVM.Variant.V, ParseFlashFilename(args),
-                    flashSpeed: ParseFlashSpeed(args));
-                return;
-
             case "loadedc15flash":
-            {
-                // Args in any order (same convention as DumpEdc15Flash): the filename is the token
-                // that isn't a SPEED/full/noverify keyword; the rest are optional modifiers.
-                var lfFile = ParseFlashFilename(args);
-                if (lfFile == null)
                 {
-                    ShowUsage();
+                    // Args in any order (same convention as DumpEdc15Flash): the filename is the token
+                    // that isn't a SPEED/full/noverify keyword; the rest are optional modifiers.
+                    var lfFile = ParseFlashFilename(args);
+                    if (lfFile == null)
+                    {
+                        ShowUsage();
+                        return;
+                    }
+
+                    var lfArgs = args.Skip(4).Select(a => a.ToLowerInvariant()).ToList();
+                    tester.LoadEdc15Flash(
+                        Edc15FlashVM.Variant.V, lfFile,
+                        forceFullWrite: lfArgs.Contains("full"),
+                        flashSpeed: ParseFlashSpeed(args),
+                        verify: !(lfArgs.Contains("noverify") || lfArgs.Contains("unverified")));
                     return;
                 }
-
-                var lfArgs = args.Skip(4).Select(a => a.ToLowerInvariant()).ToList();
-                tester.LoadEdc15Flash(
-                    Edc15FlashVM.Variant.V, lfFile,
-                    forceFullWrite: lfArgs.Contains("full"),
-                    flashSpeed: ParseFlashSpeed(args),
-                    verify: !(lfArgs.Contains("noverify") || lfArgs.Contains("unverified")));
-                return;
-            }
-
-            case "dumpedc15flashboot":
-                // Boot mode: a lower-level 28800-baud path that requires the ECU to be physically
-                // placed into boot mode before power-up. Edc15BootModeVM does its own handshake.
-                tester.DumpEdc15FlashBoot(args.Length > 4 ? args[4] : null);
-                return;
 
             case "loadedc15flashboot":
                 if (args.Length < 5)
@@ -398,6 +394,11 @@ class Program
                     return;
                 }
                 tester.LoadEdc15FlashBoot(args[4]);
+                return;
+
+            case "togglerb4mode":
+                tester.ToggleRB4Mode();
+                tester.EndCommunication();
                 return;
 
             default:
@@ -493,22 +494,22 @@ class Program
                 tester.GroupRead(groupNumber);
                 break;
 
-            case "loadeeprom":
-                tester.LoadEeprom(address!.Value, ecuInfo, _filename!);
-                break;
-
             case "loadedc15eeprom":
             {
                 // No pre-write dump: ask the loader for a post-write, pre-reboot read-back and show
                 // that (what's actually on the ECU now).
                 byte[]? postWrite = null;
                 tester.LoadEdc15Eeprom(
-                    address, _filename!, onPostWriteReadback: img => postWrite = img);
+                    (uint)address!, _filename!, onPostWriteReadback: img => postWrite = img);
                 if (postWrite is { Length: 512 })
                 {
                     Edc15VM.DisplayEepromInfo(postWrite);
                 }
             }
+                break;
+
+            case "loadeeprom":
+                tester.LoadEeprom(address!.Value, ecuInfo, _filename!);
                 break;
 
             case "mapeeprom":
@@ -625,29 +626,6 @@ class Program
                 return EDC15.Edc15FlashVM.FlashSpeed.High;
         }
         return EDC15.Edc15FlashVM.FlashSpeed.Medium;
-    }
-
-    /// <summary>
-    /// Utils.ParseUint that returns false instead of throwing on a non-numeric token -- used to tell
-    /// a numeric argument (e.g. an EEPROM START address) from a filename when scanning args.
-    /// </summary>
-    private static bool TryParseUint(string s, out uint value)
-    {
-        try
-        {
-            value = Utils.ParseUint(s);
-            return true;
-        }
-        catch (FormatException)
-        {
-            value = 0;
-            return false;
-        }
-        catch (OverflowException)
-        {
-            value = 0;
-            return false;
-        }
     }
 
     /// <summary>
@@ -817,6 +795,12 @@ COMMAND =
     DelcoVWPremium5SafeCode
     DumpEdc15Eeprom [FILENAME]
         FILENAME = Optional filename
+    DumpEdc15Flash [SPEED] [FILENAME]
+        SPEED = Low | Medium | High (default Medium)
+        FILENAME = Optional output filename
+    DumpEdc15FlashBoot [FILENAME]
+        FILENAME = Optional output filename
+        (Boot mode: ECU must be physically in boot mode before power-up; fixed 28800 baud)
     DumpEeprom START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         LENGTH = Number of bytes in decimal (e.g. 2048) or hex (e.g. 0x800)
@@ -850,25 +834,19 @@ COMMAND =
     GroupRead GROUP
         GROUP = Group number (0-255)
         (Group 0: Raw controller data)
-    DumpEdc15Flash [SPEED] [FILENAME]
-        SPEED = Low | Medium | High (default Medium)
-        FILENAME = Optional output filename
+    LoadEdc15Eeprom [START] FILENAME
+        (arguments may be given in any order)
+        START = Optional EEPROM start address in decimal (0-511) or hex (0x00-0x1FF); default 0
+        FILENAME = Name of file containing binary data to write into the EDC15 EEPROM
     LoadEdc15Flash [SPEED] [full] [noverify] FILENAME
         (arguments may be given in any order)
         FILENAME = Binary flash image to write
         SPEED = Low | Medium | High (default Medium)
         full = Write every sector (default: skip sectors whose checksum already matches)
         noverify = Skip the post-write per-sector checksum verify
-    DumpEdc15FlashBoot [FILENAME]
-        FILENAME = Optional output filename
-        (Boot mode: ECU must be physically in boot mode before power-up; fixed 28800 baud)
     LoadEdc15FlashBoot FILENAME
         FILENAME = Binary flash image to write
         (Boot mode: ECU must be physically in boot mode before power-up; fixed 28800 baud)
-    LoadEdc15Eeprom [START] FILENAME
-        (arguments may be given in any order)
-        START = Optional EEPROM start address in decimal (0-511) or hex (0x00-0x1FF); default 0
-        FILENAME = Name of file containing binary data to write into the EDC15 EEPROM
     LoadEeprom START FILENAME
         START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
         FILENAME = Name of file containing binary data to load into EEPROM
