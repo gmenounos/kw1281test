@@ -165,3 +165,4 @@ COMMAND =
     - [Dragonslab53](https://github.com/Dragonslab53)
     - [DiagProf](https://github.com/DiagProf)
     - [magna413](https://github.com/magna413)
+    - [bbear3d](https://github.com/bbear3d)
