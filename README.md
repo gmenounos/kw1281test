@@ -2,8 +2,7 @@
 VW KW1281 Protocol Test Tool
 
 This tool can send some KW1281 (and a few KW2000) commands over a dumb serial->KKL or USB->KKL cable.
-If you have a legacy Ross-Tech USB cable, you can probably use that cable by
-installing the Virtual COM Port drivers: https://www.ross-tech.com/vag-com/usb/virtual-com-port.php
+Ross-Tech HEX-USB and VasyaDiagnost/Car2diag cables are supported too; see "Diagnostic adapters" below.
 Functionality includes reading/writing the EEPROMs of VW MKIV Golf/Jetta/Beetle/Passat instrument clusters and Comfort Control Modules, reading and clearing fault codes, changing the software coding of modules, performing an actuator test of various modules and retrieving the SAFE code of the Delco Premium V radio.
 
 The tool is written in C#, targetting .NET 10.0 and runs under Windows 10/11 (most serial ports), macOS and Linux (macOS/Linux need an FTDI serial port and D2xx drivers). It may also run under
@@ -35,6 +34,9 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
 PORT = COM1|COM2|etc. (Windows)
     /dev/ttyXXXX (Linux)
     AABBCCDD (macOS/Linux FTDI cable serial number)
+    vasya:AABBCCDD (VasyaDiagnost/Car2diag cable serial number, Windows/macOS)
+    hex:AABBCCDD (Ross-Tech HEX-USB cable serial number, Windows/macOS)
+    hex:COM1 (Ross-Tech HEX-USB cable on the Virtual COM Port driver)
 BAUD = 10400|9600|etc.
 ADDRESS = Controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
 COMMAND =
@@ -149,6 +151,41 @@ COMMAND =
         ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
         VALUE = Value in decimal (e.g. 138) or hex (e.g. 0x8A)
 ```
+
+##### Diagnostic adapters
+
+Ross-Tech HEX-USB and VasyaDiagnost/Car2diag cables are not dumb KKL cables: their firmware
+performs the slow 5-baud controller wake-up itself when asked, and then passes the KW1281 bytes
+through. kw1281test talks to them in that mode, so give the cable as the PORT and the K-line
+speed (10400, 9600, ...) as the BAUD, just like with any other cable:
+
+```
+KW1281Test vasya:A5028BIA 10400 17 ReadIdent
+KW1281Test hex:RT000001 10400 17 ReadIdent
+KW1281Test hex:COM3 10400 17 ReadIdent
+```
+
+The serial number is the cable's 8-character USB serial number. In Device Manager it is part of
+the "Device instance path" on the device's Details tab: `USB\VID_0403&PID_FA24\RT000001` for a
+HEX-USB on Ross-Tech's driver or WinUSB, `FTDIBUS\VID_0403+PID_FA3F+A5028BIAA\0000` for a
+VasyaDiagnost on the FTDI driver (the serial number there is followed by the channel letter `A`).
+
+- **VasyaDiagnost/Car2diag** (USB 0403:FA3F) uses the FTDI D2XX driver that comes with the
+  cable on Windows, and the FTDI D2XX library on macOS.
+- **Ross-Tech HEX-USB** (USB 0403:FA24) on Windows works with whichever driver the cable already has:
+    - Ross-Tech's own driver: it is FTDI's D2XX driver built for Ross-Tech, so FTDI's own D2XX
+      library works with it - put `ftd2xx64.dll` (from FTDI's D2XX driver package, `amd64`
+      folder) next to kw1281test, or install FTDI's D2XX driver. Without it kw1281test falls back
+      to Ross-Tech's RT-USB library: the 32-bit one ships with the driver package, the 64-bit
+      one (RTUS64.dll) with VCDS. `KW1281_FTDI_DLL` can point at any of these.
+    - WinUSB (e.g. installed with [Zadig](https://zadig.akeo.ie/)): kw1281test drives the
+      cable's FTDI chip directly; no Ross-Tech library is needed.
+    - Ross-Tech's Virtual COM Port driver
+      (https://www.ross-tech.com/vag-com/usb/virtual-com-port.php): use `hex:COMx` as the PORT.
+
+  On macOS the cable is opened through the FTDI D2XX library.
+
+Adapter-assisted wake-up does not support KWP2000 even parity yet.
 
 ##### Credits
 - Protocol Info: https://www.blafusel.de/obd/obd2_kw1281.html  

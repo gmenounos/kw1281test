@@ -5,19 +5,35 @@ using System.Runtime.InteropServices;
 
 namespace BitFab.KW1281Test.Interface
 {
-    internal class FtdiInterface : IInterface 
+    internal class FtdiInterface : IFtdiPort 
     {
         private readonly FT _ft;
         private IntPtr _handle = IntPtr.Zero;
         private readonly byte[] _buf = new byte[1];
 
-        public FtdiInterface(string serialNumber, int baudRate)
+        /// <param name="vendorProfile">
+        /// The cable is a diagnostic adapter with a vendor product id (VasyaDiagnost, Ross-Tech):
+        /// reset and purge it on open, as the vendor software does.
+        /// </param>
+        /// <param name="preferredLibrary">See <see cref="FT(string?, uint?)"/>.</param>
+        /// <param name="customProductId">See <see cref="FT(string?, uint?)"/>.</param>
+        public FtdiInterface(string serialNumber, int baudRate, bool vendorProfile = false,
+            string? preferredLibrary = null, uint? customProductId = null)
         {
-            _ft = new FT();
+            _ft = new FT(preferredLibrary, vendorProfile ? customProductId : null);
 
             var status = _ft.Open(
                 serialNumber, FT.OpenExFlags.BySerialNumber, out _handle);
             FT.AssertOk(status);
+
+            if (vendorProfile)
+            {
+                status = _ft.ResetDevice(_handle);
+                FT.AssertOk(status);
+
+                status = _ft.Purge(_handle, FT.PurgeMask.RX | FT.PurgeMask.TX);
+                FT.AssertOk(status);
+            }
 
             status = _ft.SetBaudRate(_handle, (uint)baudRate);
             FT.AssertOk(status);
@@ -105,6 +121,18 @@ namespace BitFab.KW1281Test.Interface
         public void ClearReceiveBuffer()
         {
             var status = _ft.Purge(_handle, FT.PurgeMask.RX);
+            FT.AssertOk(status);
+        }
+
+        public void PurgeBuffers()
+        {
+            var status = _ft.Purge(_handle, FT.PurgeMask.RX | FT.PurgeMask.TX);
+            FT.AssertOk(status);
+        }
+
+        public void SetLatencyTimer(byte milliseconds)
+        {
+            var status = _ft.SetLatencyTimer(_handle, milliseconds);
             FT.AssertOk(status);
         }
 
@@ -205,6 +233,7 @@ namespace BitFab.KW1281Test.Interface
         private readonly FTDll.SetVidPid _setVidPid;
         private readonly FTDll.OpenBySerialNumber _openBySerialNumber;
         private readonly FTDll.Close _close;
+        private readonly FTDll.ResetDevice _resetDevice;
         private readonly FTDll.SetBaudRate _setBaudRate;
         private readonly FTDll.SetDataCharacteristics _setDataCharacteristics;
         private readonly FTDll.SetFlowControl _setFlowControl;
@@ -221,7 +250,16 @@ namespace BitFab.KW1281Test.Interface
         private readonly FTDll.Write _write;
 #pragma warning restore CS0649
 
-        public FT()
+        /// <param name="preferredLibrary">
+        /// A D2XX library to load instead of FTDI's own, e.g. Ross-Tech's RT-USB.dll when FTDI's
+        /// library is not installed. KW1281_FTDI_DLL overrides it.
+        /// </param>
+        /// <param name="customProductId">
+        /// USB PID of a diagnostic adapter (FA3F for VasyaDiagnost, FA24 for Ross-Tech). On
+        /// macOS/Linux the stock library only knows FTDI's own PIDs and is told about this one
+        /// with FT_SetVIDPID; on Windows the driver takes care of it.
+        /// </param>
+        public FT(string? preferredLibrary = null, uint? customProductId = null)
         {
             string libName;
             bool isMacOs = false;
@@ -246,11 +284,35 @@ namespace BitFab.KW1281Test.Interface
                 throw new InvalidOperationException($"Unknown OS: {RuntimeInformation.OSDescription}");
             }
 
+            var configuredLibrary = Environment.GetEnvironmentVariable("KW1281_FTDI_DLL");
+            if (string.IsNullOrWhiteSpace(configuredLibrary))
+            {
+                configuredLibrary = preferredLibrary;
+            }
+            if (!string.IsNullOrWhiteSpace(configuredLibrary))
+            {
+                libName = configuredLibrary;
+                Log.WriteLine($"Loading FTDI D2XX library: {libName}");
+            }
+            else if (isMacOs && customProductId.HasValue)
+            {
+                // Prefer a libftd2xx.dylib shipped next to the executable, if there is one.
+                var executableDirectory = System.IO.Path.GetDirectoryName(Environment.ProcessPath)
+                    ?? AppContext.BaseDirectory;
+                var sidecarLibrary = System.IO.Path.Combine(executableDirectory, libName);
+                if (System.IO.File.Exists(sidecarLibrary))
+                {
+                    libName = sidecarLibrary;
+                    Log.WriteLine($"Loading adjacent FTDI D2XX library: {libName}");
+                }
+            }
+
             _d2xx = NativeLibrary.Load(
                 libName, typeof(FT).Assembly, DllImportSearchPath.SafeDirectories);
 
             InitDelegate(nameof(_openBySerialNumber), out _openBySerialNumber);
             InitDelegate(nameof(_close), out _close);
+            InitDelegate(nameof(_resetDevice), out _resetDevice);
             InitDelegate(nameof(_setBaudRate), out _setBaudRate);
             InitDelegate(nameof(_setDataCharacteristics), out _setDataCharacteristics);
             InitDelegate(nameof(_setFlowControl), out _setFlowControl);
@@ -278,12 +340,23 @@ namespace BitFab.KW1281Test.Interface
             {
                 var vidStr = Environment.GetEnvironmentVariable("FTDI_VID");
                 var pidStr = Environment.GetEnvironmentVariable("FTDI_PID");
+                uint? vid = null;
+                uint? pid = null;
                 if (!string.IsNullOrEmpty(vidStr) && !string.IsNullOrEmpty(pidStr))
                 {
-                    var vid = Utils.ParseUint(vidStr);
-                    var pid = Utils.ParseUint(pidStr);
-                    Log.WriteLine($"Setting FTDI VID=0x{vid:X4}, PID=0x{pid:X4}");
-                    var status = SetVidPid(vid, pid);
+                    vid = Utils.ParseUint(vidStr);
+                    pid = Utils.ParseUint(pidStr);
+                }
+                else if (customProductId.HasValue)
+                {
+                    vid = 0x0403;
+                    pid = customProductId;
+                }
+
+                if (vid.HasValue && pid.HasValue)
+                {
+                    Log.WriteLine($"Setting FTDI VID=0x{vid.Value:X4}, PID=0x{pid.Value:X4}");
+                    var status = SetVidPid(vid.Value, pid.Value);
                     AssertOk(status);
                 }
             }
@@ -339,6 +412,12 @@ namespace BitFab.KW1281Test.Interface
             IntPtr handle)
         {
             return _close(handle);
+        }
+
+        public Status ResetDevice(
+            IntPtr handle)
+        {
+            return _resetDevice(handle);
         }
 
         public Status SetBaudRate(
@@ -536,6 +615,10 @@ namespace BitFab.KW1281Test.Interface
 
         [SymbolName("FT_Close")]
         public delegate FT.Status Close(
+            IntPtr handle);
+
+        [SymbolName("FT_ResetDevice")]
+        public delegate FT.Status ResetDevice(
             IntPtr handle);
 
         [SymbolName("FT_SetBaudRate")]

@@ -786,13 +786,47 @@ class Program
     /// </param>
     /// <param name="baudRate"></param>
     /// <returns></returns>
-    private static IInterface OpenPort(string portName, int baudRate)
+    internal static IInterface OpenPort(string portName, int baudRate)
     {
         try
         {
             IInterface @interface;
 
-            if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
+            if (portName.StartsWith("vasya:", StringComparison.OrdinalIgnoreCase))
+            {
+                var serialNumber = portName["vasya:".Length..].Trim();
+                if (!Regex.IsMatch(serialNumber.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
+                {
+                    throw new ArgumentException(
+                        "VasyaDiagnost port must be vasya: followed by the 8-character cable serial number.");
+                }
+
+                Log.WriteLine($"Opening VasyaDiagnost FTDI interface {serialNumber}");
+                @interface = new VasyaInterface(serialNumber, baudRate);
+            }
+            else if (portName.StartsWith("hex:", StringComparison.OrdinalIgnoreCase))
+            {
+                var target = portName["hex:".Length..].Trim();
+
+                // A cable installed with Ross-Tech's Virtual COM Port driver is a COM port.
+                if (Regex.IsMatch(target.ToUpper(), @"\ACOM[0-9]+\Z") ||
+                    target.StartsWith("/dev/", StringComparison.OrdinalIgnoreCase))
+                {
+                    Log.WriteLine($"Opening Ross-Tech HEX interface on serial port {target}");
+                    @interface = new RossTechSerialInterface(target, baudRate);
+                }
+                else if (Regex.IsMatch(target.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
+                {
+                    Log.WriteLine($"Opening Ross-Tech HEX FTDI interface {target}");
+                    @interface = new RossTechInterface(target, baudRate);
+                }
+                else
+                {
+                    throw new ArgumentException(
+                        "Ross-Tech port must be hex: followed by the 8-character cable serial number or a COM port.");
+                }
+            }
+            else if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
             {
                 Log.WriteLine($"Opening FTDI serial port {portName}");
                 @interface = new FtdiInterface(portName, baudRate);
@@ -841,6 +875,9 @@ Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]
 PORT = COM1|COM2|etc. (Windows)
     /dev/ttyXXXX (Linux)
     AABBCCDD (macOS/Linux FTDI cable serial number)
+    vasya:AABBCCDD (VasyaDiagnost/Car2diag cable serial number, Windows/macOS)
+    hex:AABBCCDD (Ross-Tech HEX-USB cable serial number, Windows/macOS)
+    hex:COM1 (Ross-Tech HEX-USB cable on the Virtual COM Port driver)
 BAUD = 10400|9600|etc.
 ADDRESS = Controller address, e.g. 1 (ECU), 17 (cluster), 46 (CCM), 56 (radio)
 COMMAND =
