@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace BitFab.KW1281Test;
@@ -311,5 +312,16 @@ internal static class Utils
     public static string FirstIdentLine(ControllerInfo ecuInfo)
     {
         return ecuInfo.Text.Split(Environment.NewLine).First();
+    }
+
+    public static int? FindLastIndexOf(List<byte> source, ReadOnlySpan<byte> value)
+    {
+        if (value.Length == 0)
+        {
+            return null;
+        }
+
+        var ix = CollectionsMarshal.AsSpan(source).LastIndexOf(value);
+        return ix < 0 ? null : ix;
     }
 }

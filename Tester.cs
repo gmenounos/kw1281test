@@ -1511,12 +1511,12 @@ internal partial class Tester
         }
         else
         {
-            var (isUnlocked, softwareVersion) = vdoCluster.Unlock();
+            var (isUnlocked, _) = vdoCluster.Unlock();
             if (!isUnlocked)
             {
                 Log.WriteLine("Unknown cluster software version. Memory access will likely fail.");
             }
-            vdoCluster.SeedKeyAuthenticate(softwareVersion);
+            vdoCluster.SeedKeyAuthenticate();
         }
 
         vdoCluster.WriteRam(address, value);
@@ -1618,30 +1618,8 @@ internal partial class Tester
                 break;
 
             case ControllerAddress.Cluster:
-                // TODO:UnlockCluster() is only needed for EEPROM read, not memory read
                 var vdoCluster = new VdoCluster(_kwp1281);
-                var (isUnlocked, softwareVersion) = vdoCluster.Unlock();
-                if (!isUnlocked)
-                {
-                    Log.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
-                }
-
-                if (!vdoCluster.RequiresSeedKey())
-                {
-                    Log.WriteLine(
-                        "Cluster is unlocked for ROM/EEPROM access. Skipping Seed/Key login.");
-                    return;
-                }
-
-                vdoCluster.SeedKeyAuthenticate(softwareVersion);
-                if (vdoCluster.RequiresSeedKey())
-                {
-                    Log.WriteLine("Failed to unlock cluster.");
-                }
-                else
-                {
-                    Log.WriteLine("Cluster is unlocked for ROM/EEPROM access.");
-                }
+                vdoCluster.UnlockForEepromReadWrite();
                 break;
         }
     }
@@ -1698,12 +1676,12 @@ internal partial class Tester
         }
         else
         {
-            var (isUnlocked, softwareVersion) = vdoCluster.Unlock();
+            var (isUnlocked, _) = vdoCluster.Unlock();
             if (!isUnlocked)
             {
                 Log.WriteLine("Unknown cluster software version. Memory access will likely fail.");
             }
-            vdoCluster.SeedKeyAuthenticate(softwareVersion);
+            vdoCluster.SeedKeyAuthenticate();
         }
 
         var dumpFileName = filename ?? $"cluster_mem_0x{startAddress:X6}.bin";

