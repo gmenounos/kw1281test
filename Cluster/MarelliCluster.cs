@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace BitFab.KW1281Test.Cluster
 {
-    class MarelliCluster : ICluster
+    partial class MarelliCluster : ICluster
     {
         public void UnlockForEepromReadWrite()
         {
@@ -16,22 +17,52 @@ namespace BitFab.KW1281Test.Cluster
         public string DumpEeprom(uint? address, uint? length, string? dumpFileName)
         {
             address ??= GetDefaultAddress();
-            dumpFileName ??= $"marelli_mem_${address:X4}.bin";
+            if (length is null)
+            {
+                if (address == 0x0C00)
+                {
+                    length = 1024;
+                }
+                else
+                {
+                    length = 2048;
+                }
+            }
 
-            _ = DumpMem(dumpFileName, (ushort)address, (ushort?)length);
+            dumpFileName ??= $"marelli_mem_0x{address:X4}.bin";
+
+            var bytes = DumpMem(dumpFileName, (ushort)address, (ushort)length);
+            if (bytes.Length == 0)
+            {
+                File.Delete(dumpFileName);
+            }
 
             return dumpFileName;
         }
+
+        private static readonly Regex VinRegex = VINRegex();
 
         private ushort GetDefaultAddress()
         {
             if (HasSmallEeprom())
             {
-                return 3072; // $0C00
+                Log.WriteLine("Known cluster. Appears to have the small EEPROM.");
+                return 0x0C00; // 3072
             }
             else if (HasLargeEeprom())
             {
-                return 14336; // $3800
+                Log.WriteLine("Known cluster. Appears to have the large EEPROM.");
+                return 0x3800; // 14336
+            }
+            else if (VinRegex.IsMatch(_ecuInfo))
+            {
+                Log.WriteLine("Unknown cluster. Appears to have the large EEPROM.");
+                return 0x3800; // 14336
+            }
+            else if (_ecuInfo.Contains("Ident.-Nr. Wegfahrs.:"))
+            {
+                Log.WriteLine("Unknown cluster. Appears to have the small EEPROM.");
+                return 0x0C00; // 3072
             }
             else
             {
@@ -55,28 +86,26 @@ namespace BitFab.KW1281Test.Cluster
         private byte[] DumpMem(
             string filename,
             ushort address,
-            ushort? count = null)
+            ushort count)
         {
             byte entryH; // High byte of code entry point
             byte regBlockH; // High byte of register block
 
-            if (_ecuInfo.Contains("M73 D0"))    // Audi TT
+            if (address == 0x3800 && IsFirstGenAudiTT())
             {
+                Log.WriteLine("Cluster appears to be first gen Audi TT with large EEPROM.");
                 entryH = 0x00; // $0000
-                regBlockH = (byte)((address == 0x3800) ? 0x20 : 0x08);
-                count ??= (ushort)((address == 0x3800) ? 0x800 : 0x400);
+                regBlockH = 0x20;
             }
             else if (HasSmallEeprom())
             {
                 entryH = 0x02; // $0200
                 regBlockH = 0x08; // $0800
-                count ??= 1024; // $0400
             }
             else if (HasLargeEeprom())
             {
                 entryH = 0x18; // $1800
                 regBlockH = 0x20; // $2000
-                count ??= 2048; // $0800
             }
             else if (address == 3072 && count == 1024)
             {
@@ -174,7 +203,7 @@ namespace BitFab.KW1281Test.Cluster
             };
             if (!WriteMarelliBlockAndReadAck(program))
             {
-                return Array.Empty<byte>();
+                return [];
             }
 
             Log.WriteLine("Receiving memory dump");
@@ -187,14 +216,19 @@ namespace BitFab.KW1281Test.Cluster
                 mem.Add(b);
             }
 
-            File.WriteAllBytes(filename, mem.ToArray());
+            File.WriteAllBytes(filename, [.. mem]);
             Log.WriteLine($"Saved memory dump to {filename}");
 
             Log.WriteLine("Done");
 
             _kwp1281.SetDisconnected(); // Don't try to send EndCommunication block
 
-            return mem.ToArray();
+            return [.. mem];
+        }
+
+        private bool IsFirstGenAudiTT()
+        {
+            return _ecuInfo.StartsWith("8N");
         }
 
         private bool WriteMarelliBlockAndReadAck(byte[] data)
@@ -242,6 +276,7 @@ namespace BitFab.KW1281Test.Cluster
             "1C0920901",    // Beetle 1C0920901C M73 V07
             "1C0920905",    // Beetle 1C0920905F M73 V03
             "1C0920906",    // Beetle 1C0920906A M73 V03
+            "8N1919860C  KOMBI+WEGFAHRS. M73 D22",  // Audi TT 8N
             "8N1919880E KOMBI+WEGFAHRS. M73 D23",   // Audi TT
             "8N1920930B KOMBI+WEGFAHRS. M73 D23",   // Audi TT
         ];
@@ -263,6 +298,7 @@ namespace BitFab.KW1281Test.Cluster
             "8N1919880E KOMBI+WEGFAHRS. M73 D26",   // Audi TT
             "8N1920880D  KOMBI+WEGFAHRS. M73 D10",  // Audi TT
             "8N1920880H  KOMBI+WEGFAHRS. M73 D56",  // Audi TT
+            "8N1920930E  KOMBI+WEGFAHRS. M73 D10",  // Audi TT
             "8N1920930J KOMBI+WEGFAHRS. M73 D56",   // Audi TT
             "8N1920980",    // Audi TT 8N1920980E M73 D14
             "8N2919910A",   // KOMBI+WEGFAHRS. M73 D29, Audi TT
@@ -300,7 +336,7 @@ namespace BitFab.KW1281Test.Cluster
         /// </summary>
         private static int? FindImmobilizerId(IReadOnlyList<byte> buf)
         {
-            for (var i = 0; i < buf.Count - 14; i++)
+            for (var i = 0; i <= buf.Count - 14; i++)
             {
                 if (!(buf[i] == 'V' && buf[i + 1] == 'W') &&
                     !(buf[i] == 'A' && buf[i + 1] == 'U'))
@@ -336,19 +372,41 @@ namespace BitFab.KW1281Test.Cluster
         }
 
         /// <summary>
-        /// Search the buffer for the 3 byte sequence 00,01,0F or 00,02,0F or 00,03,0F or 00,04,0F
+        /// Search the buffer for the 3 byte sequence
+        /// 00,01,0F or 00,02,0F or 00,03,0F or 00,04,0F (preferred)
+        /// or 00,00,0F.
         /// (2nd digit is probably the number of keys)
         /// </summary>
         private static int? FindKeyCount(IReadOnlyList<byte> buf)
         {
-            for (var i = 0; i < buf.Count - 3; i++)
+            for (var i = 0; i <= buf.Count - 3; i++)
             {
                 if (buf[i] != 0)
                 {
                     continue;
                 }
 
-                if (buf[i + 1] != 1 && buf[i + 1] != 2 && buf[i + 1] != 3 && buf[i + 1] != 4)
+                if (buf[i + 1] is < 1 or > 4)
+                {
+                    continue;
+                }
+
+                if (buf[i + 2] != 0x0F)
+                {
+                    continue;
+                }
+
+                return i;
+            }
+
+            for (var i = 0; i <= buf.Count - 3; i++)
+            {
+                if (buf[i] != 0)
+                {
+                    continue;
+                }
+
+                if (buf[i + 1] != 0)
                 {
                     continue;
                 }
@@ -372,5 +430,10 @@ namespace BitFab.KW1281Test.Cluster
             _kwp1281 = kwp1281;
             _ecuInfo = ecuInfo;
         }
+
+        [GeneratedRegex(
+            @"\b[A-HJ-NPR-Z0-9]{17}\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+        private static partial Regex VINRegex();
     }
 }

@@ -812,7 +812,7 @@ internal partial class Tester
         }
 
         ICluster cluster = new MarelliCluster(_kwp1281, ecuInfo.Text);
-        cluster.DumpEeprom(address, length, filename);
+        _ = cluster.DumpEeprom(address, length, filename);
     }
 
     public void DumpMem(uint address, uint length, string? filename)
@@ -930,8 +930,13 @@ internal partial class Tester
 
                 string dumpFileName = cluster.DumpEeprom(
                     address: null, length: null, dumpFileName: null);
-                byte[] buf = File.ReadAllBytes(dumpFileName);
-                ushort? skc = MarelliCluster.GetSkc(buf);
+                ushort? skc = null;
+                if (File.Exists(dumpFileName))
+                {
+                    byte[] buf = File.ReadAllBytes(dumpFileName);
+                    skc = MarelliCluster.GetSkc(buf);
+                }
+
                 if (skc.HasValue)
                 {
                     Log.WriteLine($"SKC: {skc:D5}");
