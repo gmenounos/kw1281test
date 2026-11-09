@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime;
 using System.Threading;
 
 namespace BitFab.KW1281Test

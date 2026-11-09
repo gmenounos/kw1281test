@@ -64,7 +64,13 @@ public interface IInterface : IDisposable
 
     void SetRts(bool on);
 
+    /// <summary>
+    /// Read timeout in milliseconds.
+    /// </summary>
     int ReadTimeout { get; set; }
 
+    /// <summary>
+    /// Write timeout in milliseconds.
+    /// </summary>
     int WriteTimeout { get; set; }
 }

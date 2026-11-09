@@ -1,6 +1,4 @@
-﻿using System;
-using System.IO.Ports;
-using System.Threading;
+﻿using System.IO.Ports;
 
 namespace BitFab.KW1281Test.Interface
 {

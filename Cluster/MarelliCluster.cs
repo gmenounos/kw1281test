@@ -132,17 +132,36 @@ namespace BitFab.KW1281Test.Cluster
             Log.WriteLine("Sending block 0x6C");
             _kwp1281.SendBlock([0x6C]);
 
-            Thread.Sleep(250);
+            Thread.Sleep(200);
+            _kwp1281.KwpCommon.Interface.ClearReceiveBuffer();   // optional, defensive
 
-            Log.WriteLine("Writing data to cluster microcontroller");
-            var data = new byte[]
+            var oldReadTimeout = _kwp1281.KwpCommon.Interface.ReadTimeout;
+            _kwp1281.KwpCommon.Interface.ReadTimeout = 500;
+            try
             {
-                0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x50, 0x34,
-                entryH, 0x00, // Entry point $xx00
-            };
-            if (!WriteMarelliBlockAndReadAck(data))
+                // Note that the loader header block should not contain any 0x0A bytes or the first
+                // one will be interpreted as the beginning of an unlock frame by certain clusters.
+                bool succeeded = WriteLoaderHeaderBlock(entryH);
+                if (!succeeded)
+                {
+                    return [];
+                }
+            }
+            catch (TimeoutException)
             {
-                return [];
+                Log.WriteLine("Timed out. Cluster may need an unlock frame.");
+                SendUnlockFrame();
+
+                // Now try sending the header block again
+                bool succeeded = WriteLoaderHeaderBlock(entryH);
+                if (!succeeded)
+                {
+                    return [];
+                }
+            }
+            finally
+            {
+                _kwp1281.KwpCommon.Interface.ReadTimeout = oldReadTimeout;
             }
 
             // Now we write a small memory dump program to the 68HC12 processor
@@ -197,8 +216,8 @@ namespace BitFab.KW1281Test.Cluster
 
                 // FeedWatchdog:
                 0xCC, 0x55, 0xAA,               // ldd #$55AA
-                0x7B, regBlockH, 0x17,          // stab COPRST
                 0x7A, regBlockH, 0x17,          // staa COPRST
+                0x7B, regBlockH, 0x17,          // stab COPRST
                 0x3D,                           // rts
             };
             if (!WriteMarelliBlockAndReadAck(program))
@@ -224,6 +243,64 @@ namespace BitFab.KW1281Test.Cluster
             _kwp1281.SetDisconnected(); // Don't try to send EndCommunication block
 
             return [.. mem];
+        }
+
+        private void SendUnlockFrame()
+        {
+            Log.WriteLine("Switching to 10400 baud.");
+            _kwp1281.KwpCommon.Interface.SetBaudRate(10400);
+            Thread.Sleep(50);
+
+            byte[] secret = [(byte)'G', (byte)'O', (byte)'U', (byte)'R', (byte)'O', (byte)'N'];
+
+            // Any values for p0/p1 will work as long as hi/lo are calculated correctly
+            byte p0 = 0;
+            byte p1 = 0;
+            var p = secret[p0 % 6] * secret[5 - (p1 % 6)];
+            byte hi = (byte)(secret[p1 % 6] ^ (p >> 8));
+            byte lo = (byte)((secret[5 - (p0 % 6)] + (p & 0xFF)) & 0xFF);
+
+            byte[] unlockFrame =
+            [
+                0x0A, // Marker byte (the loader discards all bytes until it receives an 0x0A)
+                p0,
+                p1,
+                hi,
+                lo,
+                0x00, 0x00, 0x00, // Unused
+                0xFF, // Written to EEPROM location $3FFC
+                0x00, 0x00, // Unused
+            ];
+
+            Log.WriteLine("Writing 11-byte unlock frame.");
+            foreach (var b in unlockFrame)
+            {
+                _kwp1281.KwpCommon.WriteByte(b);
+            }
+
+            Log.WriteLine("Switching to 9600 baud.");
+            _kwp1281.KwpCommon.Interface.SetBaudRate(9600);
+            Thread.Sleep(300);
+        }
+
+        private bool WriteLoaderHeaderBlock(byte entryH)
+        {
+            Log.WriteLine("Writing loader header block to cluster microcontroller");
+            var data = new byte[]
+            {
+                0x00, 0x01, // Block count (1)
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Unused
+                0x50, // inter-byte ACK delay
+                0x50, // initial ACK delay
+                0x34, // new baud divisor
+                entryH, 0x00, // Entry point $xx00
+            };
+            if (!WriteMarelliBlockAndReadAck(data))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private bool IsFirstGenAudiTT()

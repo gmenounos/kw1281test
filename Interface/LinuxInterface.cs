@@ -17,6 +17,12 @@ public class LinuxInterface : IInterface
     private const int IBSHIFT = 16; // Shift from CBAUD to CIBAUD
     private const uint PARENB = 0x0100; // Enable parity bit
     private const uint PARODD = 0x0200; // Use odd parity rather than even parity
+    private const uint CSIZE = 0x30;
+    private const uint CS8 = 0x30;
+    private const uint CSTOPB = 0x40;
+    private const uint CREAD = 0x80;
+    private const uint CLOCAL = 0x800;
+    private const uint CRTSCTS = 0x80000000;
 
     private const string libc = "libc";
 
@@ -30,19 +36,19 @@ public class LinuxInterface : IInterface
     private static extern int ioctl(int fd, uint request, IntPtr data);
 
     // Native method declarations
-    [DllImport(libc)]
+    [DllImport(libc, SetLastError = true, CharSet = CharSet.Ansi)]
     private static extern int open(string pathname, int flags);
 
     [DllImport(libc)]
     private static extern int close(int fd);
 
-    [DllImport(libc, CallingConvention = CallingConvention.StdCall)]
+    [DllImport(libc, SetLastError = true)]
     private static extern int read(int fd, byte[] buf, int count);
 
-    [DllImport(libc, CallingConvention = CallingConvention.StdCall)]
+    [DllImport(libc, SetLastError = true)]
     private static extern int write(int fd, byte[] buf, int count);
 
-    [DllImport(libc, CallingConvention = CallingConvention.StdCall)]
+    [DllImport(libc, SetLastError = true)]
     private static extern int tcflush(int fd, int queue);
 
 #pragma warning restore SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
@@ -51,7 +57,7 @@ public class LinuxInterface : IInterface
 
     // Define the termios structure to interact with terminal I/O settings
     [StructLayout(LayoutKind.Sequential)]
-    public struct Termios
+    private struct Termios
     {
         public tcflag_t c_iflag;    // input mode flags
         public tcflag_t c_oflag;    // output mode flags
@@ -113,7 +119,7 @@ public class LinuxInterface : IInterface
     private const int TIOCMSET = 0x5418;
     private const int TIOCM_DTR = 0x002;
     private const int O_RDWR = 2;
-    private const int O_NOCTTY = 00000400;
+    private const int O_NOCTTY = 0x100;
     private const int TCIFLUSH = 0; // Discard data received but not yet read
 
     private const int VTIME = 5;
@@ -123,7 +129,31 @@ public class LinuxInterface : IInterface
 
     private IntPtr _termios;
 
-    public int ReadTimeout { get; set; }
+    private int _readTimeout;
+
+    public int ReadTimeout
+    {
+        get => _readTimeout;
+        set
+        {
+            if (_fd < 0 || _termios == IntPtr.Zero)
+            {
+                return;
+            }
+
+            _readTimeout = value;
+            ApplyReadTimeout();
+        }
+    }
+
+    private void ApplyReadTimeout()
+    {
+        var termios = GetTtyConfiguration();
+        int tenths = _readTimeout <= 0 ? 0 : Math.Clamp((_readTimeout + 99) / 100, 1, 255);
+        termios.c_cc[VTIME] = (byte)tenths;
+        termios.c_cc[VMIN] = 0;
+        SetTtyConfiguration(termios);
+    }
 
     public int WriteTimeout { get; set; }
 
@@ -132,7 +162,8 @@ public class LinuxInterface : IInterface
         _fd = open(portName, O_RDWR | O_NOCTTY);
         if (_fd == -1)
         {
-            throw new IOException($"Failed to open port {portName}");
+            int errno = Marshal.GetLastPInvokeError();
+            throw new IOException($"Failed to open port {portName} (errno {errno})");
         }
 
         // Allocate struct and memory
@@ -144,12 +175,13 @@ public class LinuxInterface : IInterface
         termios.c_iflag = 0;
         termios.c_oflag = 0;
         termios.c_lflag = 0;
-
-        var timeout = ((IInterface)this).DefaultTimeoutMilliseconds;
-        termios.c_cc[VTIME] = (byte)(timeout / 100);
-        termios.c_cc[VMIN] = 0;
+        termios.c_cflag &= ~(CSIZE | CSTOPB | PARENB | CRTSCTS);
+        termios.c_cflag |= CS8 | CREAD | CLOCAL;
 
         SetTtyConfiguration(termios);
+
+        _readTimeout = ((IInterface)this).DefaultTimeoutMilliseconds;
+        ApplyReadTimeout();
 
         SetBaudRate(baudRate);
     }
@@ -158,7 +190,8 @@ public class LinuxInterface : IInterface
     {
         if (ioctl(_fd, TCGETS2, _termios) == -1)
         {
-            throw new IOException("Failed to get the UART configuration");
+            int errno = Marshal.GetLastPInvokeError();
+            throw new IOException($"Failed to get the UART configuration (errno {errno})");
         }
         var termios = Marshal.PtrToStructure<Termios>(_termios);
         return termios;
@@ -167,36 +200,59 @@ public class LinuxInterface : IInterface
     private void SetTtyConfiguration(Termios termios)
     {
         // Get a C pointer to struct
-        Marshal.StructureToPtr(termios, _termios, fDeleteOld: true);
+        Marshal.StructureToPtr(termios, _termios, fDeleteOld: false);
 
         // Update configuration
         if (ioctl(_fd, TCSETS2, _termios) == -1)
         {
-            throw new IOException("Failed to set the UART configuration");
+            int errno = Marshal.GetLastPInvokeError();
+            throw new IOException($"Failed to set the UART configuration (errno {errno})");
         }
     }
 
     private readonly byte[] _buffer = new byte[1];
 
+    private const int EINTR = 4;
+
     public byte ReadByte()
     {
-        // Console.WriteLine("XX ReadByte");
-
-        int bytesRead = read(_fd, _buffer, 1);
-        if (bytesRead != 1)
+        while (true)
         {
-            throw new IOException("Failed to read byte from UART");
+            int bytesRead = read(_fd, _buffer, 1);
+            if (bytesRead == 1)
+            {
+                return _buffer[0];
+            }
+            else if (bytesRead == 0)
+            {
+                throw new TimeoutException("Read timed out"); // VTIME expired
+            }
+            int errno = Marshal.GetLastPInvokeError();
+            if (errno == EINTR)
+            {
+                continue;
+            }
+            throw new IOException($"Failed to read byte from UART (errno {errno})");
         }
-        return _buffer[0];
     }
 
     public void WriteByteRaw(byte b)
     {
         _buffer[0] = b;
-        int bytesWritten = write(_fd, _buffer, 1);
-        if (bytesWritten != 1)
+
+        while (true)
         {
-            throw new IOException("Failed to write byte to UART");
+            int n = write(_fd, _buffer, 1);
+            if (n == 1)
+            {
+                return;
+            }
+            int errno = Marshal.GetLastPInvokeError();
+            if (errno == EINTR)
+            {
+                continue;
+            }
+            throw new IOException($"Failed to write byte to UART (errno {errno})");
         }
     }
 
@@ -208,7 +264,8 @@ public class LinuxInterface : IInterface
 
         if (ioctl(_fd, iov, ref data) == -1)
         {
-            throw new IOException("Failed to set/clear UART break");
+            int errno = Marshal.GetLastPInvokeError();
+            throw new IOException($"Failed to set/clear UART break (errno {errno})");
         }
     }
 
@@ -216,7 +273,8 @@ public class LinuxInterface : IInterface
     {
         if (tcflush(_fd, TCIFLUSH) == -1)
         {
-            throw new IOException("Failed to clear the UART receive buffer");
+            int errno = Marshal.GetLastPInvokeError();
+            throw new IOException($"Failed to clear the UART receive buffer (errno {errno})");
         }
     }
 
@@ -235,6 +293,7 @@ public class LinuxInterface : IInterface
         termios.c_ispeed = (uint)baudRate;
 
         SetTtyConfiguration(termios);
+        _ = tcflush(_fd, TCIFLUSH);
     }
 
     public void SetParity(Parity parity)
@@ -275,7 +334,8 @@ public class LinuxInterface : IInterface
 
         if (ioctl(_fd, TIOCMGET, ref controlLinesState) == -1)
         {
-            throw new IOException("Failed to get control lines state.");
+            int errno = Marshal.GetLastPInvokeError();
+            throw new IOException($"Failed to get UART line state (errno {errno})");
         }
 
         // Set DTR flag
@@ -291,7 +351,8 @@ public class LinuxInterface : IInterface
         // Set the modified control lines state
         if (ioctl(_fd, TIOCMSET, ref controlLinesState) == -1)
         {
-            throw new IOException("Failed to set DTR");
+            int errno = Marshal.GetLastPInvokeError();
+            throw new IOException($"Failed to set DTR (errno {errno})");
         }
     }
 
@@ -301,19 +362,25 @@ public class LinuxInterface : IInterface
         int controlLinesState = 0;
         if (ioctl(_fd, TIOCMGET, ref controlLinesState) == -1)
         {
-            throw new IOException("Failed to get uart line state");
+            int errno = Marshal.GetLastPInvokeError();
+            throw new IOException($"Failed to get UART line state (errno {errno})");
         }
 
         // Set RTS flag
         if (on)
+        {
             controlLinesState |= TIOCM_RTS;
+        }
         else
+        {
             controlLinesState &= ~TIOCM_RTS;
+        }
 
         // Set the modified control lines state
         if (ioctl(_fd, TIOCMSET, ref controlLinesState) == -1)
         {
-            throw new IOException("Failed to set RTS");
+            int errno = Marshal.GetLastPInvokeError();
+            throw new IOException($"Failed to set RTS (errno {errno})");
         }
     }
 
@@ -339,26 +406,36 @@ public class LinuxInterface : IInterface
 
             if (_fd != -1)
             {
-                SetDtr(false);
-                SetRts(false);
+                try
+                {
+                    SetDtr(false);
+                    SetRts(false);
+                }
+                catch (IOException)
+                {
+                    /* best effort on dispose */
+                }
             }
         }
 
         // Free unmanaged resources (unmanaged objects) and override a finalizer below.
 
-        if (_termios != IntPtr.Zero)
+        try
         {
-            Marshal.FreeHGlobal(_termios);
-            _termios = IntPtr.Zero;
+            if (_termios != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(_termios);
+                _termios = IntPtr.Zero;
+            }
+            if (_fd != -1)
+            {
+                _ = close(_fd);
+                _fd = -1;
+            }
         }
-        if (_fd != -1)
+        finally
         {
-            _ = close(_fd);
-            _fd = -1;
+            _disposed = true;
         }
-
-        // TODO: Set large fields to null.
-
-        _disposed = true;
     }
 }
