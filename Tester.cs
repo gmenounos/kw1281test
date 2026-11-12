@@ -802,6 +802,18 @@ internal partial class Tester
         }
     }
 
+    public void DumpMarelliFlash(ControllerInfo ecuInfo, string? filename, int? dumpBaud)
+    {
+        if (_controllerAddress != (int)ControllerAddress.Cluster)
+        {
+            Log.WriteLine("Only supported for clusters");
+            return;
+        }
+
+        var cluster = new MarelliCluster(_kwp1281, ecuInfo.Text);
+        _ = cluster.DumpFlash(filename, dumpBaud);
+    }
+
     public void DumpMarelliMem(
         uint? address, uint? length, ControllerInfo ecuInfo, string? filename)
     {
@@ -875,6 +887,45 @@ internal partial class Tester
         filename = cluster.DumpEeprom(address, length, filename);
 
         return filename;
+    }
+
+    public void DumpS12H256(
+        ControllerInfo ecuInfo, string? filename,
+        bool dumpFlash = true, bool dumpEeprom = true)
+    {
+        if (_controllerAddress != (int)ControllerAddress.Cluster)
+        {
+            Log.WriteLine("Only supported for clusters");
+            return;
+        }
+
+        var cluster = new MarelliS12H256Cluster(_kwp1281, ecuInfo.Text);
+        _ = cluster.DumpFlashAndEeprom(filename, dumpFlash, dumpEeprom);
+    }
+
+    public void DumpS12H256Eeprom(ControllerInfo ecuInfo, string? filename)
+    {
+        if (_controllerAddress != (int)ControllerAddress.Cluster)
+        {
+            Log.WriteLine("Only supported for clusters");
+            return;
+        }
+
+        var cluster = new MarelliS12H256Cluster(_kwp1281, ecuInfo.Text);
+        _ = cluster.DumpEeprom(filename);
+    }
+
+    public void DumpS12H256Ram(
+        uint address, uint length, ControllerInfo ecuInfo, string? filename)
+    {
+        if (_controllerAddress != (int)ControllerAddress.Cluster)
+        {
+            Log.WriteLine("Only supported for clusters");
+            return;
+        }
+
+        var cluster = new MarelliS12H256Cluster(_kwp1281, ecuInfo.Text);
+        _ = cluster.DumpRam(address, length, filename);
     }
 
     /// <summary>

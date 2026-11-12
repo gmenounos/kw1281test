@@ -95,6 +95,9 @@ class Program
         var command = args[3];
         uint? address = null;
         uint? length = null;
+        int? dumpBaud = null;
+        bool dumpFlash = true;
+        bool dumpEeprom = true;
         byte value = 0;
         int softwareCoding = 0;
         int workshopCode = 0;
@@ -132,10 +135,86 @@ class Program
             // Short form for Cluster: DumpRBxMem/DumpRBxMemOdd FILENAME -> dump the entire EEPROM
             _filename = args[4];
         }
+        else if (string.Compare(command, "DumpMarelliFlash", ignoreCase: true) == 0)
+        {
+            for (int i = 4; i < args.Length; i++)
+            {
+                if (string.Equals(args[i], "--baud", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (i + 1 >= args.Length)
+                    {
+                        ShowUsage();
+                        return;
+                    }
+
+                    var parsed = Utils.ParseUint(args[i + 1]);
+                    if (parsed != 9600 && parsed != 19200 && parsed != 38400)
+                    {
+                        Log.WriteLine("--baud must be 9600, 19200 or 38400.");
+                        return;
+                    }
+
+                    dumpBaud = (int)parsed;
+                    i++;
+                }
+                else if (_filename is null)
+                {
+                    _filename = args[i];
+                }
+                else
+                {
+                    ShowUsage();
+                    return;
+                }
+            }
+        }
+        else if (string.Compare(command, "DumpS12H256", ignoreCase: true) == 0)
+        {
+            bool selectFlash = false;
+            bool selectEeprom = false;
+            for (int i = 4; i < args.Length; i++)
+            {
+                if (string.Equals(args[i], "--flash", StringComparison.OrdinalIgnoreCase))
+                {
+                    selectFlash = true;
+                }
+                else if (string.Equals(args[i], "--eeprom", StringComparison.OrdinalIgnoreCase))
+                {
+                    selectEeprom = true;
+                }
+                else if (_filename is null)
+                {
+                    _filename = args[i];
+                }
+                else
+                {
+                    ShowUsage();
+                    return;
+                }
+            }
+
+            // Neither flag, or both: dump both. One flag: dump only that part.
+            dumpFlash = selectFlash || !selectEeprom;
+            dumpEeprom = selectEeprom || !selectFlash;
+        }
+        else if (string.Compare(command, "DumpS12H256Eeprom", ignoreCase: true) == 0)
+        {
+            if (args.Length > 5)
+            {
+                ShowUsage();
+                return;
+            }
+
+            if (args.Length == 5)
+            {
+                _filename = args[4];
+            }
+        }
         else if (string.Compare(command, "DumpMarelliMem", ignoreCase: true) == 0 ||
                  string.Compare(command, "DumpEeprom", ignoreCase: true) == 0 ||
                  string.Compare(command, "DumpMem", ignoreCase: true) == 0 ||
                  string.Compare(command, "DumpRam", ignoreCase: true) == 0 ||
+                 string.Compare(command, "DumpS12H256Ram", ignoreCase: true) == 0 ||
                  string.Compare(command, "DumpRBxMem", ignoreCase: true) == 0 ||
                  string.Compare(command, "DumpRBxMemOdd", ignoreCase: true) == 0 ||
                  string.Compare(command, "DumpRom", ignoreCase: true) == 0)
@@ -452,7 +531,7 @@ class Program
         {
             "readident", "readfaultcodes", "clearfaultcodes", "groupread", "basicsetting",
             "actuatortest", "adaptationread", "adaptationtest", "adaptationsave",
-            "setsoftwarecoding", "reset",
+            "setsoftwarecoding", "reset"
         };
         if (session.IsKwp2000 && !kwp2000SharedCommands.Contains(command.ToLower()))
         {
@@ -522,6 +601,10 @@ class Program
                 tester.DumpEeprom(address, length, ecuInfo!, _filename);
                 break;
 
+            case "dumpmarelliflash":
+                tester.DumpMarelliFlash(ecuInfo!, _filename, dumpBaud);
+                return;
+
             case "dumpmarellimem":
                 tester.DumpMarelliMem(address, length, ecuInfo!, _filename);
                 return;
@@ -536,6 +619,18 @@ class Program
 
             case "dumprom":
                 tester.DumpRom(address!.Value, length!.Value, _filename);
+                break;
+
+            case "dumps12h256":
+                tester.DumpS12H256(ecuInfo!, _filename, dumpFlash, dumpEeprom);
+                break;
+
+            case "dumps12h256eeprom":
+                tester.DumpS12H256Eeprom(ecuInfo!, _filename);
+                break;
+
+            case "dumps12h256ram":
+                tester.DumpS12H256Ram(address!.Value, length!.Value, ecuInfo!, _filename);
                 break;
 
             case "findlogins":
@@ -881,6 +976,11 @@ COMMAND =
     DumpEeprom FILENAME
         (For Airbag/Cluster address only) Dumps the whole EEPROM (size
          auto-detected from ReadIdent).
+    DumpMarelliFlash [FILENAME] [--baud N]
+        FILENAME = Optional filename
+        --baud N = 9600 (default), 19200 or 38400
+        (Dumps the cluster flash: eight 16 KB pages through the PPAGE window
+         on 128 KB clusters, or $1000-$FFFF on 64 KB small-EEPROM clusters.)
     DumpMarelliMem START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 3072) or hex (e.g. 0xC00)
         LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. 0x400)
@@ -901,6 +1001,25 @@ COMMAND =
         START = Start address in decimal (e.g. 8192) or hex (e.g. 0x2000)
         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. 0x10000)
         FILENAME = Optional filename
+    DumpS12H256 [FILENAME] [--flash] [--eeprom]
+        FILENAME = Optional output filename
+        --flash  = dump flash only
+        --eeprom = dump EEPROM only
+        (With neither or both flags, dumps both: flash to FILENAME and EEPROM
+         to <name>_eeprom.bin. With one flag, FILENAME is that file.
+         MC9S12H256 clusters: uploads a RAM copy service through KWP 0x0C
+         and triggers it from the CAN0 TX interrupt. Dumps 256 KB flash and
+         4 KB EEPROM, including the 0x03-protected EEPROM block.)
+    DumpS12H256Eeprom [FILENAME]
+        FILENAME = Optional filename
+        (MC9S12H256 clusters: safe 0x03-only EEPROM read. Protected and
+         register-overlaid ranges are left as 0xFF.)
+    DumpS12H256Ram START LENGTH [FILENAME]
+        START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
+        LENGTH = Number of bytes in decimal or hex
+        FILENAME = Optional filename
+        (MC9S12H256 clusters: reads $0000-$2FFF via KWP title 0x01 without
+         the VDO unlock. Protected RAM ranges are left as 0xFF.)
     FindLogins LOGIN
         LOGIN = Known good login (0-65535)
     GetSKC

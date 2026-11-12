@@ -32,6 +32,11 @@ internal interface IKW1281Dialog
     bool WriteEeprom(ushort address, List<byte> values);
 
     /// <summary>
+    /// KWP1281 title 0x0C: ROM/EPROM/EEPROM write (used by the MC9S12H256 clusters).
+    /// </summary>
+    bool WriteRomEeprom(ushort address, List<byte> values);
+
+    /// <summary>
     /// Corresponds to VDS-Pro functions 21 and 22
     /// </summary>
     List<byte>? ReadRomEeprom(ushort address, byte count);
@@ -280,14 +285,20 @@ internal class KW1281Dialog : IKW1281Dialog
         return blocks[0].Body.ToList();
     }
 
-    public bool WriteEeprom(ushort address, List<byte> values)
+    public bool WriteEeprom(ushort address, List<byte> values) =>
+        WriteMemory(BlockTitle.WriteEeprom, address, values);
+
+    public bool WriteRomEeprom(ushort address, List<byte> values) =>
+        WriteMemory(BlockTitle.WriteRomEeprom, address, values);
+
+    private bool WriteMemory(BlockTitle title, ushort address, List<byte> values)
     {
-        Log.WriteLine($"Sending WriteEeprom block (Address: ${address:X4}, Values: {Utils.DumpBytes(values)}");
+        Log.WriteLine($"Sending {title} block (Address: ${address:X4}, Values: {Utils.DumpBytes(values)}");
 
         byte count = (byte)values.Count;
         var sendBody = new List<byte>
         {
-            (byte)BlockTitle.WriteEeprom,
+            (byte)title,
             count,
             (byte)(address >> 8),
             (byte)(address & 0xFF),
@@ -300,14 +311,14 @@ internal class KW1281Dialog : IKW1281Dialog
         if (blocks.Count == 1 && blocks[0] is NakBlock)
         {
             // Permissions issue
-            Log.WriteLine("WriteEeprom failed");
+            Log.WriteLine($"{title} failed");
             return false;
         }
 
         blocks = blocks.Where(b => !b.IsAckNak).ToList();
         if (blocks.Count != 1)
         {
-            Log.WriteLine($"WriteEeprom returned {blocks.Count} blocks instead of 1");
+            Log.WriteLine($"{title} returned {blocks.Count} blocks instead of 1");
             return false;
         }
 
@@ -320,7 +331,7 @@ internal class KW1281Dialog : IKW1281Dialog
 
         if (!Enumerable.SequenceEqual(block.Body, sendBody.Skip(1).Take(4)))
         {
-            Log.WriteLine("WriteEepromResponseBlock body does not match WriteEepromBlock");
+            Log.WriteLine("WriteEepromResponseBlock body does not match the write block");
             return false;
         }
 
