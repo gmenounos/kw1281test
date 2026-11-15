@@ -407,6 +407,17 @@ class Program
 
             login = ushort.Parse(args[4]);
         }
+        else if (string.Compare(command, "WriteEepromAudiC5", ignoreCase: true) == 0)
+        {
+            if (args.Length < 6)
+            {
+                ShowUsage();
+                return;
+            }
+
+            address = Utils.ParseUint(args[4]);
+            _filename = args[5];
+        }
 
         using var @interface = OpenPort(portName, baudRate);
         var tester = new Tester(@interface, controllerAddress);
@@ -705,6 +716,10 @@ class Program
 
             case "writeeeprom":
                 tester.WriteEeprom(address!.Value, value, ecuInfo!);
+                break;
+
+            case "writeepromaudic5":
+                tester.WriteEepromAudiC5(address!.Value, _filename!);
                 break;
 
             case "writeram":
@@ -1073,6 +1088,9 @@ COMMAND =
     WriteEeprom ADDRESS VALUE
         ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
         VALUE = Value in decimal (e.g. 138) or hex (e.g. 0x8A)
+    WriteEepromAudiC5 START FILENAME
+        START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
+        FILENAME = Name of file containing binary data to write into EEPROM
     WriteRAM ADDRESS VALUE
         ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
         VALUE = Value in decimal (e.g. 138) or hex (e.g. 0x8A)
