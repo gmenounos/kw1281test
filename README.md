@@ -1,4 +1,4 @@
-# kw1281test
+﻿# kw1281test
 VW KW1281 Protocol Test Tool
 
 This tool can send some KW1281 (and a few KW2000) commands over a dumb serial->KKL or USB->KKL cable.
@@ -55,6 +55,12 @@ COMMAND =
         GROUP = Group number (0-255)
         (Group 0: Raw controller data)
     ClarionVWPremium4SafeCode
+    ClearCrashData [VALUE]
+        VALUE = Byte to fill the crash data area (optional, default 0xFF)
+                Example: ClearCrashData   -> fills with 0xFF
+                         ClearCrashData 0 -> fills with 0x00
+                The areas differ per module version and are listed in
+                Airbag/Vw51AirbagModule.cs. Take an EEPROM dump first.
     ClearFaultCodes
     DelcoVWPremium5SafeCode
     DumpEdc15Eeprom [FILENAME]
