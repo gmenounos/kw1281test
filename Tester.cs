@@ -267,7 +267,7 @@ internal partial class Tester
             dumpFileName);
     }
 
-    public void DumpClusterNecRom(string? filename)
+    public void DumpVdoNecRom(string? filename)
     {
         if (_controllerAddress != (int)ControllerAddress.Cluster)
         {
@@ -275,9 +275,9 @@ internal partial class Tester
             return;
         }
 
-        var dumpFileName = filename ?? "cluster_nec_rom_dump.bin";
+        var dumpFileName = filename ?? "vdo_nec_rom_dump.bin";
 
-        Log.WriteLine($"Saving cluster NEC ROM to {dumpFileName}");
+        Log.WriteLine($"Saving VDO NEC ROM to {dumpFileName}");
 
         var cluster = new VdoCluster(_kwp1281);
 
@@ -287,6 +287,25 @@ internal partial class Tester
             length: 65536,
             maxReadLength: 16,
             dumpFileName);
+    }
+
+    /// <summary>
+    /// Read the upper 64 KB of the FIS display controller's 128 KB mask ROM. The NEC's
+    /// memory service is 16-bit, so this uses a PRAM stub and the display task's saved
+    /// return address; see <see cref="NecUpperBankDumper"/>.
+    /// </summary>
+    public void DumpVdoNecRomHigh(string? filename, int startOffset)
+    {
+        if (_controllerAddress != (int)ControllerAddress.Cluster)
+        {
+            Log.WriteLine("Only supported for cluster");
+            return;
+        }
+
+        var dumpFileName = filename ?? "vdo_nec_rom_high.bin";
+
+        var cluster = new VdoCluster(_kwp1281);
+        new NecUpperBankDumper(cluster).Dump(dumpFileName, startOffset);
     }
 
     public void FindLogins(ushort goodLogin, int workshopCode)

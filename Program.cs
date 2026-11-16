@@ -21,7 +21,7 @@ using System.Threading;
 
 namespace BitFab.KW1281Test;
 
-class Program
+partial class Program
 {
     public static ILog Log { get; private set; } = new ConsoleLog();
 
@@ -231,6 +231,18 @@ class Program
             if (args.Length > 6)
             {
                 _filename = args[6];
+            }
+        }
+        else if (string.Compare(command, "DumpVdoNecRomHigh", ignoreCase: true) == 0)
+        {
+            if (args.Length > 4)
+            {
+                _filename = args[4];
+            }
+
+            if (args.Length > 5)
+            {
+                address = Utils.ParseUint(args[5]);
             }
         }
         else if (string.Compare(command, "WriteEeprom", ignoreCase: true) == 0)
@@ -597,10 +609,6 @@ class Program
                 tester.DumpCcmRom(_filename);
                 break;
 
-            case "dumpclusternecrom":
-                tester.DumpClusterNecRom(_filename);
-                break;
-
             case "dumpedc15eeprom":
             {
                 var eeprom = tester.ReadWriteEdc15Eeprom(_filename);
@@ -642,6 +650,14 @@ class Program
 
             case "dumps12h256ram":
                 tester.DumpS12H256Ram(address!.Value, length!.Value, ecuInfo!, _filename);
+                break;
+
+            case "dumpvdonecrom":
+                tester.DumpVdoNecRom(_filename);
+                break;
+
+            case "dumpvdonecromhigh":
+                tester.DumpVdoNecRomHigh(_filename, (int)(address ?? 0));
                 break;
 
             case "findlogins":
@@ -902,7 +918,7 @@ class Program
         {
             IInterface @interface;
 
-            if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
+            if (MyRegex.IsMatch(portName.ToUpper()))
             {
                 Log.WriteLine($"Opening FTDI serial port {portName}");
                 @interface = new FtdiInterface(portName, baudRate);
@@ -1035,6 +1051,16 @@ COMMAND =
         FILENAME = Optional filename
         (MC9S12H256 clusters: reads $0000-$2FFF via KWP title 0x01 without
          the VDO unlock. Protected RAM ranges are left as 0xFF.)
+    DumpVdoNecRom [FILENAME] (default vdo_nec_rom_dump.bin)
+        FILENAME = Optional filename
+    DumpVdoNecRomHigh [FILENAME] [START]
+        FILENAME = Optional filename (default vdo_nec_rom_high.bin)
+        START = Optional upper-bank offset in decimal or hex (default 0); a non-zero
+                start resumes FILENAME at its current length, so an interrupted dump
+                continues where it stopped
+        (FIS clusters with a 128 KB µPD784038: reads 0x10000-0x1FFFF through a PRAM stub
+         and the display task's saved return address. Bench use only; it hijacks one
+         return address per chunk and restores it when it exits.)
     FindLogins LOGIN
         LOGIN = Known good login (0-65535)
     GetSKC
@@ -1098,4 +1124,7 @@ COMMAND =
     }
 
     private string? _filename = null;
+
+    [GeneratedRegex(@"\A[A-Z0-9]{8}\Z")]
+    private static partial Regex MyRegex { get; }
 }

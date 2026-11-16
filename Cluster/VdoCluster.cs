@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace BitFab.KW1281Test.Cluster;
 
-internal class VdoCluster : ICluster
+internal partial class VdoCluster : ICluster
 {
     public void UnlockForEepromReadWrite()
     {
@@ -246,9 +246,61 @@ internal class VdoCluster : ICluster
         blocks = [.. blocks.Where(b => !b.IsAckNak)];
         if (blocks.Count != 1)
         {
-            throw new InvalidOperationException($"Custom \"Read NEC ROM\" returned {blocks.Count} blocks instead of 1");
+            var titles = string.Join(", ", blocks.Select(b => $"${b.Title:X2}"));
+            throw new InvalidOperationException(
+                $"Custom \"Read NEC ROM\" returned {blocks.Count} blocks instead of 1" +
+                (titles.Length > 0 ? $" (titles: {titles})" : " (ACK/NAK only)"));
         }
         return [.. blocks[0].Body];
+    }
+
+    /// <summary>
+    /// Write bytes to the NEC's 16-bit data space with custom command 0xA7. The display
+    /// firmware requires len == frameCount - 4 and takes the payload from the frame body,
+    /// which is what SendCustom produces for [0xA7, len, lo, hi, data...]. The main CPU
+    /// additionally caps the forwarded body at 17 bytes, so len must be &lt;= 13.
+    /// </summary>
+    public void CustomWriteNecRam(ushort address, IReadOnlyList<byte> data)
+    {
+        if (data.Count == 0 || data.Count > 13)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(data), "NEC write length must be 1..13 bytes (main-CPU forwarder limit).");
+        }
+
+        Log.WriteLine($"Sending Custom \"Write NEC RAM\" block (Address: ${address:X4}, Count: ${data.Count:X2})");
+
+        var body = new List<byte>
+        {
+            0xA7,
+            (byte)data.Count,
+            (byte)(address & 0xFF),
+            (byte)((address >> 8) & 0xFF),
+        };
+        body.AddRange(data);
+
+        // $A7 is a deferred NEC request; a NAK usually means the previous reply is still
+        // pending. Retrying is safe because the write is idempotent.
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            var blocks = SendCustom(body);
+            foreach (var block in blocks)
+            {
+                Log.WriteLine($"  reply ${block.Title:X2}: {Utils.DumpBytes(block.Body)}");
+            }
+
+            if (!blocks.Any(b => b.IsNak))
+            {
+                return;
+            }
+
+            Log.WriteLine(
+                $"Write at ${address:X4} NAK'd (attempt {attempt}/3); retrying...");
+            System.Threading.Thread.Sleep(500);
+        }
+
+        throw new InvalidOperationException(
+            $"Custom \"Write NEC RAM\" was NAK'd (Address: ${address:X4})");
     }
 
     public List<byte> MapEeprom()
@@ -403,9 +455,7 @@ internal class VdoCluster : ICluster
         // There are several EEPROM formats. We can determine the format by locating the
         // 14-character immobilizer ID and noting its offset in the dump.
 
-        var immoMatch = Regex.Match(
-            text,
-            @"[A-Z]{2}Z\dZ0[A-Z]\d{7}");
+        var immoMatch = MyRegex.Match(text);
         if (!immoMatch.Success)
         {
             Log.WriteLine("GetSkc: Unable to find Immobilizer ID in cluster dump.");
@@ -884,4 +934,7 @@ internal class VdoCluster : ICluster
         _kwp1281 = kwp1281;
         _additionalCustomCommandsUnlocked = false;
     }
+
+    [GeneratedRegex(@"[A-Z]{2}Z\dZ0[A-Z]\d{7}")]
+    private static partial Regex MyRegex { get; }
 }
