@@ -25,7 +25,9 @@ namespace BitFab.KW1281Test.Cluster;
 ///   below the caller's 0x417C, which is the signature matched here; none of the decoded
 ///   code in either bank references 0xF700-0xF7FF, so the stub and buffer live there
 ///   (0xFA00-0xFBFF holds firmware variables and 0xF880 is used by the VWK503 build).
-/// Completion is confirmed by the counter at 0xF70B rather than by a fixed delay.
+/// Completion is confirmed by the counter at 0xF70B rather than by a fixed delay; the stub
+/// increments it only after the copy, and each chunk is read back twice and must agree, because
+/// the first acquisition produced one wrong byte (upper offset 0x1C44, 0x18 instead of 0x1A).
 /// The saved return address is restored on the way out (only while it still reads as the
 /// stub with its caller context), so a completed or aborted run does not leave the frame
 /// task redirected.
@@ -183,7 +185,7 @@ internal sealed class NecUpperBankDumper
 
             counter = expected;
 
-            var data = ReadMemory(BufferAddress, count);
+            var data = ReadBufferVerified(count);
             if (data.Count != count)
             {
                 Log.WriteLine(
@@ -255,17 +257,15 @@ internal sealed class NecUpperBankDumper
     }
 
     /// <summary>
-    /// Increments a RAM counter, copies <paramref name="length"/> bytes from 0x1xxxx into
-    /// the buffer, then returns to the interrupted task. The source offset is read from
-    /// <see cref="ParamAddress"/>; the counter lets the host verify each run.
+    /// Copies <paramref name="length"/> bytes from 0x1xxxx into the buffer, then increments a
+    /// RAM counter and returns to the interrupted task. The source offset is read from
+    /// <see cref="ParamAddress"/>; the counter is written only after the copy completes, so a
+    /// changed counter means the buffer is ready to read.
     /// </summary>
     private List<byte> BuildStub(int length)
     {
         var b = new List<byte>
         {
-            0x3E, 0x10, 0x0B, 0xF7,                                    // MOV A,!0xF70B
-            0xC1,                                                      // INC A
-            0x3E, 0x11, 0x0B, 0xF7,                                    // MOV !0xF70B,A
             0x09, 0x8F,                                                // PUSH WHL
             0x09, 0x8D,                                                // PUSH TDE
             0x3E, 0xE8, 0x00, 0xF7,                                    // MOVW HL,!0xF700
@@ -282,6 +282,9 @@ internal sealed class NecUpperBankDumper
             0x4B,                                                      // EI
             0x09, 0x9D,                                                // POP TDE
             0x09, 0x9F,                                                // POP WHL
+            0x3E, 0x10, 0x0B, 0xF7,                                    // MOV A,!0xF70B
+            0xC1,                                                      // INC A
+            0x3E, 0x11, 0x0B, 0xF7,                                    // MOV !0xF70B,A
             0x2C, (byte)(_resume & 0xFF), (byte)(_resume >> 8),        // BR !resume
         };
         return b;
@@ -453,6 +456,31 @@ internal sealed class NecUpperBankDumper
     }
 
     // ------------------------------------------------------------ reads
+
+    /// <summary>
+    /// Reads the copied chunk twice and returns it only if both passes agree. One bad byte in
+    /// the first acquisition (upper offset 0x1C44, read as 0x18 instead of 0x1A) showed that a
+    /// single pass is not enough to trust.
+    /// </summary>
+    private List<byte> ReadBufferVerified(int length)
+    {
+        var empty = new List<byte>();
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            var first = ReadMemory(BufferAddress, length);
+            var second = ReadMemory(BufferAddress, length);
+            if (first.SequenceEqual(second))
+            {
+                return first;
+            }
+
+            Log.WriteLine(
+                $"Buffer read at ${BufferAddress:X4} differed between two passes " +
+                $"(attempt {attempt}/3); re-reading.");
+        }
+
+        return empty;
+    }
 
     private List<byte> ReadMemory(ushort start, int length)
     {

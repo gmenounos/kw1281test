@@ -119,7 +119,7 @@ COMMAND =
         FILENAME = Optional filename
         (MC9S12H256 clusters: reads $0000-$2FFF via KWP title 0x01 without
          the VDO unlock. Protected RAM ranges are left as 0xFF.)
-    DumpVdoNecRom [FILENAME] (default vdo_nec_rom_dump.bin)
+    DumpVdoNecRom [FILENAME] (default vdo_nec_rom.bin)
         FILENAME = Optional filename
     DumpVdoNecRomHigh [FILENAME] [START]
         FILENAME = Optional filename (default vdo_nec_rom_high.bin)
@@ -128,7 +128,8 @@ COMMAND =
                 continues where it stopped
         (FIS clusters with a 128 KB µPD784038: reads 0x10000-0x1FFFF through a PRAM stub
          and the display task's saved return address. Bench use only; it hijacks one
-         return address per chunk and restores it when it exits.)
+         return address per chunk, restores it when it exits, and reads every chunk twice
+         so the two passes must agree.)
     FindLogins LOGIN
         LOGIN = Known good login (0-65535)
     GetSKC

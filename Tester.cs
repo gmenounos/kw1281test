@@ -275,7 +275,7 @@ internal partial class Tester
             return;
         }
 
-        var dumpFileName = filename ?? "vdo_nec_rom_dump.bin";
+        var dumpFileName = filename ?? "vdo_nec_rom.bin";
 
         Log.WriteLine($"Saving VDO NEC ROM to {dumpFileName}");
 
