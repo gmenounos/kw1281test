@@ -75,6 +75,11 @@ COMMAND =
     DumpEeprom FILENAME
         (For Airbag/Cluster address only) Dumps the whole EEPROM (size
          auto-detected from ReadIdent).
+    DumpMarelliFlash [FILENAME] [--baud N]
+        FILENAME = Optional filename
+        --baud N = 9600 (default), 19200 or 38400
+        (Dumps the cluster flash: eight 16 KB pages through the PPAGE window
+         on 128 KB clusters, or $1000-$FFFF on 64 KB small-EEPROM clusters.)
     DumpMarelliMem START LENGTH [FILENAME]
         START = Start address in decimal (e.g. 3072) or hex (e.g. 0xC00)
         LENGTH = Number of bytes in decimal (e.g. 1024) or hex (e.g. 0x400)
@@ -95,6 +100,35 @@ COMMAND =
         START = Start address in decimal (e.g. 8192) or hex (e.g. 0x2000)
         LENGTH = Number of bytes in decimal (e.g. 65536) or hex (e.g. 0x10000)
         FILENAME = Optional filename
+    DumpS12H256 [FILENAME] [--flash] [--eeprom]
+        FILENAME = Optional output filename
+        --flash  = dump flash only
+        --eeprom = dump EEPROM only
+        (With neither or both flags, dumps both: flash to FILENAME and EEPROM
+         to <name>_eeprom.bin. With one flag, FILENAME is that file.
+         MC9S12H256 clusters: uploads a RAM copy service through KWP 0x0C
+         and triggers it from the CAN0 TX interrupt. Dumps 256 KB flash and
+         4 KB EEPROM, including the 0x03-protected EEPROM block.)
+    DumpS12H256Eeprom [FILENAME]
+        FILENAME = Optional filename
+        (MC9S12H256 clusters: safe 0x03-only EEPROM read. Protected and
+         register-overlaid ranges are left as 0xFF.)
+    DumpS12H256Ram START LENGTH [FILENAME]
+        START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
+        LENGTH = Number of bytes in decimal or hex
+        FILENAME = Optional filename
+        (MC9S12H256 clusters: reads $0000-$2FFF via KWP title 0x01 without
+         the VDO unlock. Protected RAM ranges are left as 0xFF.)
+    DumpVdoNecRom [FILENAME] (default vdo_nec_rom_dump.bin)
+        FILENAME = Optional filename
+    DumpVdoNecRomHigh [FILENAME] [START]
+        FILENAME = Optional filename (default vdo_nec_rom_high.bin)
+        START = Optional upper-bank offset in decimal or hex (default 0); a non-zero
+                start resumes FILENAME at its current length, so an interrupted dump
+                continues where it stopped
+        (FIS clusters with a 128 KB µPD784038: reads 0x10000-0x1FFFF through a PRAM stub
+         and the display task's saved return address. Bench use only; it hijacks one
+         return address per chunk and restores it when it exits.)
     FindLogins LOGIN
         LOGIN = Known good login (0-65535)
     GetSKC

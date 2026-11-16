@@ -1114,9 +1114,6 @@ COMMAND =
     WriteEeprom ADDRESS VALUE
         ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
         VALUE = Value in decimal (e.g. 138) or hex (e.g. 0x8A)
-    WriteEepromAudiC5 START FILENAME
-        START = Start address in decimal (e.g. 0) or hex (e.g. 0x0)
-        FILENAME = Name of file containing binary data to write into EEPROM
     WriteRAM ADDRESS VALUE
         ADDRESS = Address in decimal (e.g. 4361) or hex (e.g. 0x1109)
         VALUE = Value in decimal (e.g. 138) or hex (e.g. 0x8A)
