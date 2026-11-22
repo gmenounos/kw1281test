@@ -21,7 +21,7 @@ using System.Threading;
 
 namespace BitFab.KW1281Test;
 
-partial class Program
+class Program
 {
     public static ILog Log { get; private set; } = new ConsoleLog();
 
@@ -918,7 +918,7 @@ partial class Program
         {
             IInterface @interface;
 
-            if (MyRegex.IsMatch(portName.ToUpper()))
+            if (Regex.IsMatch(portName.ToUpper(), @"\A[A-Z0-9]{8}\Z"))
             {
                 Log.WriteLine($"Opening FTDI serial port {portName}");
                 @interface = new FtdiInterface(portName, baudRate);
@@ -1122,7 +1122,4 @@ COMMAND =
     }
 
     private string? _filename = null;
-
-    [GeneratedRegex(@"\A[A-Z0-9]{8}\Z")]
-    private static partial Regex MyRegex { get; }
 }

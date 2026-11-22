@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace BitFab.KW1281Test.Cluster;
 
-internal partial class VdoCluster : ICluster
+internal class VdoCluster : ICluster
 {
     public void UnlockForEepromReadWrite()
     {
@@ -455,7 +455,9 @@ internal partial class VdoCluster : ICluster
         // There are several EEPROM formats. We can determine the format by locating the
         // 14-character immobilizer ID and noting its offset in the dump.
 
-        var immoMatch = MyRegex.Match(text);
+        var immoMatch = Regex.Match(
+            text,
+            @"[A-Z]{2}Z\dZ0[A-Z]\d{7}");
         if (!immoMatch.Success)
         {
             Log.WriteLine("GetSkc: Unable to find Immobilizer ID in cluster dump.");
@@ -934,7 +936,4 @@ internal partial class VdoCluster : ICluster
         _kwp1281 = kwp1281;
         _additionalCustomCommandsUnlocked = false;
     }
-
-    [GeneratedRegex(@"[A-Z]{2}Z\dZ0[A-Z]\d{7}")]
-    private static partial Regex MyRegex { get; }
 }
