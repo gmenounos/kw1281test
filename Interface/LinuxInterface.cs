@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.IO.Ports;
@@ -43,6 +44,9 @@ public class LinuxInterface : IInterface
     private static extern int close(int fd);
 
     [DllImport(libc, SetLastError = true)]
+    private static extern int poll(ref PollFd fds, nuint nfds, int timeout);
+
+    [DllImport(libc, SetLastError = true)]
     private static extern int read(int fd, byte[] buf, int count);
 
     [DllImport(libc, SetLastError = true)]
@@ -52,6 +56,14 @@ public class LinuxInterface : IInterface
     private static extern int tcflush(int fd, int queue);
 
 #pragma warning restore SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PollFd
+    {
+        public int fd;
+        public short events;
+        public short revents;
+    }
 
     private const int NCCS = 19;
 
@@ -124,6 +136,7 @@ public class LinuxInterface : IInterface
 
     private const int VTIME = 5;
     private const int VMIN = 6;
+    private const short PollIn = 0x0001;
 
     private int _fd = -1;
 
@@ -134,25 +147,7 @@ public class LinuxInterface : IInterface
     public int ReadTimeout
     {
         get => _readTimeout;
-        set
-        {
-            if (_fd < 0 || _termios == IntPtr.Zero)
-            {
-                return;
-            }
-
-            _readTimeout = value;
-            ApplyReadTimeout();
-        }
-    }
-
-    private void ApplyReadTimeout()
-    {
-        var termios = GetTtyConfiguration();
-        int tenths = _readTimeout <= 0 ? 0 : Math.Clamp((_readTimeout + 99) / 100, 1, 255);
-        termios.c_cc[VTIME] = (byte)tenths;
-        termios.c_cc[VMIN] = 0;
-        SetTtyConfiguration(termios);
+        set => _readTimeout = value;
     }
 
     public int WriteTimeout { get; set; }
@@ -171,17 +166,18 @@ public class LinuxInterface : IInterface
 
         var termios = GetTtyConfiguration();
 
-        // Update termio struct with timeouts
+        // Raw mode; ReadByte uses poll so the timeout can retain millisecond precision.
         termios.c_iflag = 0;
         termios.c_oflag = 0;
         termios.c_lflag = 0;
         termios.c_cflag &= ~(CSIZE | CSTOPB | PARENB | CRTSCTS);
         termios.c_cflag |= CS8 | CREAD | CLOCAL;
+        termios.c_cc[VMIN] = 0;
+        termios.c_cc[VTIME] = 0;
 
         SetTtyConfiguration(termios);
 
         _readTimeout = ((IInterface)this).DefaultTimeoutMilliseconds;
-        ApplyReadTimeout();
 
         SetBaudRate(baudRate);
     }
@@ -216,23 +212,53 @@ public class LinuxInterface : IInterface
 
     public byte ReadByte()
     {
+        int timeoutMs = Math.Max(0, _readTimeout);
+        long deadline = Stopwatch.GetTimestamp() +
+            Stopwatch.Frequency / 1000 * timeoutMs;
+
         while (true)
         {
+            var remainingTicks = deadline - Stopwatch.GetTimestamp();
+            var remainingMs = remainingTicks > 0
+                ? (int)Math.Ceiling(remainingTicks * 1000d / Stopwatch.Frequency)
+                : 0;
+            var pollFd = new PollFd
+            {
+                fd = _fd,
+                events = PollIn
+            };
+
+            int pollResult = poll(ref pollFd, 1, remainingMs);
+            if (pollResult == 0)
+            {
+                throw new TimeoutException("Read timed out");
+            }
+            if (pollResult < 0)
+            {
+                int pollErrno = Marshal.GetLastPInvokeError();
+                if (pollErrno == EINTR)
+                {
+                    continue;
+                }
+                throw new IOException($"Failed to wait for UART input (errno {pollErrno})");
+            }
+
             int bytesRead = read(_fd, _buffer, 1);
             if (bytesRead == 1)
             {
                 return _buffer[0];
             }
-            else if (bytesRead == 0)
+            if (bytesRead == 0)
             {
-                throw new TimeoutException("Read timed out"); // VTIME expired
+                throw new TimeoutException("Read timed out");
             }
-            int errno = Marshal.GetLastPInvokeError();
-            if (errno == EINTR)
+
+            int readErrno = Marshal.GetLastPInvokeError();
+            if (readErrno == EINTR)
             {
                 continue;
             }
-            throw new IOException($"Failed to read byte from UART (errno {errno})");
+            throw new IOException($"Failed to read byte from UART (errno {readErrno})");
         }
     }
 
