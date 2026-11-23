@@ -42,4 +42,28 @@ internal static class Kwp2000Addressing
             ? address
             : wakeupAddress;
     }
+
+    /// <summary>
+    /// Unconfirmed fallbacks: the SAE J2178 physical address of the same unit (EDC16's 0x10 is
+    /// the J2178 engine address). An MK60 ABS/ESP (1C0 907 379) woken at 0x03 with KW 2027
+    /// completes the handshake and then ignores every frame addressed to 0x03; at 0x28 it answers.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<byte, byte> J2178Fallback = new Dictionary<byte, byte>
+    {
+        [0x03] = 0x28, // brakes
+    };
+
+    /// <summary>
+    /// Header addresses to try, in order. A single entry when the address is confirmed or there
+    /// is no fallback; otherwise the wakeup address first, then the J2178 guess.
+    /// </summary>
+    public static IReadOnlyList<byte> Candidates(byte wakeupAddress, int keyword)
+    {
+        if (Confirmed.ContainsKey((wakeupAddress, keyword))
+            || !J2178Fallback.TryGetValue(wakeupAddress, out var guess))
+        {
+            return new[] { HeaderAddress(wakeupAddress, keyword) };
+        }
+        return new[] { wakeupAddress, guess };
+    }
 }
