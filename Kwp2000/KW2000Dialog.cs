@@ -549,6 +549,54 @@ internal class KW2000Dialog : IKW2000Dialog
         }
     }
 
+    /// <summary>
+    /// Waits P3 while listening. Bytes left over from the previous reply (a second response
+    /// frame, a late answer) are dropped and logged; otherwise they would be read as the start
+    /// of the next reply and that read fails. Seen on an MK60 ABS (1C0 907 379): after
+    /// readEcuIdentification 1A 9B the next testerPresent "timed out" on leftover bytes.
+    /// P3 restarts after each dropped byte, because it counts from the unit's last byte.
+    /// </summary>
+    private void DrainForP3()
+    {
+        var link = _kwpCommon.Interface;
+        var previous = link.ReadTimeout;
+        var stale = new List<byte>();
+        try
+        {
+            var deadline = Stopwatch.GetTimestamp() + Stopwatch.Frequency / 1000 * P3;
+            while (true)
+            {
+                var left = (deadline - Stopwatch.GetTimestamp()) * 1000 / Stopwatch.Frequency;
+                if (left <= 0)
+                {
+                    break;
+                }
+                link.ReadTimeout = (int)left;
+                try
+                {
+                    stale.Add(link.ReadByte());
+                }
+                catch (TimeoutException)
+                {
+                    continue;
+                }
+                deadline = Stopwatch.GetTimestamp() + Stopwatch.Frequency / 1000 * P3;
+                if (stale.Count >= 512)
+                {
+                    break; // a babbling line: stop listening and send anyway
+                }
+            }
+        }
+        finally
+        {
+            link.ReadTimeout = previous;
+        }
+        if (stale.Count > 0)
+        {
+            Log.WriteLine($"Dropped before request: {string.Join(" ", stale.Select(b => b.ToString("X2")))}");
+        }
+    }
+
     public void SendMessage(Service service, byte[] body, bool excludeAddresses = false)
     {
         static void Sleep(int ms)
@@ -569,7 +617,7 @@ internal class KW2000Dialog : IKW2000Dialog
                 _controllerAddress, _testerAddress, service, body);
         }
         var checksum = message.CalcChecksum();
-        Sleep(P3);
+        DrainForP3();
 
         if (FastTiming)
         {
