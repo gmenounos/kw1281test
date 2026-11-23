@@ -49,6 +49,29 @@ public class SensorValueTests
     }
 
     [TestMethod]
+    public void Signed16BitValueHandlesWidthBoundaries()
+    {
+        F(99, 0x00, 0x00).ShouldBe("0");
+        F(99, 0x00, 0x01).ShouldBe("1");
+        F(99, 0x7F, 0xFF).ShouldBe("32767");
+        F(99, 0x80, 0x00).ShouldBe("-32768");
+        F(99, 0xFF, 0xFF).ShouldBe("-1");
+    }
+
+    [TestMethod]
+    public void Signed8BitValueHandlesSignBoundaries()
+    {
+        F(58, 0x00, 0x00).ShouldBe("0.0 /s");
+        F(58, 0x00, 0x7F).ShouldBe("129.9 /s");
+        F(58, 0x00, 0x80).ShouldBe("-130.9 /s");
+        F(58, 0x00, 0xFF).ShouldBe("-1.0 /s");
+        F(78, 0x00, 0x00).ShouldBe("0.0 /s");
+        F(78, 0x00, 0x7F).ShouldBe("231.0 /s");
+        F(78, 0x00, 0x80).ShouldBe("-232.8 /s");
+        F(78, 0x00, 0xFF).ShouldBe("-1.8 /s");
+    }
+
+    [TestMethod]
     public void UnknownFormulaShowsRawBytes()
     {
         F(250, 1, 2).ShouldBe("(250 1 2)");

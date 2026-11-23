@@ -17,10 +17,12 @@ namespace BitFab.KW1281Test.Blocks
             B = b;
         }
 
-        /// <summary>A:B as a signed 16-bit value, A is the high byte.</summary>
-        private int S16 => unchecked((short)((A << 8) | B));
-
         private int U16 => (A << 8) | B;
+
+        /// <summary>A:B as a signed 16-bit value, A is the high byte.</summary>
+        private int S16 => U16 >= 0x8000 ? U16 - 0x10000 : U16;
+
+        private static int S8(byte value) => value >= 0x80 ? value - 0x100 : value;
 
         public override string ToString()
         {
@@ -84,7 +86,7 @@ namespace BitFab.KW1281Test.Blocks
                 55 => $"{(A * B / 200.0):F1} s",
                 56 => $"{A * 256 + B} WSC",
                 57 => $"{A * 256 + B + 65536} WSC",
-                58 => $"{unchecked((sbyte)B) * 1.023:F1} /s",
+                58 => $"{S8(B) * 1.023:F1} /s",
                 59 => $"{((A * 256 + B) / 32768.0):F1}",
                 60 => $"{((A * 256 + B) * 0.01):F1} sec",
                 61 => $"{(A==0 ? (B - 128) : (B - 128) / A):F1}",
@@ -106,7 +108,7 @@ namespace BitFab.KW1281Test.Blocks
                 75 => $"{A * 256 + B}",
                 76 => $"{A * 255 + B} kOhm",
                 77 => $"{(255 * A + B * 60) / 4080.0:F2} V",
-                78 => $"{unchecked((sbyte)B) * 1.819:F1} /s",
+                78 => $"{S8(B) * 1.819:F1} /s",
                 79 => $"{B}",
                 80 => $"{U16 / 100.0:F2} kOhm",
                 81 => $"{S16 * 0.04375:F1} Deg",
