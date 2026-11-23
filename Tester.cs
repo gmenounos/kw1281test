@@ -267,6 +267,26 @@ internal partial class Tester
             dumpFileName);
     }
 
+    /// <summary>
+    /// Read one of the CDC16xx ABR banks (the $8000-$FFFF window selected by I/O register
+    /// $1F0F). The cluster's custom $86 read service is 16-bit and runs with ABR=1, so this
+    /// uses a RAM stub and the custom dispatcher's saved continuation; see
+    /// <see cref="VdoUpperBankDumper"/>.
+    /// </summary>
+    public void DumpVdoBank(int bank, int startOffset, string? filename)
+    {
+        if (_controllerAddress != (int)ControllerAddress.Cluster)
+        {
+            Log.WriteLine("Only supported for cluster");
+            return;
+        }
+
+        var dumpFileName = filename ?? $"vdo_bank{bank}.bin";
+
+        var cluster = new VdoCluster(_kwp1281);
+        new VdoUpperBankDumper(cluster).Dump(dumpFileName, bank, startOffset);
+    }
+
     public void DumpVdoNecRom(string? filename)
     {
         if (_controllerAddress != (int)ControllerAddress.Cluster)
@@ -1606,19 +1626,22 @@ internal partial class Tester
         // TODO: Verify cluster is VDO
 
         var vdoCluster = new VdoCluster(_kwp1281);
-        if (!vdoCluster.RequiresSeedKey())
+
+        // Send the $9D unlock even when no seed/key is implemented: on V599-lineage
+        // clusters that is what clears the $3C write-protect bit used by custom $87.
+        var (isUnlocked, _) = vdoCluster.Unlock();
+        if (!isUnlocked)
         {
-            Log.WriteLine(
-                "Cluster is unlocked for memory access. Skipping Seed/Key login.");
+            Log.WriteLine("Unknown cluster software version. Memory access will likely fail.");
+        }
+
+        if (vdoCluster.RequiresSeedKey())
+        {
+            vdoCluster.SeedKeyAuthenticate();
         }
         else
         {
-            var (isUnlocked, _) = vdoCluster.Unlock();
-            if (!isUnlocked)
-            {
-                Log.WriteLine("Unknown cluster software version. Memory access will likely fail.");
-            }
-            vdoCluster.SeedKeyAuthenticate();
+            Log.WriteLine("Cluster does not require Seed/Key for memory access.");
         }
 
         vdoCluster.WriteRam(address, value);
@@ -1771,19 +1794,22 @@ internal partial class Tester
         // TODO: Verify cluster is VDO
 
         var vdoCluster = new VdoCluster(_kwp1281);
-        if (!vdoCluster.RequiresSeedKey())
+
+        // Send the $9D unlock even when no seed/key is implemented; the custom $86 read is
+        // not gated by $3C, but this keeps the session state consistent with WriteRAM.
+        var (isUnlocked, _) = vdoCluster.Unlock();
+        if (!isUnlocked)
         {
-            Log.WriteLine(
-                "Cluster is unlocked for memory access. Skipping Seed/Key login.");
+            Log.WriteLine("Unknown cluster software version. Memory access will likely fail.");
+        }
+
+        if (vdoCluster.RequiresSeedKey())
+        {
+            vdoCluster.SeedKeyAuthenticate();
         }
         else
         {
-            var (isUnlocked, _) = vdoCluster.Unlock();
-            if (!isUnlocked)
-            {
-                Log.WriteLine("Unknown cluster software version. Memory access will likely fail.");
-            }
-            vdoCluster.SeedKeyAuthenticate();
+            Log.WriteLine("Cluster does not require Seed/Key for memory access.");
         }
 
         var dumpFileName = filename ?? $"cluster_mem_0x{startAddress:X6}.bin";

@@ -226,6 +226,40 @@ internal class VdoCluster : ICluster
     }
 
     /// <summary>
+    /// Write 1..16 bytes to the cluster's 16-bit address space with custom command 0x87.
+    /// The handler uses only the low 16 bits of the address and checks $3C bit 0; send the
+    /// $9D unlock (or call <see cref="Unlock"/>) before writing if the cluster is protected.
+    /// </summary>
+    public void CustomWriteMemory(ushort address, IReadOnlyList<byte> data)
+    {
+        if (data.Count is < 1 or > 16)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(data), "Custom write length must be 1..16 bytes.");
+        }
+
+        Log.WriteLine(
+            $"Sending Custom \"Write RAM\" block (Address: ${address:X4}, Count: {data.Count:X2})");
+
+        var body = new List<byte>
+        {
+            0x87,
+            (byte)data.Count,
+            (byte)(address & 0xFF),
+            (byte)(address >> 8),
+        };
+        body.AddRange(data);
+
+        var blocks = SendCustom(body);
+        if (blocks.Count == 0 || blocks.Any(b => b.IsNak))
+        {
+            throw new InvalidOperationException(
+                $"Custom \"Write RAM\" at ${address:X4} was NAK'd. " +
+                "The cluster may be write-protected (custom $9D unlock).");
+        }
+    }
+
+    /// <summary>
     /// Read the low 64KB of the cluster's NEC controller ROM.
     /// For MFA clusters, that should cover the entire ROM.
     /// For FIS clusters, the ROM is 128KB and more work is needed to retrieve the high 64KB.
@@ -417,29 +451,59 @@ internal class VdoCluster : ICluster
         }
     }
 
+    /// <summary>
+    /// Returns true when the cluster exposes the custom $96 seed/key mechanism and has not
+    /// already reached the maximum access level. A NAK to the access-level request means the
+    /// command is not implemented (as on V599LLA-lineage clusters), so no seed/key is required.
+    /// An unknown/empty response is treated the same way; the subsequent EEPROM or memory
+    /// operation still fails cleanly if the cluster is actually protected.
+    /// </summary>
     public bool RequiresSeedKey()
     {
-        var accessLevel = GetAccessLevel();
+        var accessLevel = GetAccessLevel(out bool notImplemented);
+        if (notImplemented)
+        {
+            Log.WriteLine(
+                "Cluster does not implement the access-level request (custom $96); " +
+                "treating it as no Seed/Key required.");
+            return false;
+        }
+
+        if (accessLevel is null)
+        {
+            Log.WriteLine(
+                "Access level is unknown; treating it as no Seed/Key required.");
+            return false;
+        }
+
         return accessLevel != MaxAccessLevel;
     }
 
-    private int? GetAccessLevel()
+    private int? GetAccessLevel(out bool notImplemented)
     {
+        notImplemented = false;
         Log.WriteLine("Sending Custom \"Get Access Level\" block");
         var response = SendCustom([0x96, 0x04]);
         var responseBlocks = response.Where(b => !b.IsAckNak).ToList();
-        if (responseBlocks is [CustomBlock])
+        if (responseBlocks.Count == 1 &&
+            responseBlocks[0] is CustomBlock block &&
+            block.Body.Count > 0)
         {
-            int accessLevel = responseBlocks[0].Body.First();
+            int accessLevel = block.Body[0];
             Log.WriteLine($"Access level is {accessLevel}.");
 
             return accessLevel;
         }
-        else
+
+        if (response.Any(b => b.IsNak))
         {
-            Log.WriteLine("Access level is unknown.");
+            notImplemented = true;
+            Log.WriteLine("Custom \"Get Access Level\" was NAK'd.");
             return null;
         }
+
+        Log.WriteLine("Access level is unknown.");
+        return null;
     }
 
     /// <summary>

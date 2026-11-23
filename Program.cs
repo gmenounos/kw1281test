@@ -105,6 +105,7 @@ class Program
         ushort channelValue = 0;
         ushort? login = null;
         byte groupNumber = 0;
+        int bank = 0;
         var addressValuePairs = new List<KeyValuePair<ushort, byte>>();
 
         if (string.Compare(command, "ReadEeprom", ignoreCase: true) == 0 ||
@@ -243,6 +244,34 @@ class Program
             if (args.Length > 5)
             {
                 address = Utils.ParseUint(args[5]);
+            }
+        }
+        else if (string.Compare(command, "DumpVdoBank", ignoreCase: true) == 0)
+        {
+            if (args.Length < 5)
+            {
+                ShowUsage();
+                return;
+            }
+
+            var bankValue = Utils.ParseUint(args[4]);
+            if (bankValue is < 1 or > 7)
+            {
+                Log.WriteLine(
+                    "DumpVdoBank: BANK must be 1..7 (the V599 firmware uses ABR 1, 2 and 3).");
+                return;
+            }
+
+            bank = (int)bankValue;
+
+            if (args.Length > 5)
+            {
+                _filename = args[5];
+            }
+
+            if (args.Length > 6)
+            {
+                address = Utils.ParseUint(args[6]);
             }
         }
         else if (string.Compare(command, "WriteEeprom", ignoreCase: true) == 0)
@@ -652,6 +681,10 @@ class Program
                 tester.DumpS12H256Ram(address!.Value, length!.Value, ecuInfo!, _filename);
                 break;
 
+            case "dumpvdobank":
+                tester.DumpVdoBank(bank, (int)(address ?? 0), _filename);
+                break;
+
             case "dumpvdonecrom":
                 tester.DumpVdoNecRom(_filename);
                 break;
@@ -1051,6 +1084,16 @@ COMMAND =
         FILENAME = Optional filename
         (MC9S12H256 clusters: reads $0000-$2FFF via KWP title 0x01 without
          the VDO unlock. Protected RAM ranges are left as 0xFF.)
+    DumpVdoBank BANK [FILENAME] [START]
+        BANK = ABR bank to dump (1-7; the V599 firmware uses 1, 2 and 3)
+        FILENAME = Optional filename (default vdo_bankN.bin)
+        START = Optional 0x0000-0x7FFF offset; a non-zero start resumes FILENAME at its
+                current length, so an interrupted dump continues where it stopped
+        (V599LLA-lineage clusters: the custom memory service is 16-bit and runs with
+         ABR=1, so 0x18000 and 0x28000 both read bank 1. This command writes a RAM stub,
+         hijacks the custom dispatcher's saved continuation, sets ABR, and copies one
+         256-byte page of the $8000-$FFFF window per run. Bench use only; no EEPROM or
+         I/O is written and a power cycle recovers a wedged cluster.)
     DumpVdoNecRom [FILENAME] (default vdo_nec_rom.bin)
         FILENAME = Optional filename
     DumpVdoNecRomHigh [FILENAME] [START]

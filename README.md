@@ -119,6 +119,16 @@ COMMAND =
         FILENAME = Optional filename
         (MC9S12H256 clusters: reads $0000-$2FFF via KWP title 0x01 without
          the VDO unlock. Protected RAM ranges are left as 0xFF.)
+    DumpVdoBank BANK [FILENAME] [START]
+        BANK = ABR bank to dump (1-7; the V599 firmware uses 1, 2 and 3)
+        FILENAME = Optional filename (default vdo_bankN.bin)
+        START = Optional 0x0000-0x7FFF offset; a non-zero start resumes FILENAME at its
+                current length, so an interrupted dump continues where it stopped
+        (V599LLA-lineage clusters: the custom memory service is 16-bit and runs with
+         ABR=1, so 0x18000 and 0x28000 both read bank 1. This command writes a RAM stub,
+         hijacks the custom dispatcher's saved continuation, sets ABR, and copies one
+         256-byte page of the $8000-$FFFF window per run. Bench use only; no EEPROM or
+         I/O is written and a power cycle recovers a wedged cluster.)
     DumpVdoNecRom [FILENAME] (default vdo_nec_rom.bin)
         FILENAME = Optional filename
     DumpVdoNecRomHigh [FILENAME] [START]
