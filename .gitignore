@@ -345,3 +345,4 @@ healthchecksdb
 
 .DS_Store
 /.qwen
+/PublishToPi.ps1

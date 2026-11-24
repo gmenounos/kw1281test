@@ -6,7 +6,7 @@ If you have a legacy Ross-Tech USB cable, you can probably use that cable by
 installing the Virtual COM Port drivers: https://www.ross-tech.com/vag-com/usb/virtual-com-port.php
 Functionality includes reading/writing the EEPROMs of VW MKIV Golf/Jetta/Beetle/Passat instrument clusters and Comfort Control Modules, reading and clearing fault codes, changing the software coding of modules, performing an actuator test of various modules and retrieving the SAFE code of the Delco Premium V radio.
 
-The tool is written in C#, targetting .NET 10.0 and runs under Windows 10/11 (most serial ports), macOS and Linux (macOS/Linux need an FTDI serial port and D2xx drivers). It may also run under
+The tool is written in C#, targets .NET 10.0 and .NET 11.0, and runs under Windows 10/11 (most serial ports), macOS and Linux (macOS/Linux need an FTDI serial port and D2xx drivers). It may also run under
 Windows 10/11.
 
 You can download a precompiled version for Windows, macOS and Linux from the Releases page: https://github.com/gmenounos/kw1281test/releases/
@@ -24,10 +24,11 @@ which you can find here: https://dotnet.microsoft.com/download
 and unzip it into a folder on your computer.
 
 3. Open up a command prompt on your computer and go into the folder where you unzipped
-the source code. Type `dotnet build` to build the tool.
+the source code. Type `dotnet build` to build both target frameworks.
 Or, load up the project in Visual Studio and Ctrl-Shift-B.
 
-4. You can run the tool by typing `dotnet run`
+4. Run one target framework by typing `dotnet run --framework net10.0` or
+`dotnet run --framework net11.0`.
 
 ```
 Usage: KW1281Test PORT BAUD ADDRESS COMMAND [args]

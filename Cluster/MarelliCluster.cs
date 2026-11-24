@@ -9,6 +9,16 @@ namespace BitFab.KW1281Test.Cluster;
 
 partial class MarelliCluster : ICluster
 {
+    private const ushort SmallEepromEntryPoint = 0x0200;
+    private const ushort SmallEepromRegisterBlock = 0x0800;
+    private const ushort SmallEepromAddress = 0x0C00; // 3072
+    private const ushort SmallEepromSize = 0x0400; // 1024
+
+    private const ushort LargeEepromEntryPoint = 0x0400;
+    private const ushort LargeEepromRegisterBlock = 0x2000;
+    private const ushort LargeEepromAddress = 0x3800; // 14336
+    private const ushort LargeEepromSize = 0x0800; // 2048
+
     public void UnlockForEepromReadWrite()
     {
         // Nothing to do
@@ -19,13 +29,13 @@ partial class MarelliCluster : ICluster
         address ??= GetDefaultAddress();
         if (length is null)
         {
-            if (address == 0x0C00)
+            if (address == SmallEepromAddress)
             {
-                length = 1024;
+                length = SmallEepromSize;
             }
             else
             {
-                length = 2048;
+                length = LargeEepromSize;
             }
         }
 
@@ -73,7 +83,7 @@ partial class MarelliCluster : ICluster
             Log.WriteLine("128 KB paged flash: dumping 8 x 16 KB pages through the PPAGE window.");
             return DumpBankedFlash(
                 dumpFileName,
-                IsFirstGenAudiTT() ? (byte)0x00 : (byte)0x18,
+                LargeEepromEntryPoint >> 8,
                 divisor,
                 hostBaud);
         }
@@ -100,22 +110,22 @@ partial class MarelliCluster : ICluster
         if (HasSmallEeprom())
         {
             Log.WriteLine("Known cluster. Appears to have the small EEPROM.");
-            return 0x0C00; // 3072
+            return SmallEepromAddress;
         }
         else if (HasLargeEeprom())
         {
             Log.WriteLine("Known cluster. Appears to have the large EEPROM.");
-            return 0x3800; // 14336
+            return LargeEepromAddress;
         }
         else if (VinRegex.IsMatch(_ecuInfo))
         {
             Log.WriteLine("Unknown cluster. Appears to have the large EEPROM.");
-            return 0x3800; // 14336
+            return LargeEepromAddress;
         }
         else if (_ecuInfo.Contains("Ident.-Nr. Wegfahrs.:"))
         {
             Log.WriteLine("Unknown cluster. Appears to have the small EEPROM.");
-            return 0x0C00; // 3072
+            return SmallEepromAddress;
         }
         else
         {
@@ -126,8 +136,8 @@ partial class MarelliCluster : ICluster
             Log.WriteLine();
 
             var prefix = string.Join(' ', Program.CommandAndArgs.Take(4));
-            Log.WriteLine($"{prefix} DumpMarelliMem 3072 1024");
-            Log.WriteLine($"{prefix} DumpMarelliMem 14336 2048");
+            Log.WriteLine($"{prefix} DumpMarelliMem {SmallEepromAddress} {SmallEepromSize}");
+            Log.WriteLine($"{prefix} DumpMarelliMem {LargeEepromAddress} {LargeEepromSize}");
 
             throw new UnableToProceedException();
         }
@@ -144,35 +154,29 @@ partial class MarelliCluster : ICluster
         byte entryH; // High byte of code entry point
         byte regBlockH; // High byte of register block
 
-        if (address == 0x3800 && IsFirstGenAudiTT())
+        if (HasSmallEeprom())
         {
-            Log.WriteLine("Cluster appears to be first gen Audi TT with large EEPROM.");
-            entryH = 0x00; // $0000
-            regBlockH = 0x20;
-        }
-        else if (HasSmallEeprom())
-        {
-            entryH = 0x02; // $0200
-            regBlockH = 0x08; // $0800
+            entryH = SmallEepromEntryPoint >> 8;
+            regBlockH = SmallEepromRegisterBlock >> 8;
         }
         else if (HasLargeEeprom())
         {
-            entryH = 0x18; // $1800
-            regBlockH = 0x20; // $2000
+            entryH = LargeEepromEntryPoint >> 8;
+            regBlockH = LargeEepromRegisterBlock >> 8;
         }
-        else if (address == 3072 && count == 1024)
+        else if (address == SmallEepromAddress && count == SmallEepromSize)
         {
             Log.WriteLine("Untested cluster version! You may need to disconnect your battery if this fails.");
 
-            entryH = 0x02;
-            regBlockH = 0x08;
+            entryH = SmallEepromEntryPoint >> 8;
+            regBlockH = SmallEepromRegisterBlock >> 8;
         }
-        else if (address == 14336 && count == 2048)
+        else if (address == LargeEepromAddress && count == LargeEepromSize)
         {
             Log.WriteLine("Untested cluster version! You may need to disconnect your battery if this fails.");
 
-            entryH = 0x18;
-            regBlockH = 0x20;
+            entryH = LargeEepromEntryPoint >> 8;
+            regBlockH = LargeEepromRegisterBlock >> 8;
         }
         else
         {
@@ -343,7 +347,7 @@ partial class MarelliCluster : ICluster
     private string DumpBankedFlash(
         string filename, byte entryH, byte baudDivisor, int hostBaud)
     {
-        const byte regBlockH = 0x20;    // DG128A: registers at $2000
+        const byte regBlockH = LargeEepromRegisterBlock >> 8; // DG128A: registers at $2000
         const byte ppageOffset = 0xFF;  // DG128A PPAGE is at register base + $FF
         const int pageSize = 0x4000;    // 16 KB
         const int pageCount = 8;        // 128 KB
@@ -490,8 +494,8 @@ partial class MarelliCluster : ICluster
     /// </summary>
     private string DumpFlatFlash(string filename, byte baudDivisor, int hostBaud)
     {
-        const byte entryH = 0x02;      // upload and run at $0200
-        const byte regBlockH = 0x08;   // registers at $0800
+        const byte entryH = SmallEepromEntryPoint >> 8; // upload and run at $0200
+        const byte regBlockH = SmallEepromRegisterBlock >> 8; // registers at $0800
         const ushort start = 0x1000;   // first flash byte on this part
         const ushort count = 0xF000;   // $1000-$FFFF; end $10000 wraps to $0000
 
@@ -578,11 +582,6 @@ partial class MarelliCluster : ICluster
         }
 
         return true;
-    }
-
-    private bool IsFirstGenAudiTT()
-    {
-        return _ecuInfo.StartsWith("8N");
     }
 
     private bool WriteMarelliBlockAndReadAck(byte[] data)
