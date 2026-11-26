@@ -672,6 +672,7 @@ partial class MarelliCluster : ICluster
         "8N1920880H  KOMBI+WEGFAHRS. M73 D56",  // Audi TT
         "8N1920930E  KOMBI+WEGFAHRS. M73 D10",  // Audi TT
         "8N1920930J  KOMBI+WEGFAHRS. M73 D56",  // Audi TT
+        "8N1920930Q  KOMBI+WEGFAHRS. M73 D14",  // Audi TT
         "8N1920980A  KOMBI+WEGFAHRS. M73 D04",  // Audi TT (needs unlock frame)
         "8N1920980E  KOMBI+WEGFAHRS. M73 D14",  // Audi TT
         "8N2919910A  KOMBI+WEGFAHRS. M73 D29",  // Audi TT
