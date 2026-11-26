@@ -636,12 +636,13 @@ partial class MarelliCluster : ICluster
 
     private readonly string[] _smallEepromEcus =
     [
+        "1C0919861A",   // Beetle 1C0919861AX M73 V26"
         "1C0919861C",   // KOMBI+WEGFAHRS. M73 V23
         "1C0920800",    // Beetle 1C0920800C M73 V07
         "1C0920806",    // Beetle 1C0920806G M73 V03
         "1C0920901",    // Beetle 1C0920901C M73 V07
         "1C0920905",    // Beetle 1C0920905F M73 V03
-        "1C0920906",    // Beetle 1C0920906A M73 V03
+        "1C0920906",    // Beetle 1C0920906A, 1C0920906F M73 V03
         "8N1919860C  KOMBI+WEGFAHRS. M73 D22",  // Audi TT
         "8N1919860C  KOMBI+WEGFAHRS. M73 D23",  // Audi TT
         "8N1919880E  KOMBI+WEGFAHRS. M73 D23",  // Audi TT
@@ -664,6 +665,7 @@ partial class MarelliCluster : ICluster
         "8L0920900E",   // KOMBI+WEGFAHRS. M73 D56
         "8N1919860C  KOMBI+WEGFAHRS. M73 D29",  // Audi TT
         "8N1919880E  KOMBI+WEGFAHRS. M73 D26",  // Audi TT
+        "8N1919880E  KOMBI+WEGFAHRS. M73 D29",  // Audi TT
         "8N1919880E  KOMBI+WEGFAHRS. M73 D30",  // Audi TT
         "8N1920860J  KOMBI+WEGFAHRS. M73 D56",  // Audi TT
         "8N1920880D  KOMBI+WEGFAHRS. M73 D10",  // Audi TT
